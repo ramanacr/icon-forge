@@ -1,0 +1,14 @@
+{
+  "name": "@iconforge/application",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@iconforge/commands": "workspace:*",
+    "@iconforge/project-model": "workspace:*",
+    "@noble/hashes": "2.4.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

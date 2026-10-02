@@ -4,6 +4,6 @@ import { generateSchema } from '../../scripts/schema-tools.mjs';
 
 generateSchema({
   root: dirname(fileURLToPath(import.meta.url)),
-  source: 'src/types.ts', type: 'ProjectV1', name: 'project',
+  source: 'src/project.ts', type: 'ProjectCommand', name: 'command',
   check: process.argv.includes('--check'),
 });

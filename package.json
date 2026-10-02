@@ -7,14 +7,15 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "schema:generate": "node packages/project-model/generate-schema.mjs",
-    "schema:check": "node packages/project-model/generate-schema.mjs --check",
+    "schema:generate": "node packages/project-model/generate-schema.mjs && node packages/commands/generate-schema.mjs",
+    "schema:check": "node packages/project-model/generate-schema.mjs --check && node packages/commands/generate-schema.mjs --check",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "nx": "nx"
   },
   "devDependencies": {
     "@types/node": "^24.19.0",
+    "ajv": "8.17.1",
     "nx": "23.2.1",
     "ts-json-schema-generator": "2.9.0",
     "typescript": "6.0.3",

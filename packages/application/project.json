@@ -1,0 +1,9 @@
+{
+  "name": "application",
+  "tags": ["scope:core", "type:lib"],
+  "implicitDependencies": ["project-model", "commands"],
+  "targets": {
+    "test": { "command": "vitest run packages/application" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

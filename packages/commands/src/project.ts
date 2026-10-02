@@ -1,4 +1,4 @@
-import { assertProject, type DesignSystemV1, type ProjectV1, type UUID } from '@iconforge/project-model';
+import { assertProject, type DesignSystemV1, type IconV1, type ProjectV1, type UUID } from '@iconforge/project-model';
 
 interface EnvelopeBase {
   commandVersion: '1.0';
@@ -14,6 +14,9 @@ interface EnvelopeBase {
 export type ProjectCommand = EnvelopeBase & (
   | { type: 'project.create'; payload: { id: UUID; name: string; designSystem?: DesignSystemV1 } }
   | { type: 'project.rename'; payload: { name: string } }
+  | { type: 'icon.add'; payload: { icon: IconV1 } }
+  | { type: 'icon.rename'; payload: { iconId: UUID; name: string } }
+  | { type: 'icon.remove'; payload: { iconId: UUID } }
 );
 
 export type HistoryCommand = EnvelopeBase & (
@@ -23,12 +26,9 @@ export type HistoryCommand = EnvelopeBase & (
 
 export type CommandEnvelopeV1 = ProjectCommand | HistoryCommand;
 
-export interface StructuralPatch {
-  op: 'replace';
-  path: string[];
-  before: unknown;
-  after: unknown;
-}
+export type StructuralPatch =
+  | { op: 'replace'; path: string[]; before: unknown; after: unknown }
+  | { op: 'insert' | 'remove'; path: string[]; value: unknown };
 
 export interface HandlerResult {
   project: ProjectV1;
@@ -81,13 +81,56 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
   if (command.expectedRevision !== undefined && command.expectedRevision !== project.revision) {
     throw new TypeError('revision.conflict');
   }
-  validName(command.payload.name);
-  const next = assertProject({ ...project, name: command.payload.name, revision: project.revision + 1 });
+  if (command.type === 'project.rename') {
+    validName(command.payload.name);
+    const next = assertProject({ ...project, name: command.payload.name, revision: project.revision + 1 });
+    return {
+      project: next,
+      patches: [{ op: 'replace', path: ['name'], before: project.name, after: next.name }],
+      inversePatches: [{ op: 'replace', path: ['name'], before: next.name, after: project.name }],
+      result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
+        changedIds: [project.id], patchSummary: { added: 0, updated: 1, removed: 0, iconsAffected: [] }, diagnostics: [] },
+    };
+  }
+  let icons: IconV1[];
+  let count: { added: number; updated: number; removed: number };
+  let iconId: UUID;
+  let patches: StructuralPatch[];
+  let inversePatches: StructuralPatch[];
+  if (command.type === 'icon.add') {
+    iconId = command.payload.icon.id;
+    const path = ['icons', String(project.icons.length)];
+    icons = [...project.icons, structuredClone(command.payload.icon)];
+    count = { added: 1, updated: 0, removed: 0 };
+    patches = [{ op: 'insert', path, value: command.payload.icon }];
+    inversePatches = [{ op: 'remove', path, value: command.payload.icon }];
+  } else {
+    iconId = command.payload.iconId;
+    const index = project.icons.findIndex(icon => icon.id === iconId);
+    if (index < 0) throw new TypeError('icon.not-found');
+    icons = structuredClone(project.icons);
+    if (command.type === 'icon.remove') {
+      const removed = icons[index]!;
+      icons.splice(index, 1);
+      count = { added: 0, updated: 0, removed: 1 };
+      const path = ['icons', String(index)];
+      patches = [{ op: 'remove', path, value: removed }];
+      inversePatches = [{ op: 'insert', path, value: removed }];
+    } else {
+      const before = icons[index]!.name;
+      icons[index] = { ...icons[index]!, name: command.payload.name };
+      count = { added: 0, updated: 1, removed: 0 };
+      const path = ['icons', String(index), 'name'];
+      patches = [{ op: 'replace', path, before, after: command.payload.name }];
+      inversePatches = [{ op: 'replace', path, before: command.payload.name, after: before }];
+    }
+  }
+  const next = assertProject({ ...project, icons, revision: project.revision + 1 });
   return {
     project: next,
-    patches: [{ op: 'replace', path: ['name'], before: project.name, after: next.name }],
-    inversePatches: [{ op: 'replace', path: ['name'], before: next.name, after: project.name }],
+    patches,
+    inversePatches,
     result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
-      changedIds: [project.id], patchSummary: { added: 0, updated: 1, removed: 0, iconsAffected: [] }, diagnostics: [] },
+      changedIds: [iconId], patchSummary: { ...count, iconsAffected: [iconId] }, diagnostics: [] },
   };
 }

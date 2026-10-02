@@ -6,7 +6,10 @@
   "dependencies": {
     "@iconforge/application": "workspace:*",
     "@iconforge/project-model": "workspace:*",
-    "dexie": "4.4.6"
+    "dexie": "4.4.6",
+    "fflate": "0.8.2"
   },
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts"
+  }
 }

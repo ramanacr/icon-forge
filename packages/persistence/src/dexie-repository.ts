@@ -2,6 +2,7 @@ import { Dexie, type Table } from 'dexie';
 import { assertProject, type ProjectV1 } from '@iconforge/project-model';
 import type { JournalEntry } from '@iconforge/application';
 import type { IProjectRepository, SavedProject } from './contracts.js';
+import { asProjectStorageError } from './storage-error.js';
 
 class ProjectDatabase extends Dexie {
   projects!: Table<SavedProject, string>;
@@ -29,25 +30,29 @@ export class DexieProjectRepository implements IProjectRepository {
     if (nextRevision !== expectedRevision + 1 || entry.command.projectId !== id || entry.command.dryRun) {
       throw new TypeError('journal.append.invalid');
     }
-    await this.database.transaction('rw', this.database.projects, async () => {
-      const row = await this.database.projects.get(id);
-      const revision = row?.revision ?? 0;
-      if (revision !== expectedRevision) throw new TypeError('revision.conflict');
-      const next: SavedProject = row
-        ? { ...row, revision: nextRevision, journal: [...row.journal, structuredClone(entry)] }
-        : { id, revision: nextRevision, snapshot: null, journal: [structuredClone(entry)] };
-      await this.database.projects.put(next);
-    });
+    try {
+      await this.database.transaction('rw', this.database.projects, async () => {
+        const row = await this.database.projects.get(id);
+        const revision = row?.revision ?? 0;
+        if (revision !== expectedRevision) throw new TypeError('revision.conflict');
+        const next: SavedProject = row
+          ? { ...row, revision: nextRevision, journal: [...row.journal, structuredClone(entry)] }
+          : { id, revision: nextRevision, snapshot: null, journal: [structuredClone(entry)] };
+        await this.database.projects.put(next);
+      });
+    } catch (error) { throw asProjectStorageError(error); }
   }
 
   async compact(id: string, expectedRevision: number, snapshot: ProjectV1): Promise<void> {
     assertProject(snapshot);
     if (snapshot.id !== id || snapshot.revision !== expectedRevision) throw new TypeError('snapshot.invalid');
-    await this.database.transaction('rw', this.database.projects, async () => {
-      const row = await this.database.projects.get(id);
-      if (!row || row.revision !== expectedRevision) throw new TypeError('revision.conflict');
-      await this.database.projects.put({ id, revision: expectedRevision, snapshot: structuredClone(snapshot), journal: [] });
-    });
+    try {
+      await this.database.transaction('rw', this.database.projects, async () => {
+        const row = await this.database.projects.get(id);
+        if (!row || row.revision !== expectedRevision) throw new TypeError('revision.conflict');
+        await this.database.projects.put({ id, revision: expectedRevision, snapshot: structuredClone(snapshot), journal: [] });
+      });
+    } catch (error) { throw asProjectStorageError(error); }
   }
 
   close(): void { this.database.close(); }

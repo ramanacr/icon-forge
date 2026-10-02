@@ -103,3 +103,39 @@ test('S-06 second tab is read-only until explicit takeover', async ({ browser })
   await first.evaluate(async () => (window as TestWindow).iconForgeLock!.close());
   await context.close();
 });
+
+test('S-06 2,000-icon project survives snapshot, archive and browser restart', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+    const { DexieProjectRepository, encodeProjectArchive, decodeProjectArchive } = await import(new URL('/persistence.js', location.origin).href);
+    const id = '0198e09b-a810-7000-8000-000000000010';
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch({ commandVersion: '1.0', projectId: id, commandId: '0198e09b-a810-7000-8000-000000000011',
+      issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' }, type: 'project.create', payload: { id, name: 'Large' } });
+    const project = dispatcher.project;
+    project.icons = Array.from({ length: 2_000 }, (_, index) => ({
+      id: `0198e09b-a810-7000-8000-${(index + 100).toString(16).padStart(12, '0')}`,
+      name: `icon-${index}`, aliases: [], tags: [], viewBox: [0, 0, 24, 24], nodes: [], variants: [],
+      accessibility: { kind: 'decorative' }, provenanceIds: [],
+    }));
+    const repository = new DexieProjectRepository('iconforge-s06-large');
+    await repository.append(id, 0, 1, dispatcher.journal[0]);
+    await repository.compact(id, 1, project);
+    const archive = await encodeProjectArchive(project);
+    const decoded = await decodeProjectArchive(archive);
+    repository.close();
+    return { id, archiveBytes: archive.length, decodedIcons: decoded.project.icons.length };
+  });
+  expect(result.decodedIcons).toBe(2_000);
+  expect(result.archiveBytes).toBeGreaterThan(1_000);
+  await page.reload();
+  const reopened = await page.evaluate(async id => {
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const repository = new DexieProjectRepository('iconforge-s06-large');
+    const saved = await repository.load(id);
+    repository.close();
+    return { revision: saved?.revision, icons: saved?.snapshot?.icons.length };
+  }, result.id);
+  expect(reopened).toEqual({ revision: 1, icons: 2_000 });
+});

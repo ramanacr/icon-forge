@@ -18,6 +18,6 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 
 The roadmap blocks Phase 1 until S-01 through S-06 pass or recorded adapter swaps satisfy their gates.
 
-## Specification question
+## Resolved specification question
 
-`specs/COMPILER_EXPORTS.md` allows a font profile to merge duotone layers, while normative `specs/SCHEMAS.md` has no `mergeLayers` option. The documented coding rules require architectural review rather than choosing between conflicting contracts.
+The user chose to add optional `mergeLayers` to font-profile options. Its default is `false`, so existing profiles retain the documented duotone export error. The font compiler has not been implemented yet.

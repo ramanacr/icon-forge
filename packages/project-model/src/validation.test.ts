@@ -69,4 +69,16 @@ describe('project validation', () => {
     const cyclic = { ...component, nodes: [{ ...nodes[0], id: '0198e09b-a810-7000-8000-000000000014' }] };
     expect(() => assertProject({ ...emptyProject, components: [cyclic], icons: [icon] })).toThrow();
   });
+
+  it('accepts a font profile that explicitly merges duotone layers', () => {
+    const profile = {
+      id: '0198e09b-a810-7000-8000-000000000020', name: 'web-font', target: 'font',
+      options: { family: 'Medical', formats: ['otf', 'woff2'], unitsPerEm: 1000,
+        puaStart: 57344, ligatures: false, cssPrefix: 'if', mergeLayers: true },
+    };
+    expect(() => assertProject({ ...emptyProject, exportProfiles: [profile] })).not.toThrow();
+    const { mergeLayers: _mergeLayers, ...legacyOptions } = profile.options;
+    expect(() => assertProject({ ...emptyProject, exportProfiles: [{ ...profile, options: legacyOptions }] })).not.toThrow();
+    expect(() => assertProject({ ...emptyProject, exportProfiles: [{ ...profile, options: { ...profile.options, mergeLayers: 'yes' } }] })).toThrow();
+  });
 });

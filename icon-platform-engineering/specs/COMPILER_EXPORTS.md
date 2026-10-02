@@ -42,7 +42,7 @@ Fonts carry only filled contours. Before font compilation each icon is converted
 3. Normalize winding (outer contours one direction, holes opposite) for the target flavour; resolve `evenodd` into nonzero-equivalent contours.
 4. Drop degenerate contours below `QUANTUM` area; report as info.
 5. Map viewBox → font units: `scale = unitsPerEm / grid.height`; y-flip; baseline at `descender = −round(0.125 × unitsPerEm)` unless overridden.
-Opacity and duotone `secondary` layers are not representable in a monochrome glyph: compile fails with `font.duotone-unsupported` unless the profile opts into "merge layers".
+Opacity and duotone `secondary` layers are not representable in a monochrome glyph: compile fails with `font.duotone-unsupported` unless the font profile sets `options.mergeLayers: true`. When the option is absent, it is `false`.
 
 ### Font compilation (`IFontCompiler`, ADR-023)
 - Required glyphs: `.notdef` (with outline), `space` (U+0020).

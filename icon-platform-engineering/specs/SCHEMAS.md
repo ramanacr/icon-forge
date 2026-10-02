@@ -145,7 +145,7 @@ type ExportProfileV1 =
   | { id: UUID; name: Slug; target: "sprite"; options: { idPrefix: string; precision: 0|1|2|3 } }
   | { id: UUID; name: Slug; target: "png";    options: { sizes: number[]; theme: "light" | "dark"; padding: number } }
   | { id: UUID; name: Slug; target: "ico";    options: { sizes: (16|24|32|48|64|128|256)[]; theme: "light" | "dark" } }
-  | { id: UUID; name: Slug; target: "font";   options: { family: string; formats: ("otf"|"ttf"|"woff2")[]; unitsPerEm: 1000|1024|2048; puaStart: number; ligatures: boolean; cssPrefix: string } }
+  | { id: UUID; name: Slug; target: "font";   options: { family: string; formats: ("otf"|"ttf"|"woff2")[]; unitsPerEm: 1000|1024|2048; puaStart: number; ligatures: boolean; cssPrefix: string; mergeLayers?: boolean } }
   | { id: UUID; name: Slug; target: "project"; options: Record<string, never> };
 
 type ProvenanceRecordV1 = {
@@ -154,6 +154,8 @@ type ProvenanceRecordV1 = {
   attribution?: string; originalSha256?: string; importedAt?: string; modified: boolean;
 };
 ```
+
+For font profiles, `mergeLayers` defaults to `false` when absent. A `true` value explicitly opts into merging duotone layers into one monochrome glyph. Existing profile data without the field keeps the error behavior and needs no migration.
 
 ## 6. Command envelope (ADR-026)
 

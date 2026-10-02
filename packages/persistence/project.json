@@ -1,0 +1,9 @@
+{
+  "name": "persistence",
+  "tags": ["scope:infra", "type:adapter"],
+  "implicitDependencies": ["application", "project-model"],
+  "targets": {
+    "test": { "command": "vitest run packages/persistence" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

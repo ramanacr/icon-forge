@@ -1,0 +1,12 @@
+{
+  "name": "@iconforge/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@iconforge/application": "workspace:*",
+    "@iconforge/project-model": "workspace:*",
+    "dexie": "4.4.6"
+  },
+  "exports": { ".": "./src/index.ts" }
+}

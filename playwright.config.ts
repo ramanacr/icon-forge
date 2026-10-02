@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests/parity',
+  testDir: './tests',
   testMatch: '**/*.pw.ts',
   fullyParallel: true,
   projects: [

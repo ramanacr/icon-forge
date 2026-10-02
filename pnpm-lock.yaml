@@ -57,6 +57,18 @@ importers:
         specifier: 8.17.1
         version: 8.17.1
 
+  packages/persistence:
+    dependencies:
+      '@iconforge/application':
+        specifier: workspace:*
+        version: link:../application
+      '@iconforge/project-model':
+        specifier: workspace:*
+        version: link:../project-model
+      dexie:
+        specifier: 4.4.6
+        version: 4.4.6
+
   packages/project-model:
     dependencies:
       ajv:
@@ -582,6 +594,9 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  dexie@4.4.6:
+    resolution: {integrity: sha512-hJP/BO6mjB+tX6hToIO1kmxYLNmun90wYbfcoAoLpKEyDYal/k33dg0TAfoUe2TDsbbLoVIzljJ3BN2UbR5EOg==}
 
   dotenv-expand@12.0.3:
     resolution: {integrity: sha512-uc47g4b+4k/M/SeaW1y4OApx+mtLWl92l5LMPP0GNXctZqELk+YGgOPIIC5elYmUH4OuoK3JLhuRUYegeySiFA==}
@@ -1606,6 +1621,8 @@ snapshots:
   delayed-stream@1.0.0: {}
 
   detect-libc@2.1.2: {}
+
+  dexie@4.4.6: {}
 
   dotenv-expand@12.0.3:
     dependencies:

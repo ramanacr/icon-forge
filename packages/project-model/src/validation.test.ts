@@ -81,4 +81,42 @@ describe('project validation', () => {
     expect(() => assertProject({ ...emptyProject, exportProfiles: [{ ...profile, options: legacyOptions }] })).not.toThrow();
     expect(() => assertProject({ ...emptyProject, exportProfiles: [{ ...profile, options: { ...profile.options, mergeLayers: 'yes' } }] })).toThrow();
   });
+
+  it('enforces project name and color-token constraints on loaded files', () => {
+    expect(() => assertProject({ ...emptyProject, name: '' })).toThrow();
+    expect(() => assertProject({ ...emptyProject, tokens: [{ name: 'accent', light: 'red' }] })).toThrow();
+    expect(() => assertProject({ ...emptyProject, tokens: [{ name: 'accent', light: '#123456' }] })).not.toThrow();
+  });
+
+  it('rejects invalid rectangle radii and malformed polyline coordinates', () => {
+    const rect = { id: '0198e09b-a810-7000-8000-000000000031', type: 'rect', visible: true, locked: false,
+      x: 0, y: 0, width: 10, height: 8, rx: 6, ry: 1 };
+    const icon = { id: '0198e09b-a810-7000-8000-000000000030', name: 'shape', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [rect], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    expect(() => assertProject({ ...emptyProject, icons: [icon] })).toThrow();
+    const polyline = { id: rect.id, type: 'polyline', visible: true, locked: false, closed: false, points: [0, 0, 1] };
+    expect(() => assertProject({ ...emptyProject, icons: [{ ...icon, nodes: [polyline] }] })).toThrow();
+  });
+
+  it('requires paint references to resolve to a unique token', () => {
+    const token = { name: 'accent', light: '#123456' };
+    expect(() => assertProject({ ...emptyProject, tokens: [token, token] })).toThrow();
+    expect(() => assertProject({ ...emptyProject, designSystem: { ...emptyProject.designSystem, defaultPaintToken: 'missing' } })).toThrow();
+    const node = { id: '0198e09b-a810-7000-8000-000000000041', type: 'rect', visible: true, locked: false,
+      x: 0, y: 0, width: 10, height: 8, rx: 1, ry: 1, fill: { kind: 'token', token: 'missing' } };
+    const icon = { id: '0198e09b-a810-7000-8000-000000000040', name: 'shape', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [node], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    expect(() => assertProject({ ...emptyProject, icons: [icon] })).toThrow();
+    node.fill.token = 'accent';
+    expect(() => assertProject({ ...emptyProject, tokens: [token], icons: [icon] })).not.toThrow();
+  });
+
+  it('rejects out-of-range node opacity and nonpositive viewBox dimensions', () => {
+    const node = { id: '0198e09b-a810-7000-8000-000000000051', type: 'rect', visible: true, locked: false,
+      x: 0, y: 0, width: 10, height: 8, rx: 1, ry: 1, opacity: 1.5 };
+    const icon = { id: '0198e09b-a810-7000-8000-000000000050', name: 'shape', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [node], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    expect(() => assertProject({ ...emptyProject, icons: [icon] })).toThrow();
+    expect(() => assertProject({ ...emptyProject, icons: [{ ...icon, viewBox: [0, 0, 0, 24], nodes: [{ ...node, opacity: 1 }] }] })).toThrow();
+  });
 });

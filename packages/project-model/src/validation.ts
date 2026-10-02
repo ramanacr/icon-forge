@@ -1,4 +1,4 @@
-import type { ProjectV1, SceneNodeV1 } from './types.js';
+import type { PaintV1, ProjectV1, SceneNodeV1 } from './types.js';
 import validate from './project.validator.mjs';
 import { quantize } from './quantization.js';
 
@@ -7,6 +7,7 @@ export function assertProject(input: unknown): ProjectV1 {
     throw new TypeError(`Invalid project: ${validate.errors?.map(error => `${error.instancePath} ${error.message}`).join('; ')}`);
   }
   const project = input as ProjectV1;
+  if (project.name.length < 1 || project.name.length > 120) throw new TypeError('Invalid project name');
   if (project.revision < 0 || !Number.isInteger(project.revision)) throw new TypeError('Invalid revision');
   if (project.extensions && Object.keys(project.extensions).some(key => !/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/.test(key))) {
     throw new TypeError('Extension keys must be namespaced');
@@ -35,11 +36,29 @@ export function assertProject(input: unknown): ProjectV1 {
     if (name.length > 64 || !slug.test(name)) throw new TypeError(`Invalid slug: ${name}`);
   }
   addId(project.id);
+  const tokenNames = new Set<string>(['currentColor']);
+  function checkPaint(paint: PaintV1): void {
+    if (paint.kind === 'token' && !tokenNames.has(paint.token)) {
+      throw new TypeError(`Missing paint token: ${paint.token}`);
+    }
+  }
   const components = new Map(project.components.map(component => [component.id, component]));
   function checkNodes(nodes: SceneNodeV1[], depth: number): void {
     if (depth > 32) throw new TypeError('Scene nesting exceeds 32');
     for (const node of nodes) {
       addId(node.id);
+      if (node.opacity !== undefined && (node.opacity < 0 || node.opacity > 1)) {
+        throw new TypeError('Invalid node opacity');
+      }
+      if (node.type === 'rect' && (node.width < 0 || node.height < 0 || node.rx < 0 || node.ry < 0
+        || node.rx > node.width / 2 || node.ry > node.height / 2)) {
+        throw new TypeError('Invalid rectangle radii');
+      }
+      if (node.type === 'polyline' && (node.points.length < 4 || node.points.length % 2 !== 0)) {
+        throw new TypeError('Invalid polyline points');
+      }
+      if ('fill' in node && node.fill) checkPaint(node.fill);
+      if ('stroke' in node && node.stroke) checkPaint(node.stroke.paint);
       if (node.type === 'group') checkNodes(node.children, depth + 1);
       if (node.type === 'instance') {
         const component = components.get(node.componentId);
@@ -48,8 +67,14 @@ export function assertProject(input: unknown): ProjectV1 {
     }
   }
   for (const token of project.tokens) {
-    if (token.name === 'currentColor') throw new TypeError('currentColor cannot be redefined');
+    if (tokenNames.has(token.name)) throw new TypeError(`Duplicate or reserved color token: ${token.name}`);
+    if (!/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(token.light)
+      || (token.dark !== undefined && !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(token.dark))) {
+      throw new TypeError(`Invalid color token: ${token.name}`);
+    }
+    tokenNames.add(token.name);
   }
+  if (!tokenNames.has(project.designSystem.defaultPaintToken)) throw new TypeError('Missing default paint token');
   for (const component of project.components) {
     addId(component.id);
     checkSlug(component.name);
@@ -75,6 +100,7 @@ export function assertProject(input: unknown): ProjectV1 {
   for (const icon of project.icons) {
     addId(icon.id);
     checkSlug(icon.name);
+    if (icon.viewBox[2] <= 0 || icon.viewBox[3] <= 0) throw new TypeError('Invalid viewBox dimensions');
     if (names.has(icon.name)) throw new TypeError(`Duplicate icon name: ${icon.name}`);
     names.add(icon.name);
     for (const alias of icon.aliases) checkSlug(alias);

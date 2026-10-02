@@ -1,0 +1,8 @@
+{
+  "name": "project-model",
+  "tags": ["scope:core", "type:model"],
+  "targets": {
+    "test": { "command": "vitest run packages/project-model" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

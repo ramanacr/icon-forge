@@ -1,0 +1,6 @@
+{
+  "targetDefaults": {
+    "test": { "cache": true },
+    "typecheck": { "cache": true }
+  }
+}

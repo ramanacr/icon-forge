@@ -1,0 +1,1596 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/ProjectV1",
+  "$defs": {
+    "ProjectV1": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "1.0"
+        },
+        "id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "number"
+        },
+        "designSystem": {
+          "$ref": "#/$defs/DesignSystemV1"
+        },
+        "tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ColorTokenV1"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ComponentV1"
+          }
+        },
+        "icons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IconV1"
+          }
+        },
+        "exportProfiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExportProfileV1"
+          }
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProvenanceRecordV1"
+          }
+        },
+        "extensions": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "name",
+        "revision",
+        "designSystem",
+        "tokens",
+        "components",
+        "icons",
+        "exportProfiles",
+        "provenance"
+      ],
+      "additionalProperties": false
+    },
+    "UUID": {
+      "type": "string",
+      "description": "Persisted v1 document types. SCHEMAS.md is the normative contract."
+    },
+    "DesignSystemV1": {
+      "type": "object",
+      "properties": {
+        "grid": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        },
+        "safeArea": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number"
+            },
+            "right": {
+              "type": "number"
+            },
+            "bottom": {
+              "type": "number"
+            },
+            "left": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "additionalProperties": false
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "outline",
+            "filled",
+            "duotone",
+            "custom"
+          ]
+        },
+        "stroke": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "cap": {
+              "$ref": "#/$defs/LineCap"
+            },
+            "join": {
+              "$ref": "#/$defs/LineJoin"
+            },
+            "miterLimit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "width",
+            "cap",
+            "join",
+            "miterLimit"
+          ],
+          "additionalProperties": false
+        },
+        "cornerRadius": {
+          "type": "number"
+        },
+        "defaultPaintToken": {
+          "type": "string"
+        },
+        "naming": {
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "const": "kebab"
+            },
+            "reserved": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "pattern",
+            "reserved"
+          ],
+          "additionalProperties": false
+        },
+        "severities": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Severity"
+          }
+        }
+      },
+      "required": [
+        "grid",
+        "safeArea",
+        "style",
+        "stroke",
+        "cornerRadius",
+        "defaultPaintToken",
+        "naming",
+        "severities"
+      ],
+      "additionalProperties": false
+    },
+    "LineCap": {
+      "type": "string",
+      "enum": [
+        "butt",
+        "round",
+        "square"
+      ]
+    },
+    "LineJoin": {
+      "type": "string",
+      "enum": [
+        "miter",
+        "round",
+        "bevel"
+      ]
+    },
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "off",
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "ColorTokenV1": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "light": {
+          "type": "string"
+        },
+        "dark": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "light"
+      ],
+      "additionalProperties": false
+    },
+    "ComponentV1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "$ref": "#/$defs/Slug"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "number",
+                  "string",
+                  "boolean"
+                ]
+              },
+              "default": {
+                "$ref": "#/$defs/ParamValueV1"
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "default"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SceneNodeV1"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "parameters",
+        "nodes"
+      ],
+      "additionalProperties": false
+    },
+    "Slug": {
+      "type": "string"
+    },
+    "ParamValueV1": {
+      "type": [
+        "number",
+        "string",
+        "boolean"
+      ]
+    },
+    "SceneNodeV1": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "path"
+            },
+            "path": {
+              "$ref": "#/$defs/PathDataV1"
+            },
+            "fill": {
+              "$ref": "#/$defs/PaintV1"
+            },
+            "fillRule": {
+              "type": "string",
+              "enum": [
+                "nonzero",
+                "evenodd"
+              ]
+            },
+            "stroke": {
+              "$ref": "#/$defs/StrokeV1"
+            },
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "locked": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary"
+              ]
+            }
+          },
+          "required": [
+            "fillRule",
+            "id",
+            "locked",
+            "path",
+            "type",
+            "visible"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "group"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SceneNodeV1"
+              }
+            },
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "locked": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary"
+              ]
+            }
+          },
+          "required": [
+            "children",
+            "id",
+            "locked",
+            "type",
+            "visible"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "rect"
+            },
+            "x": {
+              "$ref": "#/$defs/Coord"
+            },
+            "y": {
+              "$ref": "#/$defs/Coord"
+            },
+            "width": {
+              "$ref": "#/$defs/Coord"
+            },
+            "height": {
+              "$ref": "#/$defs/Coord"
+            },
+            "rx": {
+              "$ref": "#/$defs/Coord"
+            },
+            "ry": {
+              "$ref": "#/$defs/Coord"
+            },
+            "fill": {
+              "$ref": "#/$defs/PaintV1"
+            },
+            "stroke": {
+              "$ref": "#/$defs/StrokeV1"
+            },
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "locked": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary"
+              ]
+            }
+          },
+          "required": [
+            "height",
+            "id",
+            "locked",
+            "rx",
+            "ry",
+            "type",
+            "visible",
+            "width",
+            "x",
+            "y"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "ellipse"
+            },
+            "cx": {
+              "$ref": "#/$defs/Coord"
+            },
+            "cy": {
+              "$ref": "#/$defs/Coord"
+            },
+            "rx": {
+              "$ref": "#/$defs/Coord"
+            },
+            "ry": {
+              "$ref": "#/$defs/Coord"
+            },
+            "fill": {
+              "$ref": "#/$defs/PaintV1"
+            },
+            "stroke": {
+              "$ref": "#/$defs/StrokeV1"
+            },
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "locked": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary"
+              ]
+            }
+          },
+          "required": [
+            "cx",
+            "cy",
+            "id",
+            "locked",
+            "rx",
+            "ry",
+            "type",
+            "visible"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "line"
+            },
+            "x1": {
+              "$ref": "#/$defs/Coord"
+            },
+            "y1": {
+              "$ref": "#/$defs/Coord"
+            },
+            "x2": {
+              "$ref": "#/$defs/Coord"
+            },
+            "y2": {
+              "$ref": "#/$defs/Coord"
+            },
+            "stroke": {
+              "$ref": "#/$defs/StrokeV1"
+            },
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "locked": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "locked",
+            "stroke",
+            "type",
+            "visible",
+            "x1",
+            "x2",
+            "y1",
+            "y2"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "polyline"
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coord"
+              }
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "fill": {
+              "$ref": "#/$defs/PaintV1"
+            },
+            "stroke": {
+              "$ref": "#/$defs/StrokeV1"
+            },
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "locked": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary"
+              ]
+            }
+          },
+          "required": [
+            "closed",
+            "id",
+            "locked",
+            "points",
+            "type",
+            "visible"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "instance"
+            },
+            "componentId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "arguments": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/ParamValueV1"
+              }
+            },
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "locked": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary"
+              ]
+            }
+          },
+          "required": [
+            "arguments",
+            "componentId",
+            "id",
+            "locked",
+            "type",
+            "visible"
+          ]
+        }
+      ]
+    },
+    "PathDataV1": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SubpathV1"
+      }
+    },
+    "SubpathV1": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Coord"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SegmentV1"
+          }
+        },
+        "closed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "start",
+        "segments",
+        "closed"
+      ],
+      "additionalProperties": false
+    },
+    "Coord": {
+      "type": "number"
+    },
+    "SegmentV1": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "k": {
+              "type": "string",
+              "const": "L"
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coord"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "k",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "k": {
+              "type": "string",
+              "const": "Q"
+            },
+            "c": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coord"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coord"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "k",
+            "c",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "k": {
+              "type": "string",
+              "const": "C"
+            },
+            "c1": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coord"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "c2": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coord"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coord"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "k",
+            "c1",
+            "c2",
+            "to"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PaintV1": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "none"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "token"
+            },
+            "token": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "token"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "color"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "StrokeV1": {
+      "type": "object",
+      "properties": {
+        "paint": {
+          "$ref": "#/$defs/PaintV1"
+        },
+        "width": {
+          "$ref": "#/$defs/Coord"
+        },
+        "cap": {
+          "$ref": "#/$defs/LineCap"
+        },
+        "join": {
+          "$ref": "#/$defs/LineJoin"
+        },
+        "miterLimit": {
+          "type": "number"
+        },
+        "dash": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Coord"
+          }
+        }
+      },
+      "required": [
+        "paint",
+        "width",
+        "cap",
+        "join",
+        "miterLimit"
+      ],
+      "additionalProperties": false
+    },
+    "MatrixV1": {
+      "type": "array",
+      "minItems": 6,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/Coord"
+        },
+        {
+          "$ref": "#/$defs/Coord"
+        }
+      ],
+      "maxItems": 6
+    },
+    "IconV1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "$ref": "#/$defs/Slug"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Slug"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "category": {
+          "type": "string"
+        },
+        "viewBox": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Coord"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SceneNodeV1"
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VariantV1"
+          }
+        },
+        "accessibility": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "decorative",
+                "informative"
+              ]
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        "font": {
+          "type": "object",
+          "properties": {
+            "codepoint": {
+              "type": "number"
+            },
+            "glyphName": {
+              "type": "string"
+            },
+            "ligature": {
+              "type": "string"
+            },
+            "advance": {
+              "type": "number"
+            },
+            "lsb": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "recipeRef": {
+          "$ref": "#/$defs/UUID"
+        },
+        "provenanceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UUID"
+          }
+        },
+        "ruleOverrides": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Severity"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "aliases",
+        "tags",
+        "viewBox",
+        "nodes",
+        "variants",
+        "accessibility",
+        "provenanceIds"
+      ],
+      "additionalProperties": false
+    },
+    "VariantV1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "$ref": "#/$defs/Slug"
+        },
+        "dimensions": {
+          "type": "object",
+          "properties": {
+            "style": {
+              "type": "string",
+              "enum": [
+                "outline",
+                "filled",
+                "duotone"
+              ]
+            },
+            "size": {
+              "type": "number"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "not": {}
+              }
+            ]
+          }
+        },
+        "overrides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VariantOverrideV1"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "dimensions",
+        "overrides"
+      ],
+      "additionalProperties": false
+    },
+    "VariantOverrideV1": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "hide"
+            },
+            "nodeId": {
+              "$ref": "#/$defs/UUID"
+            }
+          },
+          "required": [
+            "op",
+            "nodeId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "replaceNode"
+            },
+            "nodeId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "node": {
+              "$ref": "#/$defs/SceneNodeV1"
+            }
+          },
+          "required": [
+            "op",
+            "nodeId",
+            "node"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "setStroke"
+            },
+            "nodeId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "stroke": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StrokeV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "nodeId",
+            "stroke"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "setFill"
+            },
+            "nodeId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "fill": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PaintV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "nodeId",
+            "fill"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "setTransform"
+            },
+            "nodeId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "transform": {
+              "$ref": "#/$defs/MatrixV1"
+            }
+          },
+          "required": [
+            "op",
+            "nodeId",
+            "transform"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ExportProfileV1": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "svg"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "precision": {
+                  "type": "number",
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                "sizeAttrs": {
+                  "type": "boolean"
+                },
+                "paintMode": {
+                  "type": "string",
+                  "enum": [
+                    "currentColor",
+                    "tokens",
+                    "resolved"
+                  ]
+                },
+                "metadata": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "precision",
+                "sizeAttrs",
+                "paintMode",
+                "metadata"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "sprite"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "idPrefix": {
+                  "type": "string"
+                },
+                "precision": {
+                  "type": "number",
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ]
+                }
+              },
+              "required": [
+                "idPrefix",
+                "precision"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "png"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "sizes": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "theme": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "dark"
+                  ]
+                },
+                "padding": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sizes",
+                "theme",
+                "padding"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "ico"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "sizes": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "enum": [
+                      16,
+                      24,
+                      32,
+                      48,
+                      64,
+                      128,
+                      256
+                    ]
+                  }
+                },
+                "theme": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "dark"
+                  ]
+                }
+              },
+              "required": [
+                "sizes",
+                "theme"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "font"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "family": {
+                  "type": "string"
+                },
+                "formats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "otf",
+                      "ttf",
+                      "woff2"
+                    ]
+                  }
+                },
+                "unitsPerEm": {
+                  "type": "number",
+                  "enum": [
+                    1000,
+                    1024,
+                    2048
+                  ]
+                },
+                "puaStart": {
+                  "type": "number"
+                },
+                "ligatures": {
+                  "type": "boolean"
+                },
+                "cssPrefix": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "family",
+                "formats",
+                "unitsPerEm",
+                "puaStart",
+                "ligatures",
+                "cssPrefix"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "project"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ProvenanceRecordV1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "source": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "attribution": {
+          "type": "string"
+        },
+        "originalSha256": {
+          "type": "string"
+        },
+        "importedAt": {
+          "type": "string"
+        },
+        "modified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "modified"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

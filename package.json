@@ -10,12 +10,16 @@
     "schema:generate": "node packages/project-model/generate-schema.mjs && node packages/commands/generate-schema.mjs",
     "schema:check": "node packages/project-model/generate-schema.mjs --check && node packages/commands/generate-schema.mjs --check",
     "test": "vitest run",
+    "test:parity": "playwright test",
     "typecheck": "tsc --noEmit",
     "nx": "nx"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.1",
     "@types/node": "^24.19.0",
     "ajv": "8.17.1",
+    "esbuild": "0.28.2",
+    "fast-check": "4.10.2",
     "nx": "23.2.1",
     "ts-json-schema-generator": "2.9.0",
     "typescript": "6.0.3",

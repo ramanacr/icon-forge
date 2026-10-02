@@ -16,6 +16,8 @@ node_modules/
 .nx/
 dist/
 .pnpm-store/
+test-results/
+playwright-report/
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

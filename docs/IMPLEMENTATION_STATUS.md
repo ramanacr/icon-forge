@@ -8,11 +8,11 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 - V1 project types, Draft 2020-12 JSON Schema generation, CSP-safe standalone validator, semantic checks, canonical serialization and half-even quantization.
 - Pure `project.create` and `project.rename` handlers with revision checks and reversible structural patches.
 - Application dispatcher with dry-run, idempotency, SHA-256 checksummed journal, replay, corrupt-tail reporting and defensive state copies.
-- CI checks for frozen installation, generated-schema drift, typecheck and tests.
+- CI checks for frozen installation, generated-schema drift, typecheck, unit tests and a three-browser Playwright parity fixture.
 
 ## Gates still open
 
-- S-01: Node/Chromium parity was observed for a small quantization fixture. Firefox, WebKit, full golden corpus and replay parity are pending.
+- S-01: Node/Chromium parity passes for quantization and a checksummed journal replay fixture; 2,000-run numeric property checks pass. Firefox, WebKit and the full golden corpus are pending. The CI job is configured to install all three browsers, but it has not run on a remote runner yet.
 - S-02 through S-06: no conformance suites have passed yet.
 - Remaining Phase 0 work: full command registry, transactions, undo/redo, migrations, repository persistence, Nx dependency-boundary lint, performance harness and the required spikes.
 

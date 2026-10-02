@@ -1,9 +1,9 @@
 import validate from './command.validator.mjs';
-import type { ProjectCommand } from './project.js';
+import type { CommandEnvelopeV1 } from './project.js';
 
-export function assertProjectCommand(input: unknown): ProjectCommand {
+export function assertCommandEnvelope(input: unknown): CommandEnvelopeV1 {
   if (!validate(input)) {
     throw new TypeError(`Invalid command: ${validate.errors?.map(error => `${error.instancePath} ${error.message}`).join('; ')}`);
   }
-  return input as ProjectCommand;
+  return input as CommandEnvelopeV1;
 }

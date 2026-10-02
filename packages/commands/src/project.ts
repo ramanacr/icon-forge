@@ -16,6 +16,13 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'project.rename'; payload: { name: string } }
 );
 
+export type HistoryCommand = EnvelopeBase & (
+  | { type: 'history.undo'; payload: Record<string, never> }
+  | { type: 'history.redo'; payload: Record<string, never> }
+);
+
+export type CommandEnvelopeV1 = ProjectCommand | HistoryCommand;
+
 export interface StructuralPatch {
   op: 'replace';
   path: string[];

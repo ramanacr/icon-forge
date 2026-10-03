@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { unzipSync, zipSync } from 'fflate';
 import { ProjectDispatcher } from '@iconforge/application';
 import { canonicalJson } from '@iconforge/project-model';
-import { decodeProjectArchive, encodeProjectArchive } from './project-archive.js';
+import { decodeProjectArchive, encodeProjectArchive, openProjectArchive } from './project-archive.js';
 
 const id = '0198e09b-a810-7000-8000-000000000001';
 const dispatcher = new ProjectDispatcher();
@@ -57,5 +57,19 @@ describe('.iconproj ZIP', () => {
     const bomb = zipSync({ ...normal, 'extensions/vendor/large.bin': new Uint8Array(17 * 1024 * 1024) });
     expect(bomb.length).toBeLessThan(100_000);
     await expect(decodeProjectArchive(bomb)).rejects.toThrow('project-archive.size-limit');
+  });
+
+  it('opens a future major project read-only with its original data intact', async () => {
+    const entries = unzipSync(await encodeProjectArchive(project));
+    const future = { ...project, schemaVersion: '2.0', futureField: { value: 7 } };
+    entries['project.json'] = new TextEncoder().encode(canonicalJson(future));
+    const manifest = JSON.parse(new TextDecoder().decode(entries['manifest.json']));
+    manifest.schemaVersion = '2.0';
+    manifest.contentSha256 = createHash('sha256').update(entries['project.json']!).digest('hex');
+    entries['manifest.json'] = new TextEncoder().encode(canonicalJson(manifest));
+    const archive = zipSync(entries);
+    const opened = await openProjectArchive(archive);
+    expect(opened).toMatchObject({ mode: 'read-only', reason: 'future-major', original: future });
+    await expect(decodeProjectArchive(archive)).rejects.toThrow('project-archive.read-only');
   });
 });

@@ -1,5 +1,5 @@
 import { unzipSync, zipSync, type Zippable } from 'fflate';
-import { assertProject, canonicalJson, type ProjectV1 } from '@iconforge/project-model';
+import { assertProject, canonicalJson, openProjectDocument, type MigrationStep, type ProjectV1 } from '@iconforge/project-model';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -12,6 +12,9 @@ export interface ProjectArchive {
   project: ProjectV1;
   attachments: Record<string, Uint8Array>;
 }
+export type ProjectArchiveOpen =
+  | { mode: 'read-write'; project: ProjectV1; migratedFrom: string | null; attachments: Record<string, Uint8Array> }
+  | { mode: 'read-only'; reason: 'future-major' | 'unsupported-version'; original: unknown; attachments: Record<string, Uint8Array> };
 
 async function hexSha256(bytes: Uint8Array): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
@@ -62,7 +65,7 @@ export async function encodeProjectArchive(
   return archive;
 }
 
-export async function decodeProjectArchive(bytes: Uint8Array): Promise<ProjectArchive> {
+export async function openProjectArchive(bytes: Uint8Array, migrations: readonly MigrationStep[] = []): Promise<ProjectArchiveOpen> {
   if (bytes.length > MAX_ARCHIVE_BYTES) throw new TypeError('project-archive.size-limit');
   const names = new Set<string>();
   let totalSize = 0;
@@ -88,10 +91,11 @@ export async function decodeProjectArchive(bytes: Uint8Array): Promise<ProjectAr
     || !('contentSha256' in manifest) || manifest.contentSha256 !== await hexSha256(projectBytes)) {
     throw new TypeError('project-archive.hash-mismatch');
   }
-  const project = assertProject(JSON.parse(decoder.decode(projectBytes)));
-  if (!('projectId' in manifest) || manifest.projectId !== project.id
-    || !('schemaVersion' in manifest) || manifest.schemaVersion !== project.schemaVersion
-    || decoder.decode(projectBytes) !== canonicalJson(project)) throw new TypeError('project-archive.invalid-manifest');
+  const document: unknown = JSON.parse(decoder.decode(projectBytes));
+  if (typeof document !== 'object' || document === null || !('id' in document) || !('schemaVersion' in document)
+    || !('projectId' in manifest) || manifest.projectId !== document.id
+    || !('schemaVersion' in manifest) || manifest.schemaVersion !== document.schemaVersion
+    || decoder.decode(projectBytes) !== canonicalJson(document)) throw new TypeError('project-archive.invalid-manifest');
   const attachments: Record<string, Uint8Array> = {};
   for (const [path, data] of Object.entries(files)) {
     if (path !== 'manifest.json' && path !== 'project.json') {
@@ -99,5 +103,11 @@ export async function decodeProjectArchive(bytes: Uint8Array): Promise<ProjectAr
       attachments[path] = data;
     }
   }
-  return { project, attachments };
+  return { ...openProjectDocument(document, migrations), attachments };
+}
+
+export async function decodeProjectArchive(bytes: Uint8Array): Promise<ProjectArchive> {
+  const opened = await openProjectArchive(bytes);
+  if (opened.mode === 'read-only') throw new TypeError('project-archive.read-only');
+  return { project: opened.project, attachments: opened.attachments };
 }

@@ -6,6 +6,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 
 - pnpm 11 / Nx workspace with Node 24 and TypeScript 6.0. Tagged package dependencies are enforced by Nx ESLint in CI; a forbidden import probe was rejected.
 - V1 project types, Draft 2020-12 JSON Schema generation, CSP-safe standalone validator, semantic checks, canonical serialization and half-even quantization.
+- Pure ordered migration framework with final-schema validation and read-only opening of future-major project documents, including `.iconproj` containers. There is no historical production version to migrate yet.
 - Pure project create/rename/design-system update, token upsert/remove and icon add/rename/remove handlers with revision checks and reversible structural patches. Icon and token patches address a single array entry or field to keep journals bounded; token removal checks references.
 - Application dispatcher with dry-run, idempotency, revisioned undo/redo, structural patches persisted in the SHA-256 checksummed journal, replay, corrupt-tail reporting and defensive state copies. Replay fixtures cover 1, 200 and 5,000 commands.
 - IndexedDB repository adapter with atomic revision-checked journal append, snapshot compaction and corrupt-tail truncation; browser-tested reload, two-tab Web Lock takeover and read-only revision announcements in Chromium.
@@ -20,7 +21,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 - S-03 and S-05: no conformance suites have passed yet.
 - S-04: resvg WASM in a Chromium worker produces byte-identical PNGs to Node across nine fixed sizes from 16–512 px, with correct alpha for the fixture, a local 512 px render under 250 ms and a gzipped WASM below 1.5 MB. Other browsers and a broader image corpus remain pending, so the gate has not passed.
 - S-06: Chromium append/reload, stale-write rejection, compaction, corrupt-tail recovery, two-tab takeover, revision announcements, 2,000-icon save/load, forced quota and interrupted-tab atomicity pass. Persistence-status and file-save adapters pass unit tests and mocked browser adapter checks. A deterministic fault during an in-flight transaction, real native picker/download behaviour, Safari install/non-install documentation and Firefox/WebKit checks are pending.
-- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, migrations, component/variant SVG expansion, remaining repository durability features, performance harness and the required spikes.
+- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, future production migration fixtures, component/variant SVG expansion, remaining repository durability features, performance harness and the required spikes.
 
 The roadmap blocks Phase 1 until S-01 through S-06 pass or recorded adapter swaps satisfy their gates.
 

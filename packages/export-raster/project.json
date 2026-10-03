@@ -1,0 +1,8 @@
+{
+  "name": "export-raster",
+  "tags": ["scope:infra", "type:adapter", "layer:export-raster"],
+  "targets": {
+    "test": { "command": "vitest run packages/export-raster" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

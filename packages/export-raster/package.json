@@ -1,0 +1,8 @@
+{
+  "name": "@iconforge/export-raster",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@resvg/resvg-wasm": "2.6.2" },
+  "exports": { ".": "./src/index.ts" }
+}

@@ -200,3 +200,59 @@ test('S-06 browser file-save adapters only report success after writing', async 
     fallbackMethod: 'download', sameBytes: true });
   expect(['persistent', 'best-effort', 'unsupported']).toContain(result.durability);
 });
+
+test('S-06 quota failure leaves no partial committed project', async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'CDP quota override is Chromium-only');
+  await page.goto(baseUrl);
+  const session = await context.newCDPSession(page);
+  await session.send('Storage.overrideQuotaForOrigin', { origin: baseUrl, quotaSize: 1 });
+  try {
+    const result = await page.evaluate(async () => {
+      const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+      const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+      const id = '0198e09b-a810-7000-8000-000000000050';
+      const dispatcher = new ProjectDispatcher();
+      dispatcher.dispatch({ commandVersion: '1.0', projectId: id, commandId: '0198e09b-a810-7000-8000-000000000051',
+        issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' }, type: 'project.create', payload: { id, name: 'Medical' } });
+      const repository = new DexieProjectRepository('iconforge-s06-quota');
+      let errorCode = '';
+      try { await repository.append(id, 0, 1, dispatcher.journal[0]); }
+      catch (error) { errorCode = typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+        ? error.code : error instanceof Error ? error.name : ''; }
+      const saved = await repository.load(id);
+      repository.close();
+      return { errorCode, saved };
+    });
+    expect(result.errorCode).toBe('quota-exceeded');
+    expect(result.saved).toBeNull();
+  } finally {
+    await session.send('Storage.overrideQuotaForOrigin', { origin: baseUrl });
+    await session.detach();
+  }
+});
+
+test('S-06 closing a tab during append leaves an atomic journal state', async ({ page, context }) => {
+  await page.goto(baseUrl);
+  const id = '0198e09b-a810-7000-8000-000000000060';
+  await page.evaluate(async id => {
+    const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch({ commandVersion: '1.0', projectId: id, commandId: '0198e09b-a810-7000-8000-000000000061',
+      issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' }, type: 'project.create', payload: { id, name: 'Medical' } });
+    const repository = new DexieProjectRepository('iconforge-s06-interrupted');
+    void repository.append(id, 0, 1, dispatcher.journal[0]).catch(() => {});
+  }, id);
+  await page.close();
+  const reopened = await context.newPage();
+  await reopened.goto(baseUrl);
+  const saved = await reopened.evaluate(async id => {
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const repository = new DexieProjectRepository('iconforge-s06-interrupted');
+    const row = await repository.load(id);
+    repository.close();
+    return row === null ? null : { revision: row.revision, entries: row.journal.length, snapshot: row.snapshot };
+  }, id);
+  expect(saved === null || (saved.revision === 1 && saved.entries === 1 && saved.snapshot === null)).toBe(true);
+  await reopened.close();
+});

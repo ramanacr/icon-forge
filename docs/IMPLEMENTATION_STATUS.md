@@ -10,14 +10,15 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 - Application dispatcher with dry-run, idempotency, revisioned undo/redo, structural patches persisted in the SHA-256 checksummed journal, replay, corrupt-tail reporting and defensive state copies. Replay fixtures cover 1, 200 and 5,000 commands.
 - IndexedDB repository adapter with atomic revision-checked journal append, snapshot compaction and corrupt-tail truncation; browser-tested reload and two-tab Web Lock takeover in Chromium.
 - Persistent-storage status request, quota-error classification, deterministic `.iconproj` ZIP with SHA-256 project and original hashes, and native-file/download save adapter. Chromium passes a 2,000-icon snapshot and archive round trip.
+- Pure SVG primitive serializer with escaped accessibility text, canonical paint and path output, precision fallback for narrow closed segments, and a Node/Chromium golden hash. Archive extraction enforces path, entry count and byte limits before decompression.
 - CI checks for frozen installation, generated-schema drift, typecheck, unit tests and a three-browser Playwright parity fixture.
 
 ## Gates still open
 
-- S-01: Node/Chromium parity passes for quantization and a checksummed journal replay fixture; 2,000-run numeric property checks pass. Firefox, WebKit and the full golden corpus are pending. The CI job is configured to install all three browsers, but it has not run on a remote runner yet.
+- S-01: Node/Chromium parity passes for quantization, checksummed journal replay and one canonical SVG fixture; 2,000-run numeric property checks pass. Firefox, WebKit and the full golden corpus are pending. The CI job is configured to install all three browsers, but it has not run on a remote runner yet.
 - S-02 through S-05: no conformance suites have passed yet.
 - S-06: Chromium append/reload, stale-write rejection, compaction, corrupt-tail recovery, two-tab takeover and 2,000-icon save/load pass. Persistence-status and file-save adapters pass unit tests and mocked browser adapter checks. Forced quota, crash-mid-write, real native picker/download behaviour, Safari install/non-install documentation and Firefox/WebKit checks are pending.
-- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, migrations, remaining repository durability features, performance harness and the required spikes.
+- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, migrations, component/variant SVG expansion, remaining repository durability features, performance harness and the required spikes.
 
 The roadmap blocks Phase 1 until S-01 through S-06 pass or recorded adapter swaps satisfy their gates.
 

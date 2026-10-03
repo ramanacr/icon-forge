@@ -66,6 +66,12 @@ importers:
         specifier: 8.17.1
         version: 8.17.1
 
+  packages/compiler-core:
+    dependencies:
+      '@iconforge/project-model':
+        specifier: workspace:*
+        version: link:../project-model
+
   packages/persistence:
     dependencies:
       '@iconforge/application':

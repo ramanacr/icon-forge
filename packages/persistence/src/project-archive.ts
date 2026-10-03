@@ -4,6 +4,9 @@ import { assertProject, canonicalJson, type ProjectV1 } from '@iconforge/project
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 const ZIP_EPOCH = new Date('1980-01-01T00:00:00Z');
+const MAX_ENTRY_BYTES = 16 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
+const MAX_ENTRIES = 10_000;
 
 export interface ProjectArchive {
   project: ProjectV1;
@@ -33,24 +36,47 @@ export async function encodeProjectArchive(
 ): Promise<Uint8Array> {
   assertProject(project);
   const projectBytes = encoder.encode(canonicalJson(project));
+  if (projectBytes.length > MAX_ENTRY_BYTES || Object.keys(attachments).length + 2 > MAX_ENTRIES) {
+    throw new TypeError('project-archive.size-limit');
+  }
   const manifest = {
     format: 'iconforge-project', formatVersion: 1, schemaVersion: project.schemaVersion,
     projectId: project.id, contentSha256: await hexSha256(projectBytes),
   };
+  const manifestBytes = encoder.encode(canonicalJson(manifest));
   const files: Zippable = {
-    'manifest.json': encoder.encode(canonicalJson(manifest)),
+    'manifest.json': manifestBytes,
     'project.json': projectBytes,
   };
+  let totalSize = projectBytes.length + manifestBytes.length;
   for (const path of Object.keys(attachments).sort()) {
     assertAttachmentPath(path);
+    if (attachments[path]!.length > MAX_ENTRY_BYTES) throw new TypeError('project-archive.size-limit');
+    totalSize += attachments[path]!.length;
+    if (totalSize > MAX_ARCHIVE_BYTES) throw new TypeError('project-archive.size-limit');
     await assertOriginalHash(path, attachments[path]!);
     files[path] = attachments[path]!;
   }
-  return zipSync(files, { mtime: ZIP_EPOCH, level: 9 });
+  const archive = zipSync(files, { mtime: ZIP_EPOCH, level: 9 });
+  if (archive.length > MAX_ARCHIVE_BYTES) throw new TypeError('project-archive.size-limit');
+  return archive;
 }
 
 export async function decodeProjectArchive(bytes: Uint8Array): Promise<ProjectArchive> {
-  const files = unzipSync(bytes);
+  if (bytes.length > MAX_ARCHIVE_BYTES) throw new TypeError('project-archive.size-limit');
+  const names = new Set<string>();
+  let totalSize = 0;
+  const files = unzipSync(bytes, { filter: info => {
+    if (info.name !== 'manifest.json' && info.name !== 'project.json') assertAttachmentPath(info.name);
+    if (names.has(info.name)) throw new TypeError('project-archive.duplicate-entry');
+    names.add(info.name);
+    totalSize += info.originalSize;
+    if (names.size > MAX_ENTRIES || !Number.isSafeInteger(info.originalSize)
+      || info.originalSize > MAX_ENTRY_BYTES || totalSize > MAX_ARCHIVE_BYTES) {
+      throw new TypeError('project-archive.size-limit');
+    }
+    return true;
+  } });
   if (!files['manifest.json'] || !files['project.json']) throw new TypeError('project-archive.missing-entry');
   for (const path of Object.keys(files)) {
     if (path !== 'manifest.json' && path !== 'project.json') assertAttachmentPath(path);

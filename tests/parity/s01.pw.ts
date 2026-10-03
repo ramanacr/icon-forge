@@ -11,6 +11,7 @@ import { expect, test } from '@playwright/test';
 const sourceDir = resolve('packages/project-model/src');
 const goldenSha256 = '33f5f4ac03efa3b64f81218335455f8dde6fa536317a70cc018f83c1b24eec9d';
 const replayGoldenSha256 = '38c845166678bd1515b504be7896ca9397d2abb7a4c4970359b76062fee87aea';
+const svgGoldenSha256 = 'a97ce291647a5d1ba2dd139f51ad01a543ea645856298f1c826e2be27f69df4b';
 let outputDir: string;
 let server: Server;
 let baseUrl: string;
@@ -27,12 +28,13 @@ test.beforeAll(async () => {
     entryPoints: {
       application: resolve('packages/application/src/index.ts'),
       model: resolve('packages/project-model/src/index.ts'),
+      compiler: resolve('packages/compiler-core/src/index.ts'),
     },
     outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
   });
   server = createServer(async (request, response) => {
     const name = request.url?.slice(1);
-    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js'].includes(name ?? '')) {
+    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js', 'compiler.js'].includes(name ?? '')) {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>');
       return;
     }
@@ -42,6 +44,42 @@ test.beforeAll(async () => {
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('No test server address');
   baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+test('S-01 canonical SVG fixture matches Node and the browser', async ({ page }) => {
+  const application = await import(pathToFileURL(join(outputDir, 'application.js')).href);
+  const compiler = await import(pathToFileURL(join(outputDir, 'compiler.js')).href);
+  const id = '0198e09b-a810-7000-8000-000000000040';
+  const base = { commandVersion: '1.0', projectId: id, issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' } };
+  const create = { ...base, commandId: '0198e09b-a810-7000-8000-000000000041', type: 'project.create', payload: { id, name: 'Medical' } };
+  const icon = { id: '0198e09b-a810-7000-8000-000000000042', name: 'medical-plus', aliases: [], tags: [],
+    viewBox: [0, 0, 24, 24], variants: [], provenanceIds: [], accessibility: { kind: 'informative', label: 'Medical & care' },
+    nodes: [
+      { id: '0198e09b-a810-7000-8000-000000000043', type: 'path', visible: true, locked: false,
+        fillRule: 'nonzero', fill: { kind: 'none' }, stroke: { paint: { kind: 'token', token: 'currentColor' },
+          width: 1.75, cap: 'round', join: 'round', miterLimit: 4 },
+        path: [{ start: [2, 12], segments: [{ k: 'L', to: [22, 12] }], closed: false }] },
+      { id: '0198e09b-a810-7000-8000-000000000044', type: 'rect', visible: true, locked: false,
+        x: 10.5, y: 2, width: 3, height: 20, rx: 0.5, ry: 0.5, fill: { kind: 'token', token: 'currentColor' } },
+    ] };
+  const add = { ...base, commandId: '0198e09b-a810-7000-8000-000000000045', type: 'icon.add', payload: { icon } };
+  const options = { precision: 3, paintMode: 'tokens', sizeAttrs: false, metadata: false };
+  const dispatcher = new application.ProjectDispatcher();
+  dispatcher.dispatch(create);
+  dispatcher.dispatch(add);
+  const nodeSvg: string = compiler.serializeIconSvg(dispatcher.project, dispatcher.project.icons[0], options);
+  expect(createHash('sha256').update(nodeSvg).digest('hex')).toBe(svgGoldenSha256);
+
+  await page.goto(baseUrl);
+  const browserSvg = await page.evaluate(async ({ create, add, options }) => {
+    const application = await import(new URL('/application.js', location.origin).href);
+    const compiler = await import(new URL('/compiler.js', location.origin).href);
+    const dispatcher = new application.ProjectDispatcher();
+    dispatcher.dispatch(create);
+    dispatcher.dispatch(add);
+    return compiler.serializeIconSvg(dispatcher.project, dispatcher.project.icons[0], options);
+  }, { create, add, options });
+  expect(browserSvg).toBe(nodeSvg);
 });
 
 test.afterAll(async () => {

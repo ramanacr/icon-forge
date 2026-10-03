@@ -15,6 +15,7 @@ export default [
           { sourceTag: 'layer:model', onlyDependOnLibsWithTags: ['layer:model'] },
           { sourceTag: 'layer:commands', onlyDependOnLibsWithTags: ['layer:model', 'layer:commands'] },
           { sourceTag: 'layer:application', onlyDependOnLibsWithTags: ['layer:model', 'layer:commands', 'layer:application'] },
+          { sourceTag: 'layer:compiler', onlyDependOnLibsWithTags: ['layer:model', 'layer:compiler'] },
           { sourceTag: 'layer:persistence', onlyDependOnLibsWithTags: ['layer:model', 'layer:application', 'layer:persistence'] },
         ],
       }],

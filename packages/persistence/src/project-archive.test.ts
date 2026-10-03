@@ -49,4 +49,13 @@ describe('.iconproj ZIP', () => {
       'originals/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.svg': new TextEncoder().encode('<svg/>'),
     })).rejects.toThrow('project-archive.original-hash-mismatch');
   });
+
+  it('rejects zip-slip paths and oversized decompression before extracting', async () => {
+    const normal = unzipSync(await encodeProjectArchive(project));
+    await expect(decodeProjectArchive(zipSync({ ...normal, '../escape.svg': new Uint8Array([1]) })))
+      .rejects.toThrow('project-archive.path');
+    const bomb = zipSync({ ...normal, 'extensions/vendor/large.bin': new Uint8Array(17 * 1024 * 1024) });
+    expect(bomb.length).toBeLessThan(100_000);
+    await expect(decodeProjectArchive(bomb)).rejects.toThrow('project-archive.size-limit');
+  });
 });

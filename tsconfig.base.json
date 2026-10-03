@@ -4,7 +4,8 @@
       "@iconforge/project-model": ["./packages/project-model/src/index.ts"],
       "@iconforge/commands": ["./packages/commands/src/index.ts"],
       "@iconforge/application": ["./packages/application/src/index.ts"],
-      "@iconforge/persistence": ["./packages/persistence/src/index.ts"]
+      "@iconforge/persistence": ["./packages/persistence/src/index.ts"],
+      "@iconforge/compiler-core": ["./packages/compiler-core/src/index.ts"]
     }
   }
 }

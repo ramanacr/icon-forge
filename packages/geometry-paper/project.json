@@ -1,0 +1,9 @@
+{
+  "name": "geometry-paper",
+  "tags": ["scope:infra", "type:adapter", "layer:geometry-paper"],
+  "implicitDependencies": ["geometry", "project-model"],
+  "targets": {
+    "test": { "command": "vitest run packages/geometry-paper" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

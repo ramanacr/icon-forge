@@ -1,0 +1,9 @@
+{
+  "name": "geometry",
+  "tags": ["scope:core", "type:lib", "layer:geometry"],
+  "implicitDependencies": ["project-model"],
+  "targets": {
+    "test": { "command": "vitest run packages/geometry" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

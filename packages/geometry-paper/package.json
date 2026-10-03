@@ -1,0 +1,8 @@
+{
+  "name": "@iconforge/geometry-paper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@iconforge/geometry": "workspace:*", "@iconforge/project-model": "workspace:*", "paper": "0.12.18" },
+  "exports": { ".": "./src/index.ts" }
+}

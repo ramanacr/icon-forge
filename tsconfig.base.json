@@ -5,7 +5,9 @@
       "@iconforge/commands": ["./packages/commands/src/index.ts"],
       "@iconforge/application": ["./packages/application/src/index.ts"],
       "@iconforge/persistence": ["./packages/persistence/src/index.ts"],
-      "@iconforge/export-svg": ["./packages/export-svg/src/index.ts"]
+      "@iconforge/export-svg": ["./packages/export-svg/src/index.ts"],
+      "@iconforge/geometry": ["./packages/geometry/src/index.ts"],
+      "@iconforge/geometry-paper": ["./packages/geometry-paper/src/index.ts"]
     }
   }
 }

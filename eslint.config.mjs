@@ -13,9 +13,11 @@ export default [
         allow: [],
         depConstraints: [
           { sourceTag: 'layer:model', onlyDependOnLibsWithTags: ['layer:model'] },
-          { sourceTag: 'layer:commands', onlyDependOnLibsWithTags: ['layer:model', 'layer:commands'] },
+          { sourceTag: 'layer:commands', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry', 'layer:commands'] },
           { sourceTag: 'layer:application', onlyDependOnLibsWithTags: ['layer:model', 'layer:commands', 'layer:application'] },
           { sourceTag: 'layer:export-svg', onlyDependOnLibsWithTags: ['layer:model', 'layer:export-svg'] },
+          { sourceTag: 'layer:geometry', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry'] },
+          { sourceTag: 'layer:geometry-paper', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry', 'layer:geometry-paper'] },
           { sourceTag: 'layer:persistence', onlyDependOnLibsWithTags: ['layer:model', 'layer:application', 'layer:persistence'] },
         ],
       }],

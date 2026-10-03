@@ -25,6 +25,20 @@ describe('project dispatcher', () => {
     expect(dispatcher.project?.icons[0]?.name).toBe('pulse');
     expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
   });
+
+  it('undoes and replays token and design-system transactions', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000020', type: 'token.upsert',
+      payload: { token: { name: 'accent', light: '#112233' } } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000021', type: 'project.updateDesignSystem',
+      payload: { patch: { defaultPaintToken: 'accent' } } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000022', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.designSystem.defaultPaintToken).toBe('currentColor');
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000023', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.tokens).toEqual([]);
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
   it('does not commit a dry-run and applies the confirmed command once', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

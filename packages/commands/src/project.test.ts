@@ -63,4 +63,35 @@ describe('project command handlers', () => {
     expect(() => applyProjectCommand(added.project, { ...envelope, type: 'icon.add', payload: { icon: { ...icon, id: '0198e09b-a810-7000-8000-000000000011' } } })).toThrow();
     expect(() => applyProjectCommand(added.project, { ...envelope, type: 'icon.remove', payload: { iconId: '0198e09b-a810-7000-8000-000000000099' } })).toThrow('icon.not-found');
   });
+
+  it('updates design policy and color tokens without rewriting icons', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const token = { name: 'accent', light: '#112233', dark: '#ddeeff' };
+    const upserted = applyProjectCommand(created.project, { ...envelope, type: 'token.upsert', payload: { token } });
+    const updated = applyProjectCommand(upserted.project, { ...envelope, type: 'project.updateDesignSystem',
+      payload: { patch: { defaultPaintToken: 'accent' } } });
+    expect(created.project.tokens).toEqual([]);
+    expect(upserted.project.tokens).toEqual([token]);
+    expect(updated.project.designSystem.defaultPaintToken).toBe('accent');
+    expect(updated.project.icons).toEqual(created.project.icons);
+    expect(() => applyProjectCommand(updated.project, { ...envelope, type: 'token.remove', payload: { name: 'accent' } }))
+      .toThrow('token.in-use');
+    const reset = applyProjectCommand(updated.project, { ...envelope, type: 'project.updateDesignSystem',
+      payload: { patch: { defaultPaintToken: 'currentColor' } } });
+    const removed = applyProjectCommand(reset.project, { ...envelope, type: 'token.remove', payload: { name: 'accent' } });
+    expect(removed.project.tokens).toEqual([]);
+    expect(removed.inversePatches).toEqual([{ op: 'insert', path: ['tokens', '0'], value: token }]);
+  });
+
+  it('blocks token removal while an icon node refers to it', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const upserted = applyProjectCommand(created.project, { ...envelope, type: 'token.upsert',
+      payload: { token: { name: 'accent', light: '#112233' } } });
+    const added = applyProjectCommand(upserted.project, { ...envelope, type: 'icon.add', payload: { icon: {
+      ...icon, nodes: [{ id: '0198e09b-a810-7000-8000-000000000012', type: 'rect', visible: true, locked: false,
+        x: 0, y: 0, width: 10, height: 10, rx: 0, ry: 0, fill: { kind: 'token', token: 'accent' } }],
+    } } });
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'token.remove', payload: { name: 'accent' } }))
+      .toThrow('token.in-use');
+  });
 });

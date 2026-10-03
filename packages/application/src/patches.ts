@@ -24,6 +24,23 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
         throw new TypeError('patch.path.unsupported');
       }
       current = { ...current, icons };
+    } else if (patch.path[0] === 'tokens' && patch.path.length === 2) {
+      if (current === null || !/^(0|[1-9]\d*)$/.test(patch.path[1]!)) throw new TypeError('patch.conflict');
+      const index = Number(patch.path[1]);
+      const tokens = structuredClone(current.tokens);
+      if (patch.op === 'insert') {
+        if (index > tokens.length) throw new TypeError('patch.conflict');
+        tokens.splice(index, 0, structuredClone(patch.value as ProjectV1['tokens'][number]));
+      } else if (patch.op === 'remove') {
+        if (index >= tokens.length || canonicalJson(tokens[index]) !== canonicalJson(patch.value)) throw new TypeError('patch.conflict');
+        tokens.splice(index, 1);
+      } else if (patch.op === 'replace') {
+        if (index >= tokens.length || canonicalJson(tokens[index]) !== canonicalJson(patch.before)) throw new TypeError('patch.conflict');
+        tokens[index] = structuredClone(patch.after as ProjectV1['tokens'][number]);
+      } else {
+        throw new TypeError('patch.op.unsupported');
+      }
+      current = { ...current, tokens };
     } else if (patch.op !== 'replace') {
       throw new TypeError('patch.op.unsupported');
     } else if (patch.path.length === 0) {
@@ -34,6 +51,9 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
         throw new TypeError('patch.conflict');
       }
       current = { ...current, name: patch.after };
+    } else if (patch.path.length === 1 && patch.path[0] === 'designSystem') {
+      if (current === null || canonicalJson(current.designSystem) !== canonicalJson(patch.before)) throw new TypeError('patch.conflict');
+      current = { ...current, designSystem: structuredClone(patch.after as ProjectV1['designSystem']) };
     } else {
       throw new TypeError('patch.path.unsupported');
     }

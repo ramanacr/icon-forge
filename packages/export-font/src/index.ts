@@ -5,6 +5,8 @@ export interface FilledFontGlyph {
   name: string;
   codepoint: number;
   ligature?: string;
+  advance?: number;
+  lsb?: number;
   viewBox: [number, number, number, number];
   path: Array<{ start: [number, number]; segments: Array<
     | { k: 'L'; to: [number, number] }
@@ -113,9 +115,27 @@ export function buildOtfFont(input: OtfFontInput): Uint8Array {
       }
       path.closePath();
     }
+    if ((glyph.advance !== undefined && !Number.isFinite(glyph.advance))
+      || (glyph.lsb !== undefined && !Number.isFinite(glyph.lsb))) throw new TypeError('font.metrics.invalid');
+    const advance = glyph.advance === undefined ? input.unitsPerEm : quantize(glyph.advance, 0);
+    const lsb = glyph.lsb === undefined
+      ? path.commands.length === 0 ? 0 : quantize(path.getBoundingBox().x1, 0)
+      : quantize(glyph.lsb, 0);
+    if (advance <= 0 || advance > 65535 || lsb < -32768 || lsb > 32767) throw new TypeError('font.metrics.invalid');
+    if (glyph.lsb !== undefined && path.commands.length > 0) {
+      const shift = lsb - path.getBoundingBox().x1;
+      for (const command of path.commands) {
+        if ('x' in command) command.x = quantize(command.x + shift);
+        if ('x1' in command) command.x1 = quantize(command.x1 + shift);
+        if ('x2' in command) command.x2 = quantize(command.x2 + shift);
+      }
+    }
     iconGlyphIds.set(glyph.name, glyphs.length);
-    glyphs.push(new opentype.Glyph({ name: glyph.name, unicode: glyph.codepoint,
-      advanceWidth: input.unitsPerEm, path }));
+    const compiled = new opentype.Glyph({ name: glyph.name, unicode: glyph.codepoint,
+      advanceWidth: advance, path });
+    // opentype.js 1.3.4 declares this constructor option but does not bind it.
+    compiled.leftSideBearing = lsb;
+    glyphs.push(compiled);
   }
   const font = new opentype.Font({ familyName: family, styleName: 'Regular', unitsPerEm: input.unitsPerEm,
     ascender, descender: ascender - input.unitsPerEm, glyphs, createdTimestamp: 1 });

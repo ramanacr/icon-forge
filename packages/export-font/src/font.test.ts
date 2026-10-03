@@ -71,4 +71,23 @@ describe('S-05 OTF/CFF font construction', () => {
     if ('fonts' in parsed) throw new Error('Expected a single OTF font');
     expect(parsed.familyName).toBe('Medical Icons');
   });
+
+  it('writes explicit advances and bearings that agree with outline bounds', () => {
+    const bytes = buildOtfFont({ ...input, glyphs: [{ ...input.glyphs[0]!, advance: 1200, lsb: -200 }] });
+    const parsed = fontkit.create(Buffer.from(bytes));
+    if ('fonts' in parsed) throw new Error('Expected a single OTF font');
+    const glyph = parsed.glyphForCodePoint(0xe000);
+    expect(glyph.advanceWidth).toBe(1200);
+    expect(glyph.bbox.minX).toBeCloseTo(-200, 2);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let hmtxOffset = -1;
+    for (let index = 0; index < view.getUint16(4); index++) {
+      const record = 12 + index * 16;
+      if (String.fromCharCode(...bytes.slice(record, record + 4)) === 'hmtx') hmtxOffset = view.getUint32(record + 8);
+    }
+    expect(hmtxOffset).toBeGreaterThan(0);
+    expect(view.getInt16(hmtxOffset + glyph.id * 4 + 2)).toBe(-200);
+    expect(() => buildOtfFont({ ...input, glyphs: [{ ...input.glyphs[0]!, advance: 70_000 }] }))
+      .toThrow('font.metrics.invalid');
+  });
 });

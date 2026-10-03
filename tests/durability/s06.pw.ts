@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { expect, test } from '@playwright/test';
+import { decodeProjectArchive } from '../../packages/persistence/src/project-archive.js';
 
 let outputDir: string;
 let server: Server;
@@ -227,6 +228,33 @@ test('S-06 browser file-save adapters only report success after writing', async 
   expect(['persistent', 'best-effort', 'unsupported']).toContain(result.durability);
 });
 
+test('S-06 browser download fallback produces a readable project archive', async ({ page }) => {
+  await page.goto(baseUrl);
+  const [download, result] = await Promise.all([
+    page.waitForEvent('download'),
+    page.evaluate(async () => {
+      const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+      const { saveProjectFile } = await import(new URL('/persistence.js', location.origin).href);
+      const id = '0198e09b-a810-7000-8000-000000000035';
+      const dispatcher = new ProjectDispatcher();
+      dispatcher.dispatch({ commandVersion: '1.0', projectId: id, commandId: '0198e09b-a810-7000-8000-000000000036',
+        issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' }, type: 'project.create', payload: { id, name: 'Medical' } });
+      const previous = Object.getOwnPropertyDescriptor(globalThis, 'showSaveFilePicker');
+      Object.defineProperty(globalThis, 'showSaveFilePicker', { configurable: true, value: undefined });
+      try { return await saveProjectFile(dispatcher.project); }
+      finally {
+        if (previous) Object.defineProperty(globalThis, 'showSaveFilePicker', previous);
+        else delete (globalThis as typeof globalThis & { showSaveFilePicker?: unknown }).showSaveFilePicker;
+      }
+    }),
+  ]);
+  expect(result).toEqual({ method: 'download', revision: 1 });
+  expect(download.suggestedFilename()).toBe('Medical.iconproj');
+  const saved = await readFile(await download.path());
+  const archive = await decodeProjectArchive(new Uint8Array(saved));
+  expect(archive.project).toMatchObject({ name: 'Medical', revision: 1 });
+});
+
 test('S-06 quota failure leaves no partial committed project', async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'CDP quota override is Chromium-only');
   await page.goto(baseUrl);
@@ -281,4 +309,41 @@ test('S-06 closing a tab during append leaves an atomic journal state', async ({
   }, id);
   expect(saved === null || (saved.revision === 1 && saved.entries === 1 && saved.snapshot === null)).toBe(true);
   await reopened.close();
+});
+
+test('S-06 abort after an in-flight journal put preserves the prior revision', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const id = '0198e09b-a810-7000-8000-000000000070';
+    const base = { commandVersion: '1.0', projectId: id, issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' } };
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000071', type: 'project.create',
+      payload: { id, name: 'Medical' } });
+    const repository = new DexieProjectRepository('iconforge-s06-inflight-abort');
+    await repository.append(id, 0, 1, dispatcher.journal[0]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000072', type: 'project.rename',
+      payload: { name: 'Clinical' }, expectedRevision: 1 });
+    const originalPut = IDBObjectStore.prototype.put;
+    let injected = false;
+    IDBObjectStore.prototype.put = function (...args) {
+      const request = Reflect.apply(originalPut, this, args) as IDBRequest;
+      if (this.name === 'projects' && !injected) {
+        injected = true;
+        request.addEventListener('success', () => this.transaction.abort());
+      }
+      return request;
+    };
+    let failed = false;
+    try { await repository.append(id, 1, 2, dispatcher.journal[1]); }
+    catch { failed = true; }
+    finally { IDBObjectStore.prototype.put = originalPut; repository.close(); }
+    const reopened = new DexieProjectRepository('iconforge-s06-inflight-abort');
+    const row = await reopened.load(id);
+    reopened.close();
+    return { injected, failed, revision: row?.revision, entries: row?.journal.length,
+      firstCommand: row?.journal[0]?.command.type };
+  });
+  expect(result).toEqual({ injected: true, failed: true, revision: 1, entries: 1, firstCommand: 'project.create' });
 });

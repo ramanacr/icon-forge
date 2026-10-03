@@ -1,8 +1,13 @@
-import paper from 'paper';
+import paperCore from 'paper/dist/paper-core.js';
 import { quantize, type PathDataV1, type SubpathV1 } from '@iconforge/project-model';
 import type { BooleanOp, BooleanResult, IGeometryEngine } from '@iconforge/geometry';
 
-function toPaperPath(scope: paper.PaperScope, data: PathDataV1): paper.PathItem {
+const paper = paperCore as unknown as typeof import('paper');
+type PaperScope = InstanceType<(typeof import('paper'))['PaperScope']>;
+type PathItem = InstanceType<(typeof import('paper'))['PathItem']>;
+type Path = InstanceType<(typeof import('paper'))['Path']>;
+
+function toPaperPath(scope: PaperScope, data: PathDataV1): PathItem {
   const paths = data.map(subpath => {
     const path = new scope.Path({ insert: false });
     path.moveTo(new scope.Point(...subpath.start));
@@ -17,8 +22,8 @@ function toPaperPath(scope: paper.PaperScope, data: PathDataV1): paper.PathItem 
   return paths.length === 1 ? paths[0]! : new scope.CompoundPath({ children: paths, insert: false });
 }
 
-function fromPaperPath(item: paper.PathItem): PathDataV1 {
-  const paths = item instanceof paper.CompoundPath ? item.children as paper.Path[] : [item as paper.Path];
+function fromPaperPath(item: PathItem): PathDataV1 {
+  const paths = item instanceof paper.CompoundPath ? item.children as Path[] : [item as Path];
   return paths.filter(path => path.segments.length > 0).map(path => {
     const segments = path.segments;
     const start = [quantize(segments[0]!.point.x), quantize(segments[0]!.point.y)] as [number, number];

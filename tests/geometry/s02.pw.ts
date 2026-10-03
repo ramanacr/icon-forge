@@ -14,11 +14,9 @@ test.beforeAll(async () => {
   outputDir = await mkdtemp(join(tmpdir(), 'iconforge-s02-'));
   await writeFile(join(outputDir, 'package.json'), '{"type":"module"}');
   await build({ entryPoints: [resolve('packages/geometry-paper/src/worker-spike.ts')], outfile: join(outputDir, 'worker.js'),
-    bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
-    alias: { paper: resolve('packages/geometry-paper/node_modules/paper/dist/paper-core.js') } });
+    bundle: true, format: 'esm', platform: 'browser', target: 'es2022' });
   const minified = await build({ entryPoints: [resolve('packages/geometry-paper/src/worker-spike.ts')],
-    bundle: true, write: false, minify: true, format: 'esm', platform: 'browser', target: 'es2022',
-    alias: { paper: resolve('packages/geometry-paper/node_modules/paper/dist/paper-core.js') } });
+    bundle: true, write: false, minify: true, format: 'esm', platform: 'browser', target: 'es2022' });
   expect(gzipSync(minified.outputFiles[0]!.contents, { level: 9 }).length).toBeLessThanOrEqual(120 * 1024);
   server = createServer(async (request, response) => {
     if (request.url !== '/worker.js') { response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>'); return; }
@@ -60,4 +58,49 @@ test('S-02 Paper.js runs a Boolean in a DOM-free worker', async ({ page }) => {
     }, 0) / 2);
   }, 0);
   expect(area).toBeCloseTo(150, 3);
+  const iouByOperation = await page.evaluate((operations: Record<string, { path: Array<{
+    start: [number, number]; segments: Array<{ k: 'L' | 'Q' | 'C'; to: [number, number]; c?: [number, number];
+      c1?: [number, number]; c2?: [number, number] }>; closed: boolean }>; diagnostics: unknown[] }>) => {
+    const operationModes: Record<string, GlobalCompositeOperation> = {
+      union: 'source-over', subtract: 'destination-out', intersect: 'source-in', exclude: 'xor',
+    };
+    const occupancy = (canvas: HTMLCanvasElement): Uint8Array => {
+      const rgba = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+      return Uint8Array.from({ length: canvas.width * canvas.height }, (_, index) => rgba[index * 4 + 3]! > 127 ? 1 : 0);
+    };
+    const makeCanvas = (): HTMLCanvasElement => { const canvas = document.createElement('canvas'); canvas.width = 220; canvas.height = 120; return canvas; };
+    return Object.fromEntries(Object.entries(operations).map(([name, output]) => {
+      const reference = makeCanvas();
+      const referenceContext = reference.getContext('2d')!;
+      referenceContext.scale(10, 10);
+      referenceContext.fillRect(0, 0, 10, 10);
+      referenceContext.globalCompositeOperation = operationModes[name]!;
+      referenceContext.fillRect(5, 0, 10, 10);
+      const actual = makeCanvas();
+      const actualContext = actual.getContext('2d')!;
+      actualContext.scale(10, 10);
+      const path = new Path2D();
+      for (const subpath of output.path) {
+        path.moveTo(...subpath.start);
+        for (const segment of subpath.segments) {
+          if (segment.k === 'L') path.lineTo(...segment.to);
+          else if (segment.k === 'Q') path.quadraticCurveTo(...segment.c!, ...segment.to);
+          else path.bezierCurveTo(...segment.c1!, ...segment.c2!, ...segment.to);
+        }
+        if (subpath.closed) path.closePath();
+      }
+      actualContext.fill(path);
+      const expected = occupancy(reference);
+      const observed = occupancy(actual);
+      let intersection = 0;
+      let union = 0;
+      for (let index = 0; index < expected.length; index++) {
+        if (expected[index] && observed[index]) intersection++;
+        if (expected[index] || observed[index]) union++;
+      }
+      return [name, union === 0 ? 1 : intersection / union];
+    }));
+  }, (result as { canonicalOperations: Record<string, { path: Array<{ start: [number, number]; segments: Array<{
+    k: 'L' | 'Q' | 'C'; to: [number, number]; c?: [number, number]; c1?: [number, number]; c2?: [number, number] }>; closed: boolean }>; diagnostics: unknown[] }> }).canonicalOperations);
+  for (const [operation, iou] of Object.entries(iouByOperation)) expect(iou, operation).toBeGreaterThanOrEqual(0.999);
 });

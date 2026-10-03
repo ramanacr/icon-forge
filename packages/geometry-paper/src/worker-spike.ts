@@ -1,10 +1,13 @@
-import paper from 'paper';
+import paperCore from 'paper/dist/paper-core.js';
 import { quantize } from '@iconforge/project-model';
 import { PaperGeometryEngine } from './index.js';
 
+const paper = paperCore as unknown as typeof import('paper');
+type Path = InstanceType<(typeof import('paper'))['Path']>;
+
 type SpikeResult = { domAvailable: boolean; canvasAvailable: boolean; areas?: Record<string, number>;
   edgeAreas?: Record<string, number>; inputsUnchanged?: boolean; canonicalResult?: unknown;
-  invalidResult?: unknown; canonicalInputsUnchanged?: boolean; error?: string };
+  invalidResult?: unknown; canonicalInputsUnchanged?: boolean; canonicalOperations?: unknown; error?: string };
 
 self.addEventListener('message', () => {
   Object.defineProperty(self, 'OffscreenCanvas', { configurable: true, value: undefined });
@@ -23,7 +26,7 @@ self.addEventListener('message', () => {
     };
     result.areas = Object.fromEntries(Object.entries(operations).map(([name, output]) => {
       const paths = output instanceof scope.CompoundPath ? output.children : [output];
-      return [name, quantize(paths.reduce((sum, path) => sum + Math.abs((path as paper.Path).area), 0))];
+      return [name, quantize(paths.reduce((sum, path) => sum + Math.abs((path as Path).area), 0))];
     }));
     result.inputsUnchanged = left.pathData === before[0] && right.pathData === before[1];
     const coincident = new scope.Path.Rectangle({ rectangle: new scope.Rectangle(0, 0, 10, 10), insert: false });
@@ -36,7 +39,7 @@ self.addEventListener('message', () => {
     };
     result.edgeAreas = Object.fromEntries(Object.entries(edgeCases).map(([name, output]) => {
       const paths = output instanceof scope.CompoundPath ? output.children : [output];
-      return [name, quantize(paths.reduce((sum, path) => sum + Math.abs((path as paper.Path).area), 0))];
+      return [name, quantize(paths.reduce((sum, path) => sum + Math.abs((path as Path).area), 0))];
     }));
     const rectangle = (x: number) => [{ start: [x, 0] as [number, number], segments: [
       { k: 'L' as const, to: [x + 10, 0] as [number, number] },
@@ -49,6 +52,12 @@ self.addEventListener('message', () => {
     const originalLeft = JSON.stringify(canonicalLeft);
     const originalRight = JSON.stringify(canonicalRight);
     result.canonicalResult = engine.boolean(canonicalLeft, canonicalRight, 'union');
+    result.canonicalOperations = {
+      union: result.canonicalResult,
+      subtract: engine.boolean(canonicalLeft, canonicalRight, 'subtract'),
+      intersect: engine.boolean(canonicalLeft, canonicalRight, 'intersect'),
+      exclude: engine.boolean(canonicalLeft, canonicalRight, 'exclude'),
+    };
     result.canonicalInputsUnchanged = JSON.stringify(canonicalLeft) === originalLeft && JSON.stringify(canonicalRight) === originalRight;
     result.invalidResult = engine.boolean([{ ...canonicalLeft[0]!, closed: false }], canonicalRight, 'union');
   } catch (error) { result.error = String(error); }

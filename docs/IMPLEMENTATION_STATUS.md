@@ -13,6 +13,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 - Persistent-storage status request, quota-error classification, deterministic `.iconproj` ZIP with SHA-256 project and original hashes, and native-file/download save adapter. Chromium passes a 2,000-icon snapshot and archive round trip.
 - Pure `export-svg` primitive serializer with escaped accessibility text, canonical paint and path output, precision fallback for narrow closed segments, and a Node/Chromium golden hash. Archive extraction enforces path, entry count and byte limits before decompression.
 - CI checks for frozen installation, generated-schema drift, typecheck, unit tests and a three-browser Playwright parity fixture.
+- Chromium performance harness checks 500-icon validation, 100 simple SVG serializations and p95 single-icon apply/undo against documented budgets with the required 10% tolerance.
 
 ## Gates still open
 
@@ -21,7 +22,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 - S-03 and S-05: no conformance suites have passed yet.
 - S-04: resvg WASM in a Chromium worker produces byte-identical PNGs to Node across nine fixed sizes from 16–512 px, with correct alpha for the fixture, a local 512 px render under 250 ms and a gzipped WASM below 1.5 MB. Other browsers and a broader image corpus remain pending, so the gate has not passed.
 - S-06: Chromium append/reload, stale-write rejection, compaction, corrupt-tail recovery, two-tab takeover, revision announcements, 2,000-icon save/load, forced quota and interrupted-tab atomicity pass. Persistence-status and file-save adapters pass unit tests and mocked browser adapter checks. A deterministic fault during an in-flight transaction, real native picker/download behaviour, Safari install/non-install documentation and Firefox/WebKit checks are pending.
-- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, future production migration fixtures, component/variant SVG expansion, remaining repository durability features, performance harness and the required spikes.
+- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, future production migration fixtures, component/variant SVG expansion, remaining repository durability features, other performance operations and the required spikes.
 
 The roadmap blocks Phase 1 until S-01 through S-06 pass or recorded adapter swaps satisfy their gates.
 

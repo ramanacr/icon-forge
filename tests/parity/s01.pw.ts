@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { build } from 'esbuild';
 import { expect, test } from '@playwright/test';
+import type { ProjectV1, SceneNodeV1 } from '../../packages/project-model/src/types.js';
 
 const sourceDir = resolve('packages/project-model/src');
 const goldenSha256 = '33f5f4ac03efa3b64f81218335455f8dde6fa536317a70cc018f83c1b24eec9d';
@@ -129,4 +130,78 @@ test('S-01 journal replay matches Node and the browser', async ({ page }) => {
   }, { create, rename });
   expect(browserResult.artifact).toBe(nodeArtifact);
   expect(browserResult.checksums).toEqual(nodeChecksums);
+});
+
+test('S-01 deterministic corpus has pinned JSON and SVG hashes', async ({ page }) => {
+  const id = (number: number): string => `0198e09b-a810-7000-8000-${number.toString(16).padStart(12, '0')}`;
+  const rect = (number: number): Extract<SceneNodeV1, { type: 'rect' }> => ({ id: id(number), type: 'rect', visible: true, locked: false,
+    x: 2, y: 2, width: 20, height: 20, rx: 1, ry: 1, fill: { kind: 'token', token: 'currentColor' } });
+  const makeProject = (name: string, nodes: SceneNodeV1[]): ProjectV1 => ({
+    schemaVersion: '1.0', id: id(1), name: 'Corpus', revision: 1,
+    designSystem: { grid: { width: 24, height: 24 }, safeArea: { top: 2, right: 2, bottom: 2, left: 2 },
+      style: 'filled', stroke: { width: 1.75, cap: 'round', join: 'round', miterLimit: 4 }, cornerRadius: 2,
+      defaultPaintToken: 'currentColor', naming: { pattern: 'kebab', reserved: [] }, severities: {} },
+    tokens: [], components: [], exportProfiles: [], provenance: [], icons: [{ id: id(2), name, aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes, variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] }],
+  });
+  const fixtures: Record<string, ProjectV1> = {
+    'rotate-15deg': makeProject('rotate-15deg', [{ ...rect(3), transform: [0.965926, 0.258819, -0.258819, 0.965926, 0, 0] }]),
+    'rotate-arbitrary': makeProject('rotate-arbitrary', [{ ...rect(3), transform: [0.955279, 0.295708, -0.295708, 0.955279, 1.25, -2.5] }]),
+    'scale-non-uniform': makeProject('scale-non-uniform', [{ id: id(3), type: 'group', visible: true, locked: false,
+      transform: [1.5, 0, 0, 0.75, -0, 2.5], children: [rect(4)] }]),
+    'arc-to-cubic': makeProject('arc-to-cubic', [{ id: id(3), type: 'path', visible: true, locked: false,
+      fillRule: 'nonzero', fill: { kind: 'none' }, stroke: { paint: { kind: 'token', token: 'currentColor' },
+        width: 1.75, cap: 'round', join: 'round', miterLimit: 4 },
+      path: [{ start: [0, 12], segments: [{ k: 'C', c1: [0, 5.373], c2: [5.373, 0], to: [12, 0] }], closed: false }] }]),
+    'quantize-half-even-boundary': makeProject('quantize-half-even-boundary', [{ ...rect(3), x: 1.234, y: -1.236 }]),
+    'negative-zero': makeProject('negative-zero', [{ ...rect(3), x: -0, y: -0 }]),
+  };
+  const large = makeProject('icon-000', [rect(3)]);
+  large.icons = Array.from({ length: 500 }, (_, index) => ({ ...structuredClone(large.icons[0]!),
+    id: id(1000 + index), name: `icon-${String(index).padStart(3, '0')}`,
+    nodes: [rect(2000 + index)] }));
+  fixtures['large-project-serialize'] = large;
+  const options = { precision: 3 as const, paintMode: 'tokens' as const, sizeAttrs: false, metadata: false };
+  const model = await import(pathToFileURL(join(outputDir, 'model.js')).href);
+  const compiler = await import(pathToFileURL(join(outputDir, 'compiler.js')).href);
+  const boundary = [model.quantize(1.2345), model.quantize(-1.2355), model.quantize(-0)];
+  expect(boundary).toEqual([1.234, -1.236, 0]);
+  const nodeHashes = Object.fromEntries(Object.entries(fixtures).map(([name, project]) => [name, {
+    json: createHash('sha256').update(model.canonicalJson(project)).digest('hex'),
+    svg: createHash('sha256').update(compiler.serializeIconSvg(project, project.icons[0], options)).digest('hex'),
+  }]));
+  const goldenHashes: Record<string, { json: string; svg: string }> = {
+    'arc-to-cubic': { json: 'f0bc6716bc502993dada7a0f22fc4374924a97ad8726deb77d04b7969d22fc25',
+      svg: 'd709224123dcc251da31140caa9fb06e1a68683064d8f21817d8ccf99c5d352e' },
+    'large-project-serialize': { json: '233cbd322fd5e21180fccebe5606994931c12ab42416ca784029d52f9fa0c9c4',
+      svg: '749ef28b002e95b4ae7e4a5b8b542a8bfcb517368026063101cb03f0a693af6f' },
+    'negative-zero': { json: 'e23860383f09c5546c561e32b30161aafc9b6f149cae873a97f112cf41a11f6c',
+      svg: '24ffcf863f4b236b29026236d0ae596c6a56e566eb6750aa22b619306c138c30' },
+    'quantize-half-even-boundary': { json: '16b9a7630eedb669f08a863ed44e5fecbdc9a961a0f665cbaa320cf7ad85f7a5',
+      svg: 'f78c137307c268337cd79e5ab5c818f9a0e636ed51cd2b3448324455247b86e1' },
+    'rotate-15deg': { json: '297ad7a40292fde8b73f4dfe9cc6785dbd8289d1e8a5a35db1a93de40955bdaf',
+      svg: 'cbe4aee2eb2667940d830b551c90063b597191d644fe3ec418930be99eee01ea' },
+    'rotate-arbitrary': { json: 'dc908f17656856764adcfae4172f702f42502dff5d40d27ece3e8d112c508051',
+      svg: '5ba9a2d026683d217c4a7115f2d57dfc9d7e3cac0a516d285462334a7b5c6697' },
+    'scale-non-uniform': { json: 'c8a81414e0a1dc0edeb9b9996ebb11c425c6266a1e808dd85ca4287667ab0822',
+      svg: 'd4bcbbd37386d02c97d05a0cd095282152d5e840d387cea8710c85740a4b1682' },
+  };
+  expect(nodeHashes).toEqual(goldenHashes);
+  await page.goto(baseUrl);
+  const browserHashes = await page.evaluate(async ({ fixtures, options }) => {
+    const model = await import(new URL('/model.js', location.origin).href);
+    const compiler = await import(new URL('/compiler.js', location.origin).href);
+    const sha = async (value: string): Promise<string> => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',
+      new TextEncoder().encode(value))), byte => byte.toString(16).padStart(2, '0')).join('');
+    return Object.fromEntries(await Promise.all(Object.entries(fixtures).map(async ([name, project]) => [name, {
+      json: await sha(model.canonicalJson(project)),
+      svg: await sha(compiler.serializeIconSvg(project, project.icons[0], options)),
+    }])));
+  }, { fixtures, options });
+  expect(browserHashes).toEqual(nodeHashes);
+  const browserBoundary = await page.evaluate(async () => {
+    const model = await import(new URL('/model.js', location.origin).href);
+    return [model.quantize(1.2345), model.quantize(-1.2355), model.quantize(-0)];
+  });
+  expect(browserBoundary).toEqual(boundary);
 });

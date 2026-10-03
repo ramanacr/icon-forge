@@ -14,11 +14,11 @@ test.beforeAll(async () => {
   await writeFile(join(outputDir, 'package.json'), '{"type":"module"}');
   await build({ entryPoints: {
     application: resolve('packages/application/src/index.ts'), model: resolve('packages/project-model/src/index.ts'),
-    svg: resolve('packages/export-svg/src/index.ts'),
+    svg: resolve('packages/export-svg/src/index.ts'), persistence: resolve('packages/persistence/src/index.ts'),
   }, outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022' });
   server = createServer(async (request, response) => {
     const name = request.url?.slice(1);
-    if (!['application.js', 'model.js', 'svg.js'].includes(name ?? '')) {
+    if (!['application.js', 'model.js', 'svg.js', 'persistence.js'].includes(name ?? '')) {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>'); return;
     }
     response.writeHead(200, { 'content-type': 'text/javascript' }).end(await readFile(join(outputDir, name!)));
@@ -40,6 +40,7 @@ test('Phase 0 validation, command history and SVG throughput budgets', async ({ 
     const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
     const { assertProject } = await import(new URL('/model.js', location.origin).href);
     const { serializeIconSvg } = await import(new URL('/svg.js', location.origin).href);
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
     const id = '0198e09b-a810-7000-8000-000000000080';
     const base = { commandVersion: '1.0', projectId: id, issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' } };
     const create = new ProjectDispatcher();
@@ -57,6 +58,14 @@ test('Phase 0 validation, command history and SVG throughput budgets', async ({ 
     assertProject(project);
     const validateMs = performance.now() - validateStart;
     const svgProject = { ...project, icons: project.icons.slice(0, 100) };
+    const repository = new DexieProjectRepository('iconforge-perf-open100');
+    await repository.append(id, 0, 1, create.journal[0]);
+    await repository.compact(id, 1, svgProject);
+    const openStart = performance.now();
+    const opened = await repository.load(id);
+    assertProject(opened.snapshot);
+    const open100Ms = performance.now() - openStart;
+    repository.close();
     const options = { precision: 3, paintMode: 'tokens', sizeAttrs: false, metadata: false };
     const svgStart = performance.now();
     const svgs = svgProject.icons.map((icon: unknown) => serializeIconSvg(svgProject, icon, options));
@@ -75,14 +84,17 @@ test('Phase 0 validation, command history and SVG throughput budgets', async ({ 
       undoTimes.push(performance.now() - undoStart);
     }
     const p95 = (samples: number[]): number => samples.sort((a, b) => a - b)[Math.ceil(samples.length * 0.95) - 1]!;
-    return { validateMs, svgMs, svgCount: svgs.length, finalName: dispatcher.project.icons[0].name,
+    return { validateMs, svgMs, open100Ms, openedIcons: opened.snapshot.icons.length,
+      svgCount: svgs.length, finalName: dispatcher.project.icons[0].name,
       applyP95Ms: p95(applyTimes), undoP95Ms: p95(undoTimes) };
   });
   expect(metrics.svgCount).toBe(100);
+  expect(metrics.openedIcons).toBe(100);
   expect(metrics.finalName).toBe('icon-0');
   if (testInfo.project.name === 'chromium') {
     expect(metrics.validateMs).toBeLessThanOrEqual(2_200);
     expect(metrics.svgMs).toBeLessThanOrEqual(2_200);
+    expect(metrics.open100Ms).toBeLessThanOrEqual(1_100);
     expect(metrics.applyP95Ms).toBeLessThanOrEqual(55);
     expect(metrics.undoP95Ms).toBeLessThanOrEqual(55);
   }

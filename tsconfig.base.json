@@ -8,7 +8,8 @@
       "@iconforge/export-svg": ["./packages/export-svg/src/index.ts"],
       "@iconforge/geometry": ["./packages/geometry/src/index.ts"],
       "@iconforge/geometry-paper": ["./packages/geometry-paper/src/index.ts"],
-      "@iconforge/export-raster": ["./packages/export-raster/src/index.ts"]
+      "@iconforge/export-raster": ["./packages/export-raster/src/index.ts"],
+      "@iconforge/export-font": ["./packages/export-font/src/index.ts"]
     }
   }
 }

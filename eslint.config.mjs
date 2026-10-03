@@ -19,6 +19,7 @@ export default [
           { sourceTag: 'layer:geometry', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry'] },
           { sourceTag: 'layer:geometry-paper', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry', 'layer:geometry-paper'] },
           { sourceTag: 'layer:export-raster', onlyDependOnLibsWithTags: ['layer:export-raster'] },
+          { sourceTag: 'layer:export-font', onlyDependOnLibsWithTags: ['layer:model', 'layer:export-font'] },
           { sourceTag: 'layer:persistence', onlyDependOnLibsWithTags: ['layer:model', 'layer:application', 'layer:persistence'] },
         ],
       }],

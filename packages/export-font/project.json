@@ -1,0 +1,9 @@
+{
+  "name": "export-font",
+  "tags": ["scope:infra", "type:adapter", "layer:export-font"],
+  "implicitDependencies": ["project-model"],
+  "targets": {
+    "test": { "command": "vitest run packages/export-font" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

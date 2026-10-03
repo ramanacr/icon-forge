@@ -20,8 +20,14 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'token.remove'; payload: { name: string } }
   | { type: 'icon.add'; payload: { icon: IconV1 } }
   | { type: 'icon.rename'; payload: { iconId: UUID; name: string } }
+  | { type: 'icon.updateMetadata'; payload: { iconId: UUID; patch: IconMetadataPatch } }
   | { type: 'icon.remove'; payload: { iconId: UUID } }
 );
+
+export type IconMetadataPatch = Partial<Pick<IconV1, 'aliases' | 'tags' | 'accessibility'>> & {
+  /** Explicit null removes the optional font mapping. */
+  font?: IconV1['font'] | null;
+};
 
 export type HistoryCommand = EnvelopeBase & (
   | { type: 'history.undo'; payload: Record<string, never> }
@@ -173,6 +179,42 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       const path = ['icons', String(index)];
       patches = [{ op: 'remove', path, value: removed }];
       inversePatches = [{ op: 'insert', path, value: removed }];
+    } else if (command.type === 'icon.updateMetadata') {
+      const patch = command.payload.patch;
+      if (Object.keys(patch).length === 0) throw new TypeError('icon.metadata.empty-patch');
+      const path = ['icons', String(index)];
+      patches = [];
+      inversePatches = [];
+      for (const field of ['aliases', 'tags', 'accessibility'] as const) {
+        if (!Object.hasOwn(patch, field)) continue;
+        const before = icons[index]![field];
+        const after = structuredClone(patch[field]);
+        icons[index] = { ...icons[index]!, [field]: after } as IconV1;
+        patches.push({ op: 'replace', path: [...path, field], before, after });
+        inversePatches.push({ op: 'replace', path: [...path, field], before: after, after: before });
+      }
+      if (Object.hasOwn(patch, 'font')) {
+        if (patch.font === undefined) throw new TypeError('icon.font.invalid');
+        const before = icons[index]!.font;
+        if (patch.font === null) {
+          if (before === undefined) throw new TypeError('icon.font.not-set');
+          const { font: _removed, ...withoutFont } = icons[index]!;
+          icons[index] = withoutFont;
+          patches.push({ op: 'remove', path: [...path, 'font'], value: before });
+          inversePatches.push({ op: 'insert', path: [...path, 'font'], value: before });
+        } else if (before === undefined) {
+          const after = structuredClone(patch.font);
+          icons[index] = { ...icons[index]!, font: after };
+          patches.push({ op: 'insert', path: [...path, 'font'], value: after });
+          inversePatches.push({ op: 'remove', path: [...path, 'font'], value: after });
+        } else {
+          const after = structuredClone(patch.font);
+          icons[index] = { ...icons[index]!, font: after };
+          patches.push({ op: 'replace', path: [...path, 'font'], before, after });
+          inversePatches.push({ op: 'replace', path: [...path, 'font'], before: after, after: before });
+        }
+      }
+      count = { added: 0, updated: 1, removed: 0 };
     } else {
       const before = icons[index]!.name;
       icons[index] = { ...icons[index]!, name: command.payload.name };

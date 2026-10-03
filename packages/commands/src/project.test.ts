@@ -94,4 +94,29 @@ describe('project command handlers', () => {
     expect(() => applyProjectCommand(added.project, { ...envelope, type: 'token.remove', payload: { name: 'accent' } }))
       .toThrow('token.in-use');
   });
+
+  it('updates icon metadata through narrow reversible patches', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon } });
+    const updated = applyProjectCommand(added.project, { ...envelope, type: 'icon.updateMetadata', payload: {
+      iconId: icon.id, patch: { aliases: ['cardiac'], tags: ['clinical'], accessibility: { kind: 'informative', label: 'Heart' },
+        font: { codepoint: 0xe000, ligature: 'heart' } },
+    } });
+    expect(added.project.icons[0]).toEqual(icon);
+    expect(updated.project.icons[0]).toMatchObject({ aliases: ['cardiac'], tags: ['clinical'],
+      accessibility: { kind: 'informative', label: 'Heart' }, font: { codepoint: 0xe000, ligature: 'heart' } });
+    expect(updated.patches.map(patch => patch.path)).toEqual([
+      ['icons', '0', 'aliases'], ['icons', '0', 'tags'], ['icons', '0', 'accessibility'], ['icons', '0', 'font'],
+    ]);
+    expect(updated.patches[3]?.op).toBe('insert');
+    expect(updated.inversePatches[3]?.op).toBe('remove');
+    const cleared = applyProjectCommand(updated.project, { ...envelope, type: 'icon.updateMetadata', payload: {
+      iconId: icon.id, patch: { font: null },
+    } });
+    expect(cleared.project.icons[0]?.font).toBeUndefined();
+    expect(cleared.patches).toEqual([{ op: 'remove', path: ['icons', '0', 'font'], value: { codepoint: 0xe000, ligature: 'heart' } }]);
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'icon.updateMetadata', payload: {
+      iconId: icon.id, patch: { aliases: ['Not A Slug'] },
+    } })).toThrow();
+  });
 });

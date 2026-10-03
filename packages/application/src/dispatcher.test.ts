@@ -26,6 +26,26 @@ describe('project dispatcher', () => {
     expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
   });
 
+  it('undoes and replays metadata insertion and clearing', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-000000000050', name: 'heart', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000051', type: 'icon.add', payload: { icon } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000052', type: 'icon.updateMetadata',
+      payload: { iconId: icon.id, patch: { tags: ['clinical'], font: { codepoint: 0xe000 } } } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000053', type: 'icon.updateMetadata',
+      payload: { iconId: icon.id, patch: { font: null } } });
+    expect(dispatcher.project?.icons[0]?.font).toBeUndefined();
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000054', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]?.font?.codepoint).toBe(0xe000);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000055', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]).toEqual(icon);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000056', type: 'history.redo', payload: {} });
+    expect(dispatcher.project?.icons[0]?.tags).toEqual(['clinical']);
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
+
   it('undoes and replays token and design-system transactions', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

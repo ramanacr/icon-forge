@@ -20,6 +20,25 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
           throw new TypeError('patch.conflict');
         }
         icons[index] = { ...icons[index]!, name: patch.after };
+      } else if (patch.path.length === 3 && ['aliases', 'tags', 'accessibility', 'font'].includes(patch.path[2]!)) {
+        if (index >= icons.length) throw new TypeError('patch.conflict');
+        const field = patch.path[2]! as 'aliases' | 'tags' | 'accessibility' | 'font';
+        const icon = icons[index]!;
+        const present = Object.hasOwn(icon, field);
+        const value = icon[field];
+        if (patch.op === 'replace') {
+          if (!present || canonicalJson(value) !== canonicalJson(patch.before)) throw new TypeError('patch.conflict');
+          icons[index] = { ...icon, [field]: structuredClone(patch.after) };
+        } else if (patch.op === 'insert' && field === 'font') {
+          if (present) throw new TypeError('patch.conflict');
+          icons[index] = { ...icon, font: structuredClone(patch.value as NonNullable<typeof icon.font>) };
+        } else if (patch.op === 'remove' && field === 'font') {
+          if (!present || canonicalJson(value) !== canonicalJson(patch.value)) throw new TypeError('patch.conflict');
+          const { font: _removed, ...withoutFont } = icon;
+          icons[index] = withoutFont;
+        } else {
+          throw new TypeError('patch.op.unsupported');
+        }
       } else {
         throw new TypeError('patch.path.unsupported');
       }

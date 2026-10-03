@@ -9,7 +9,32 @@ type SpikeResult = { domAvailable: boolean; canvasAvailable: boolean; areas?: Re
   edgeAreas?: Record<string, number>; inputsUnchanged?: boolean; canonicalResult?: unknown;
   invalidResult?: unknown; canonicalInputsUnchanged?: boolean; canonicalOperations?: unknown; error?: string };
 
-self.addEventListener('message', () => {
+self.addEventListener('message', (event: MessageEvent) => {
+  if (event.data?.case === 'curved') {
+    const engine = new PaperGeometryEngine();
+    const radius = 10;
+    const tangent = radius * 0.5522847498307936;
+    const left = [{ start: [20, 10] as [number, number], segments: [
+      { k: 'C' as const, c1: [20, 10 + tangent] as [number, number], c2: [10 + tangent, 20] as [number, number], to: [10, 20] as [number, number] },
+      { k: 'C' as const, c1: [10 - tangent, 20] as [number, number], c2: [0, 10 + tangent] as [number, number], to: [0, 10] as [number, number] },
+      { k: 'C' as const, c1: [0, 10 - tangent] as [number, number], c2: [10 - tangent, 0] as [number, number], to: [10, 0] as [number, number] },
+      { k: 'C' as const, c1: [10 + tangent, 0] as [number, number], c2: [20, 10 - tangent] as [number, number], to: [20, 10] as [number, number] },
+    ], closed: true }];
+    const right = [{ start: [10, 5] as [number, number], segments: [
+      { k: 'L' as const, to: [25, 5] as [number, number] },
+      { k: 'L' as const, to: [25, 15] as [number, number] },
+      { k: 'L' as const, to: [10, 15] as [number, number] },
+    ], closed: true }];
+    const original = JSON.stringify({ left, right });
+    const operations = {
+      union: engine.boolean(left, right, 'union'),
+      subtract: engine.boolean(left, right, 'subtract'),
+      intersect: engine.boolean(left, right, 'intersect'),
+      exclude: engine.boolean(left, right, 'exclude'),
+    };
+    self.postMessage({ operations, left, right, inputsUnchanged: JSON.stringify({ left, right }) === original });
+    return;
+  }
   Object.defineProperty(self, 'OffscreenCanvas', { configurable: true, value: undefined });
   const result: SpikeResult = { domAvailable: typeof document !== 'undefined', canvasAvailable: typeof OffscreenCanvas !== 'undefined' };
   try {

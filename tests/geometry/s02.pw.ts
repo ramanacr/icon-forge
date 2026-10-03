@@ -104,3 +104,58 @@ test('S-02 Paper.js runs a Boolean in a DOM-free worker', async ({ page }) => {
     k: 'L' | 'Q' | 'C'; to: [number, number]; c?: [number, number]; c1?: [number, number]; c2?: [number, number] }>; closed: boolean }>; diagnostics: unknown[] }> }).canonicalOperations);
   for (const [operation, iou] of Object.entries(iouByOperation)) expect(iou, operation).toBeGreaterThanOrEqual(0.999);
 });
+
+test('S-02 curved Boolean output matches Canvas compositing', async ({ page }) => {
+  await page.goto(baseUrl);
+  const scores = await page.evaluate(async () => {
+    type Point = [number, number];
+    type Subpath = { start: Point; segments: Array<{ k: 'L' | 'Q' | 'C'; to: Point; c?: Point; c1?: Point; c2?: Point }>; closed: boolean };
+    type Result = { operations: Record<string, { path: Subpath[] | null; diagnostics: unknown[] }>;
+      left: Subpath[]; right: Subpath[]; inputsUnchanged: boolean };
+    const result = await new Promise<Result>((resolve, reject) => {
+      const worker = new Worker('/worker.js', { type: 'module' });
+      worker.onmessage = event => { worker.terminate(); resolve(event.data); };
+      worker.onerror = event => { worker.terminate(); reject(new Error(event.message)); };
+      worker.postMessage({ case: 'curved' });
+    });
+    if (!result.inputsUnchanged) throw new Error('Boolean mutated its inputs');
+    const pathFor = (subpaths: Subpath[]): Path2D => {
+      const path = new Path2D();
+      for (const subpath of subpaths) {
+        path.moveTo(...subpath.start);
+        for (const segment of subpath.segments) {
+          if (segment.k === 'L') path.lineTo(...segment.to);
+          else if (segment.k === 'Q') path.quadraticCurveTo(...segment.c!, ...segment.to);
+          else path.bezierCurveTo(...segment.c1!, ...segment.c2!, ...segment.to);
+        }
+        if (subpath.closed) path.closePath();
+      }
+      return path;
+    };
+    const raster = (first: Path2D, second?: Path2D, mode: GlobalCompositeOperation = 'source-over'): Uint8Array => {
+      const canvas = document.createElement('canvas'); canvas.width = 600; canvas.height = 500;
+      const context = canvas.getContext('2d')!;
+      context.translate(50, 50); context.scale(20, 20);
+      context.fill(first);
+      if (second) { context.globalCompositeOperation = mode; context.fill(second); }
+      const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      return Uint8Array.from({ length: canvas.width * canvas.height }, (_, index) => rgba[index * 4 + 3]! > 127 ? 1 : 0);
+    };
+    const modes: Record<string, GlobalCompositeOperation> = {
+      union: 'source-over', subtract: 'destination-out', intersect: 'source-in', exclude: 'xor',
+    };
+    return Object.fromEntries(Object.entries(modes).map(([name, mode]) => {
+      const output = result.operations[name]!;
+      if (output.path === null || output.diagnostics.length) throw new Error(`Boolean failed: ${name}`);
+      const expected = raster(pathFor(result.left), pathFor(result.right), mode);
+      const actual = raster(pathFor(output.path));
+      let intersection = 0; let union = 0;
+      for (let index = 0; index < expected.length; index++) {
+        if (expected[index] && actual[index]) intersection++;
+        if (expected[index] || actual[index]) union++;
+      }
+      return [name, union === 0 ? 1 : intersection / union];
+    }));
+  });
+  for (const [operation, iou] of Object.entries(scores)) expect(iou, operation).toBeGreaterThanOrEqual(0.999);
+});

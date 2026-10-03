@@ -18,7 +18,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 ## Gates still open
 
 - S-01: Node/Chromium parity passes for quantization, checksummed journal replay and one canonical SVG fixture; 2,000-run numeric property checks pass. Firefox, WebKit and the full golden corpus are pending. The CI job is configured to install all three browsers, but it has not run on a remote runner yet.
-- S-02: Paper.js runs four rectangle Booleans plus coincident/touching cases in a DOM-free, canvas-free Chromium worker; inputs stay unchanged and the minified worker is below 120 KB gzip. `IGeometryEngine` converts output back to quantized canonical paths, and rectangle output meets raster IoU ≥ 0.999 for all four operations. Curved/near-degenerate corpus, full diagnostics and other browsers remain pending, so the spike has not passed.
+- S-02: Paper.js runs four rectangle Booleans plus coincident/touching cases in a DOM-free, canvas-free Chromium worker; inputs stay unchanged and the minified worker is below 120 KB gzip. `IGeometryEngine` converts output back to quantized canonical paths. Rectangle and one cubic-circle/rectangle fixture meet raster IoU ≥ 0.999 for all four operations against Canvas compositing. The broader curved/near-degenerate corpus, full diagnostics and other browsers remain pending, so the spike has not passed.
 - S-03: no conformance suite has passed; the Rust/WASM outline engine is still absent.
 - S-04: resvg WASM in a Chromium worker produces byte-identical PNGs to Node across nine fixed sizes from 16–512 px, with correct alpha for the fixture, a local 512 px render under 250 ms and a gzipped WASM below 1.5 MB. Other browsers and a broader image corpus remain pending, so the gate has not passed.
 - S-05: a deterministic OTF/CFF fixture has `.notdef`, space, PUA cmap and ligatures with input glyphs. Fontkit parses and shapes it; Chromium `FontFace` loads it and the fixture glyph reaches raster IoU ≥ 0.98. WOFF2, TTF/cu2qu, broader glyph cases, package metrics and other browsers remain pending, so the gate has not passed.
@@ -29,4 +29,4 @@ The roadmap blocks Phase 1 until S-01 through S-06 pass or recorded adapter swap
 
 ## Resolved specification question
 
-The user chose to add optional `mergeLayers` to font-profile options. Its default is `false`, so existing profiles retain the documented duotone export error. The font compiler has not been implemented yet.
+The user chose to add optional `mergeLayers` to font-profile options. Its default is `false`, so existing profiles retain the documented duotone export error. The OTF font-construction spike accepts already filled glyph paths; full font export, including stroke outlining and duotone handling, remains pending.

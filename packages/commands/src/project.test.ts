@@ -163,4 +163,24 @@ describe('project command handlers', () => {
     expect(() => applyProjectCommand(added.project, { ...envelope, type: 'icon.duplicate',
       payload: { iconId: icon.id, newIconId, idMap: { [groupId]: idMap[groupId] } } })).toThrow('icon.duplicate.id-map');
   });
+
+  it('adds, replaces and removes an icon variant with reversible narrow patches', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const addedIcon = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon } });
+    const variant = { id: '0198e09b-a810-7000-8000-000000000085', name: 'small', dimensions: { size: 16 }, overrides: [] };
+    const added = applyProjectCommand(addedIcon.project, { ...envelope, type: 'variant.add',
+      payload: { iconId: icon.id, variant } });
+    expect(added.project.icons[0]?.variants).toEqual([variant]);
+    expect(added.patches).toEqual([{ op: 'insert', path: ['icons', '0', 'variants', '0'], value: variant }]);
+    const changed = { ...variant, dimensions: { size: 20 } };
+    const updated = applyProjectCommand(added.project, { ...envelope, type: 'variant.update',
+      payload: { iconId: icon.id, variant: changed } });
+    expect(updated.patches).toEqual([{ op: 'replace', path: ['icons', '0', 'variants', '0'], before: variant, after: changed }]);
+    const removed = applyProjectCommand(updated.project, { ...envelope, type: 'variant.remove',
+      payload: { iconId: icon.id, variantId: variant.id } });
+    expect(removed.project.icons[0]?.variants).toEqual([]);
+    expect(removed.inversePatches).toEqual([{ op: 'insert', path: ['icons', '0', 'variants', '0'], value: changed }]);
+    expect(() => applyProjectCommand(addedIcon.project, { ...envelope, type: 'variant.remove',
+      payload: { iconId: icon.id, variantId: variant.id } })).toThrow('variant.not-found');
+  });
 });

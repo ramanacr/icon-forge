@@ -1,5 +1,5 @@
 import { assertProject, type ColorTokenV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type PaintV1, type ProjectV1,
-  type SceneNodeV1, type UUID } from '@iconforge/project-model';
+  type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 
 interface EnvelopeBase {
@@ -24,6 +24,9 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'icon.updateMetadata'; payload: { iconId: UUID; patch: IconMetadataPatch } }
   | { type: 'icon.remove'; payload: { iconId: UUID } }
   | { type: 'icon.duplicate'; payload: { iconId: UUID; newIconId: UUID; idMap: Record<UUID, UUID> } }
+  | { type: 'variant.add'; payload: { iconId: UUID; variant: VariantV1 } }
+  | { type: 'variant.update'; payload: { iconId: UUID; variant: VariantV1 } }
+  | { type: 'variant.remove'; payload: { iconId: UUID; variantId: UUID } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -190,6 +193,46 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     return { project: next, patches: [patch], inversePatches: [inversePatch],
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [profileId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
+  }
+  if (command.type === 'variant.add' || command.type === 'variant.update' || command.type === 'variant.remove') {
+    const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);
+    if (iconIndex < 0) throw new TypeError('icon.not-found');
+    const icon = project.icons[iconIndex]!;
+    const variantId = command.type === 'variant.remove' ? command.payload.variantId : command.payload.variant.id;
+    const variantIndex = icon.variants.findIndex(variant => variant.id === variantId);
+    if (command.type === 'variant.add' && variantIndex >= 0) throw new TypeError('variant.already-exists');
+    if (command.type !== 'variant.add' && variantIndex < 0) throw new TypeError('variant.not-found');
+    const icons = structuredClone(project.icons);
+    const variants = icons[iconIndex]!.variants;
+    let patch: StructuralPatch;
+    let inversePatch: StructuralPatch;
+    let count: { added: number; updated: number; removed: number };
+    if (command.type === 'variant.add') {
+      const variant = structuredClone(command.payload.variant);
+      const path = ['icons', String(iconIndex), 'variants', String(variants.length)];
+      variants.push(variant);
+      patch = { op: 'insert', path, value: variant };
+      inversePatch = { op: 'remove', path, value: variant };
+      count = { added: 1, updated: 0, removed: 0 };
+    } else if (command.type === 'variant.remove') {
+      const removed = variants.splice(variantIndex, 1)[0]!;
+      const path = ['icons', String(iconIndex), 'variants', String(variantIndex)];
+      patch = { op: 'remove', path, value: removed };
+      inversePatch = { op: 'insert', path, value: removed };
+      count = { added: 0, updated: 0, removed: 1 };
+    } else {
+      const before = variants[variantIndex]!;
+      const after = structuredClone(command.payload.variant);
+      variants[variantIndex] = after;
+      const path = ['icons', String(iconIndex), 'variants', String(variantIndex)];
+      patch = { op: 'replace', path, before, after };
+      inversePatch = { op: 'replace', path, before: after, after: before };
+      count = { added: 0, updated: 1, removed: 0 };
+    }
+    const next = assertProject({ ...project, icons, revision: project.revision + 1 });
+    return { project: next, patches: [patch], inversePatches: [inversePatch],
+      result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
+        changedIds: [icon.id, variantId], patchSummary: { ...count, iconsAffected: [icon.id] }, diagnostics: [] } };
   }
   let icons: IconV1[];
   let count: { added: number; updated: number; removed: number };

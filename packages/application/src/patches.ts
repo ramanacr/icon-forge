@@ -39,6 +39,26 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
         } else {
           throw new TypeError('patch.op.unsupported');
         }
+      } else if (patch.path.length === 4 && patch.path[2] === 'variants' && /^(0|[1-9]\d*)$/.test(patch.path[3]!)) {
+        if (index >= icons.length) throw new TypeError('patch.conflict');
+        const variantIndex = Number(patch.path[3]);
+        const variants = icons[index]!.variants;
+        if (patch.op === 'insert') {
+          if (variantIndex > variants.length) throw new TypeError('patch.conflict');
+          variants.splice(variantIndex, 0, structuredClone(patch.value as ProjectV1['icons'][number]['variants'][number]));
+        } else if (patch.op === 'remove') {
+          if (variantIndex >= variants.length || canonicalJson(variants[variantIndex]) !== canonicalJson(patch.value)) {
+            throw new TypeError('patch.conflict');
+          }
+          variants.splice(variantIndex, 1);
+        } else if (patch.op === 'replace') {
+          if (variantIndex >= variants.length || canonicalJson(variants[variantIndex]) !== canonicalJson(patch.before)) {
+            throw new TypeError('patch.conflict');
+          }
+          variants[variantIndex] = structuredClone(patch.after as ProjectV1['icons'][number]['variants'][number]);
+        } else {
+          throw new TypeError('patch.op.unsupported');
+        }
       } else {
         throw new TypeError('patch.path.unsupported');
       }

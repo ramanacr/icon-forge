@@ -81,6 +81,24 @@ describe('project dispatcher', () => {
     expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
   });
 
+  it('undoes and replays a variant replacement', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-0000000000a0', name: 'heart', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    const variant = { id: '0198e09b-a810-7000-8000-0000000000a1', name: 'small', dimensions: { size: 16 }, overrides: [] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000a2', type: 'icon.add', payload: { icon } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000a3', type: 'variant.add',
+      payload: { iconId: icon.id, variant } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000a4', type: 'variant.update',
+      payload: { iconId: icon.id, variant: { ...variant, dimensions: { size: 20 } } } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000a5', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]?.variants[0]).toEqual(variant);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000a6', type: 'history.redo', payload: {} });
+    expect(dispatcher.project?.icons[0]?.variants[0]?.dimensions.size).toBe(20);
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
+
   it('undoes and replays token and design-system transactions', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

@@ -19,6 +19,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm schema:check
       - run: pnpm typecheck
+      - run: pnpm lint:boundaries
       - run: pnpm test
 
   parity:

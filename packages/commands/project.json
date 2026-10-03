@@ -1,6 +1,6 @@
 {
   "name": "commands",
-  "tags": ["scope:core", "type:lib"],
+  "tags": ["scope:core", "type:lib", "layer:commands"],
   "implicitDependencies": ["project-model"],
   "targets": {
     "test": { "command": "vitest run packages/commands" },

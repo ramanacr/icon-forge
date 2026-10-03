@@ -1,6 +1,6 @@
 {
   "name": "application",
-  "tags": ["scope:core", "type:lib"],
+  "tags": ["scope:core", "type:lib", "layer:application"],
   "implicitDependencies": ["project-model", "commands"],
   "targets": {
     "test": { "command": "vitest run packages/application" },

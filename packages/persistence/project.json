@@ -1,6 +1,6 @@
 {
   "name": "persistence",
-  "tags": ["scope:infra", "type:adapter"],
+  "tags": ["scope:infra", "type:adapter", "layer:persistence"],
   "implicitDependencies": ["application", "project-model"],
   "targets": {
     "test": { "command": "vitest run packages/persistence" },

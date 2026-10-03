@@ -4,7 +4,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 
 ## Implemented foundations
 
-- pnpm 11 / Nx workspace with Node 24 and TypeScript 6.0.
+- pnpm 11 / Nx workspace with Node 24 and TypeScript 6.0. Tagged package dependencies are enforced by Nx ESLint in CI; a forbidden import probe was rejected.
 - V1 project types, Draft 2020-12 JSON Schema generation, CSP-safe standalone validator, semantic checks, canonical serialization and half-even quantization.
 - Pure project create/rename and icon add/rename/remove handlers with revision checks and reversible structural patches. Icon patches address a single array entry or field to keep journals bounded.
 - Application dispatcher with dry-run, idempotency, revisioned undo/redo, structural patches persisted in the SHA-256 checksummed journal, replay, corrupt-tail reporting and defensive state copies. Replay fixtures cover 1, 200 and 5,000 commands.
@@ -17,7 +17,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 - S-01: Node/Chromium parity passes for quantization and a checksummed journal replay fixture; 2,000-run numeric property checks pass. Firefox, WebKit and the full golden corpus are pending. The CI job is configured to install all three browsers, but it has not run on a remote runner yet.
 - S-02 through S-05: no conformance suites have passed yet.
 - S-06: Chromium append/reload, stale-write rejection, compaction, two-tab takeover and 2,000-icon save/load pass. Persistence-status and file-save adapter unit tests pass. Forced quota, crash-mid-write, native picker/download browser behaviour, Safari install/non-install documentation and Firefox/WebKit checks are pending.
-- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, migrations, remaining repository durability features, Nx dependency-boundary lint, performance harness and the required spikes.
+- Remaining Phase 0 work: rest of the command registry, multi-command gesture transactions, migrations, remaining repository durability features, performance harness and the required spikes.
 
 The roadmap blocks Phase 1 until S-01 through S-06 pass or recorded adapter swaps satisfy their gates.
 

@@ -10,6 +10,31 @@ type SpikeResult = { domAvailable: boolean; canvasAvailable: boolean; areas?: Re
   invalidResult?: unknown; canonicalInputsUnchanged?: boolean; canonicalOperations?: unknown; error?: string };
 
 self.addEventListener('message', (event: MessageEvent) => {
+  if (event.data?.case === 'nested-hole') {
+    const left = [
+      { start: [0, 0] as [number, number], segments: [
+        { k: 'L' as const, to: [20, 0] as [number, number] }, { k: 'L' as const, to: [20, 20] as [number, number] },
+        { k: 'L' as const, to: [0, 20] as [number, number] },
+      ], closed: true },
+      { start: [5, 5] as [number, number], segments: [
+        { k: 'L' as const, to: [5, 15] as [number, number] }, { k: 'L' as const, to: [15, 15] as [number, number] },
+        { k: 'L' as const, to: [15, 5] as [number, number] },
+      ], closed: true },
+    ];
+    const right = [{ start: [10, 0] as [number, number], segments: [
+      { k: 'L' as const, to: [25, 0] as [number, number] }, { k: 'L' as const, to: [25, 20] as [number, number] },
+      { k: 'L' as const, to: [10, 20] as [number, number] },
+    ], closed: true }];
+    const engine = new PaperGeometryEngine();
+    const operations = {
+      union: engine.boolean(left, right, 'union'),
+      subtract: engine.boolean(left, right, 'subtract'),
+      intersect: engine.boolean(left, right, 'intersect'),
+      exclude: engine.boolean(left, right, 'exclude'),
+    };
+    self.postMessage({ operations, left, right });
+    return;
+  }
   if (event.data?.case === 'thin-overlap') {
     const rectangle = (x: number) => [{ start: [x, 0] as [number, number], segments: [
       { k: 'L' as const, to: [x + 10, 0] as [number, number] },

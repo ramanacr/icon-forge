@@ -183,4 +183,23 @@ describe('project command handlers', () => {
     expect(() => applyProjectCommand(addedIcon.project, { ...envelope, type: 'variant.remove',
       payload: { iconId: icon.id, variantId: variant.id } })).toThrow('variant.not-found');
   });
+
+  it('adds, updates and removes a component while protecting instance references', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const component = { id: '0198e09b-a810-7000-8000-0000000000b0', name: 'cross', parameters: [], nodes: [] };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'component.add', payload: { component } });
+    expect(added.patches).toEqual([{ op: 'insert', path: ['components', '0'], value: component }]);
+    const changed = { ...component, name: 'plus' };
+    const updated = applyProjectCommand(added.project, { ...envelope, type: 'component.update', payload: { component: changed } });
+    expect(updated.patches).toEqual([{ op: 'replace', path: ['components', '0'], before: component, after: changed }]);
+    const referencing = applyProjectCommand(updated.project, { ...envelope, type: 'icon.add', payload: { icon: { ...icon,
+      nodes: [{ id: '0198e09b-a810-7000-8000-0000000000b1', type: 'instance', visible: true, locked: false,
+        componentId: component.id, arguments: {} }] } } });
+    expect(() => applyProjectCommand(referencing.project, { ...envelope, type: 'component.remove',
+      payload: { componentId: component.id } })).toThrow('component.in-use');
+    const removed = applyProjectCommand(updated.project, { ...envelope, type: 'component.remove',
+      payload: { componentId: component.id } });
+    expect(removed.project.components).toEqual([]);
+    expect(removed.inversePatches).toEqual([{ op: 'insert', path: ['components', '0'], value: changed }]);
+  });
 });

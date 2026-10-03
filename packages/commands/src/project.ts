@@ -1,4 +1,4 @@
-import { assertProject, type ColorTokenV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type PaintV1, type ProjectV1,
+import { assertProject, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type PaintV1, type ProjectV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 
@@ -27,6 +27,9 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'variant.add'; payload: { iconId: UUID; variant: VariantV1 } }
   | { type: 'variant.update'; payload: { iconId: UUID; variant: VariantV1 } }
   | { type: 'variant.remove'; payload: { iconId: UUID; variantId: UUID } }
+  | { type: 'component.add'; payload: { component: ComponentV1 } }
+  | { type: 'component.update'; payload: { component: ComponentV1 } }
+  | { type: 'component.remove'; payload: { componentId: UUID } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -87,6 +90,14 @@ function tokenIsUsed(project: ProjectV1, name: string): boolean {
       override.op === 'replaceNode' ? nodeUses(override.node)
         : override.op === 'setFill' ? paintUses(override.fill)
           : override.op === 'setStroke' ? override.stroke !== null && paintUses(override.stroke.paint) : false)));
+}
+
+function componentIsUsed(project: ProjectV1, id: UUID): boolean {
+  const uses = (node: SceneNodeV1): boolean => node.type === 'instance' && node.componentId === id
+    || node.type === 'group' && node.children.some(uses);
+  return project.components.some(component => component.nodes.some(uses))
+    || project.icons.some(icon => icon.nodes.some(uses) || icon.variants.some(variant => variant.overrides.some(override =>
+      override.op === 'replaceNode' && uses(override.node))));
 }
 
 export function applyProjectCommand(project: ProjectV1 | null, command: ProjectCommand): HandlerResult {
@@ -193,6 +204,43 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     return { project: next, patches: [patch], inversePatches: [inversePatch],
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [profileId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
+  }
+  if (command.type === 'component.add' || command.type === 'component.update' || command.type === 'component.remove') {
+    const componentId = command.type === 'component.remove' ? command.payload.componentId : command.payload.component.id;
+    const index = project.components.findIndex(component => component.id === componentId);
+    if (command.type === 'component.add' && index >= 0) throw new TypeError('component.already-exists');
+    if (command.type !== 'component.add' && index < 0) throw new TypeError('component.not-found');
+    if (command.type === 'component.remove' && componentIsUsed(project, componentId)) throw new TypeError('component.in-use');
+    const components = structuredClone(project.components);
+    let patch: StructuralPatch;
+    let inversePatch: StructuralPatch;
+    let count: { added: number; updated: number; removed: number };
+    if (command.type === 'component.add') {
+      const component = structuredClone(command.payload.component);
+      const path = ['components', String(components.length)];
+      components.push(component);
+      patch = { op: 'insert', path, value: component };
+      inversePatch = { op: 'remove', path, value: component };
+      count = { added: 1, updated: 0, removed: 0 };
+    } else if (command.type === 'component.remove') {
+      const removed = components.splice(index, 1)[0]!;
+      const path = ['components', String(index)];
+      patch = { op: 'remove', path, value: removed };
+      inversePatch = { op: 'insert', path, value: removed };
+      count = { added: 0, updated: 0, removed: 1 };
+    } else {
+      const before = components[index]!;
+      const after = structuredClone(command.payload.component);
+      components[index] = after;
+      const path = ['components', String(index)];
+      patch = { op: 'replace', path, before, after };
+      inversePatch = { op: 'replace', path, before: after, after: before };
+      count = { added: 0, updated: 1, removed: 0 };
+    }
+    const next = assertProject({ ...project, components, revision: project.revision + 1 });
+    return { project: next, patches: [patch], inversePatches: [inversePatch],
+      result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
+        changedIds: [componentId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
   }
   if (command.type === 'variant.add' || command.type === 'variant.update' || command.type === 'variant.remove') {
     const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);

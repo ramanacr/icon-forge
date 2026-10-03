@@ -99,6 +99,21 @@ describe('project dispatcher', () => {
     expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
   });
 
+  it('undoes and replays a component update', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const component = { id: '0198e09b-a810-7000-8000-0000000000c0', name: 'cross', parameters: [], nodes: [] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000c1', type: 'component.add',
+      payload: { component } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000c2', type: 'component.update',
+      payload: { component: { ...component, name: 'plus' } } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000c3', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.components).toEqual([component]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000c4', type: 'history.redo', payload: {} });
+    expect(dispatcher.project?.components[0]?.name).toBe('plus');
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
+
   it('undoes and replays token and design-system transactions', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

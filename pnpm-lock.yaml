@@ -66,7 +66,7 @@ importers:
         specifier: 8.17.1
         version: 8.17.1
 
-  packages/compiler-core:
+  packages/export-svg:
     dependencies:
       '@iconforge/project-model':
         specifier: workspace:*

@@ -1,0 +1,9 @@
+{
+  "name": "export-svg",
+  "tags": ["scope:infra", "type:adapter", "layer:export-svg"],
+  "implicitDependencies": ["project-model"],
+  "targets": {
+    "test": { "command": "vitest run packages/export-svg" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

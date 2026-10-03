@@ -10,7 +10,7 @@ Phase 0 is in progress. The v4 engineering package remains the design authority.
 - Application dispatcher with dry-run, idempotency, revisioned undo/redo, structural patches persisted in the SHA-256 checksummed journal, replay, corrupt-tail reporting and defensive state copies. Replay fixtures cover 1, 200 and 5,000 commands.
 - IndexedDB repository adapter with atomic revision-checked journal append, snapshot compaction and corrupt-tail truncation; browser-tested reload, two-tab Web Lock takeover and read-only revision announcements in Chromium.
 - Persistent-storage status request, quota-error classification, deterministic `.iconproj` ZIP with SHA-256 project and original hashes, and native-file/download save adapter. Chromium passes a 2,000-icon snapshot and archive round trip.
-- Pure SVG primitive serializer with escaped accessibility text, canonical paint and path output, precision fallback for narrow closed segments, and a Node/Chromium golden hash. Archive extraction enforces path, entry count and byte limits before decompression.
+- Pure `export-svg` primitive serializer with escaped accessibility text, canonical paint and path output, precision fallback for narrow closed segments, and a Node/Chromium golden hash. Archive extraction enforces path, entry count and byte limits before decompression.
 - CI checks for frozen installation, generated-schema drift, typecheck, unit tests and a three-browser Playwright parity fixture.
 
 ## Gates still open

@@ -1,9 +1,0 @@
-{
-  "name": "compiler-core",
-  "tags": ["scope:core", "type:lib", "layer:compiler"],
-  "implicitDependencies": ["project-model"],
-  "targets": {
-    "test": { "command": "vitest run packages/compiler-core" },
-    "typecheck": { "command": "tsc --noEmit" }
-  }
-}

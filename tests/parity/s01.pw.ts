@@ -28,7 +28,7 @@ test.beforeAll(async () => {
     entryPoints: {
       application: resolve('packages/application/src/index.ts'),
       model: resolve('packages/project-model/src/index.ts'),
-      compiler: resolve('packages/compiler-core/src/index.ts'),
+      compiler: resolve('packages/export-svg/src/index.ts'),
     },
     outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
   });

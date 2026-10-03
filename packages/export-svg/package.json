@@ -1,5 +1,5 @@
 {
-  "name": "@iconforge/compiler-core",
+  "name": "@iconforge/export-svg",
   "version": "0.0.0",
   "private": true,
   "type": "module",

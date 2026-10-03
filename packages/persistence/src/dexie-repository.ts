@@ -55,5 +55,21 @@ export class DexieProjectRepository implements IProjectRepository {
     } catch (error) { throw asProjectStorageError(error); }
   }
 
+  async truncateJournal(id: string, expectedRevision: number, validLength: number): Promise<void> {
+    if (!Number.isSafeInteger(validLength) || validLength < 0) throw new TypeError('journal.length.invalid');
+    try {
+      await this.database.transaction('rw', this.database.projects, async () => {
+        const row = await this.database.projects.get(id);
+        if (!row || row.revision !== expectedRevision) throw new TypeError('revision.conflict');
+        const baseRevision = row.snapshot?.revision ?? 0;
+        if (baseRevision + row.journal.length !== row.revision || validLength > row.journal.length) {
+          throw new TypeError('journal.length.invalid');
+        }
+        await this.database.projects.put({ ...row, revision: baseRevision + validLength,
+          journal: row.journal.slice(0, validLength) });
+      });
+    } catch (error) { throw asProjectStorageError(error); }
+  }
+
   close(): void { this.database.close(); }
 }

@@ -139,3 +139,64 @@ test('S-06 2,000-icon project survives snapshot, archive and browser restart', a
   }, result.id);
   expect(reopened).toEqual({ revision: 1, icons: 2_000 });
 });
+
+test('S-06 corrupt journal tail is recovered and durably truncated', async ({ page }) => {
+  await page.goto(baseUrl);
+  const beforeReload = await page.evaluate(async () => {
+    const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const id = '0198e09b-a810-7000-8000-000000000020';
+    const base = { commandVersion: '1.0', projectId: id, issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' } };
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000021', type: 'project.create', payload: { id, name: 'Medical' } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000022', type: 'project.rename', payload: { name: 'Clinical' } });
+    const repository = new DexieProjectRepository('iconforge-s06-recovery');
+    await repository.append(id, 0, 1, dispatcher.journal[0]);
+    await repository.append(id, 1, 2, { ...dispatcher.journal[1], checksum: 'corrupt' });
+    const saved = await repository.load(id);
+    const recovered = ProjectDispatcher.replay(saved.snapshot, saved.journal);
+    await repository.truncateJournal(id, saved.revision, recovered.journal.length);
+    repository.close();
+    return { id, recoveredName: recovered.project?.name, diagnostics: recovered.recoveryDiagnostics.length };
+  });
+  expect(beforeReload.recoveredName).toBe('Medical');
+  expect(beforeReload.diagnostics).toBe(1);
+  await page.reload();
+  const afterReload = await page.evaluate(async id => {
+    const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const repository = new DexieProjectRepository('iconforge-s06-recovery');
+    const saved = await repository.load(id);
+    const replayed = ProjectDispatcher.replay(saved.snapshot, saved.journal);
+    repository.close();
+    return { revision: saved.revision, journalLength: saved.journal.length,
+      name: replayed.project?.name, diagnostics: replayed.recoveryDiagnostics.length };
+  }, beforeReload.id);
+  expect(afterReload).toEqual({ revision: 1, journalLength: 1, name: 'Medical', diagnostics: 0 });
+});
+
+test('S-06 browser file-save adapters only report success after writing', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+    const { saveProjectFile, decodeProjectArchive, requestPersistentStorage } = await import(new URL('/persistence.js', location.origin).href);
+    const id = '0198e09b-a810-7000-8000-000000000030';
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch({ commandVersion: '1.0', projectId: id, commandId: '0198e09b-a810-7000-8000-000000000031',
+      issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' }, type: 'project.create', payload: { id, name: 'Medical' } });
+    let written: Uint8Array | undefined;
+    let closed = false;
+    const saved = await saveProjectFile(dispatcher.project, { picker: async () => ({ createWritable: async () => ({
+      write: async (bytes: Uint8Array) => { written = bytes; }, close: async () => { closed = true; },
+    }) }) });
+    let downloaded: Uint8Array | undefined;
+    const fallback = await saveProjectFile(dispatcher.project, { download: async (_name: string, bytes: Uint8Array) => { downloaded = bytes; } });
+    const decoded = await decodeProjectArchive(written!);
+    const durability = await requestPersistentStorage();
+    return { savedMethod: saved.method, closed, name: decoded.project.name,
+      fallbackMethod: fallback.method, sameBytes: downloaded?.length === written?.length, durability };
+  });
+  expect(result).toMatchObject({ savedMethod: 'file', closed: true, name: 'Medical',
+    fallbackMethod: 'download', sameBytes: true });
+  expect(['persistent', 'best-effort', 'unsupported']).toContain(result.durability);
+});

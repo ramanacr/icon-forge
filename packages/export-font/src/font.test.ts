@@ -46,4 +46,29 @@ describe('S-05 OTF/CFF font construction', () => {
     expect(shaped.glyphs).toHaveLength(1);
     expect(shaped.glyphs[0]?.id).toBe(parsed.glyphForCodePoint(0xe000).id);
   });
+
+  it('preserves explicit PUA mappings across insertion order and empty glyphs', () => {
+    const empty = { name: 'empty', codepoint: 0xe001, viewBox: [0, 0, 24, 24] as [number, number, number, number],
+      path: [] };
+    const a = buildOtfFont({ ...input, glyphs: [input.glyphs[0]!, empty] });
+    const b = buildOtfFont({ ...input, glyphs: [empty, input.glyphs[0]!] });
+    expect(a).toEqual(b);
+    const parsed = fontkit.create(Buffer.from(a));
+    if ('fonts' in parsed) throw new Error('Expected a single OTF font');
+    expect(parsed.glyphForCodePoint(0xe000).name).toBe('medical-plus');
+    expect(parsed.glyphForCodePoint(0xe001).name).toBe('empty');
+    expect(parsed.glyphForCodePoint(0xe001).path.commands).toHaveLength(0);
+    const original = fontkit.create(Buffer.from(buildOtfFont(input)));
+    if ('fonts' in original) throw new Error('Expected a single OTF font');
+    expect(original.glyphForCodePoint(0xe000).name).toBe(parsed.glyphForCodePoint(0xe000).name);
+  });
+
+  it('rejects duplicate codepoints and sanitizes the family name', () => {
+    expect(() => buildOtfFont({ ...input, glyphs: [input.glyphs[0]!,
+      { ...input.glyphs[0]!, name: 'other', codepoint: 0xe000 }] })).toThrow('font.glyph.invalid');
+    expect(() => buildOtfFont({ ...input, family: '!!!' })).toThrow('font.input.invalid');
+    const parsed = fontkit.create(Buffer.from(buildOtfFont({ ...input, family: 'Medical!? Icons' })));
+    if ('fonts' in parsed) throw new Error('Expected a single OTF font');
+    expect(parsed.familyName).toBe('Medical Icons');
+  });
 });

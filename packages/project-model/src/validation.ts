@@ -104,10 +104,24 @@ export function assertProject(input: unknown): ProjectV1 {
     if (names.has(icon.name)) throw new TypeError(`Duplicate icon name: ${icon.name}`);
     names.add(icon.name);
     for (const alias of icon.aliases) checkSlug(alias);
+    const nodeIds = new Set<string>();
+    const collectNodeIds = (nodes: SceneNodeV1[]): void => {
+      for (const node of nodes) {
+        nodeIds.add(node.id);
+        if (node.type === 'group') collectNodeIds(node.children);
+      }
+    };
+    collectNodeIds(icon.nodes);
     checkNodes(icon.nodes, 0);
     for (const variant of icon.variants) {
       addId(variant.id);
       checkSlug(variant.name);
+      for (const override of variant.overrides) {
+        if (!nodeIds.has(override.nodeId)) throw new TypeError(`Missing variant target: ${override.nodeId}`);
+        if (override.op === 'replaceNode') checkNodes([override.node], 0);
+        if (override.op === 'setFill' && override.fill) checkPaint(override.fill);
+        if (override.op === 'setStroke' && override.stroke) checkPaint(override.stroke.paint);
+      }
     }
   }
   for (const profile of project.exportProfiles) { addId(profile.id); checkSlug(profile.name); }

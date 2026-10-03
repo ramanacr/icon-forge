@@ -137,4 +137,30 @@ describe('project command handlers', () => {
     expect(() => applyProjectCommand(removed.project, { ...envelope, type: 'exportProfile.remove',
       payload: { profileId: profile.id } })).toThrow('export-profile.not-found');
   });
+
+  it('duplicates an icon with caller-supplied IDs and remapped variant references', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const groupId = '0198e09b-a810-7000-8000-000000000070';
+    const childId = '0198e09b-a810-7000-8000-000000000071';
+    const variantId = '0198e09b-a810-7000-8000-000000000072';
+    const replacementId = '0198e09b-a810-7000-8000-000000000073';
+    const source: IconV1 = { ...icon, nodes: [{ id: groupId, type: 'group', visible: true, locked: false,
+      children: [{ id: childId, type: 'rect', visible: true, locked: false, x: 1, y: 1, width: 8, height: 8, rx: 0, ry: 0 }] }],
+      variants: [{ id: variantId, name: 'small', dimensions: { size: 16 }, overrides: [{ op: 'replaceNode', nodeId: childId,
+        node: { id: replacementId, type: 'ellipse', visible: true, locked: false, cx: 4, cy: 4, rx: 2, ry: 2 } }] }] };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon: source } });
+    const newIconId = '0198e09b-a810-7000-8000-000000000080';
+    const idMap = { [groupId]: '0198e09b-a810-7000-8000-000000000081',
+      [childId]: '0198e09b-a810-7000-8000-000000000082', [variantId]: '0198e09b-a810-7000-8000-000000000083',
+      [replacementId]: '0198e09b-a810-7000-8000-000000000084' };
+    const duplicated = applyProjectCommand(added.project, { ...envelope, type: 'icon.duplicate',
+      payload: { iconId: icon.id, newIconId, idMap } });
+    expect(duplicated.project.icons[0]).toEqual(source);
+    expect(duplicated.project.icons[1]).toMatchObject({ id: newIconId, name: 'heart-copy',
+      nodes: [{ id: idMap[groupId], children: [{ id: idMap[childId] }] }],
+      variants: [{ id: idMap[variantId], overrides: [{ nodeId: idMap[childId], node: { id: idMap[replacementId] } }] }] });
+    expect(duplicated.patches).toEqual([{ op: 'insert', path: ['icons', '1'], value: duplicated.project.icons[1] }]);
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'icon.duplicate',
+      payload: { iconId: icon.id, newIconId, idMap: { [groupId]: idMap[groupId] } } })).toThrow('icon.duplicate.id-map');
+  });
 });

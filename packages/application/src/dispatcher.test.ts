@@ -63,6 +63,24 @@ describe('project dispatcher', () => {
     expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
   });
 
+  it('replays and undoes deterministic icon duplication', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-000000000090', name: 'heart', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000091', type: 'icon.add', payload: { icon } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000092', type: 'icon.duplicate',
+      payload: { iconId: icon.id, newIconId: '0198e09b-a810-7000-8000-000000000093', idMap: {} } });
+    expect(dispatcher.project?.icons.map(item => item.name)).toEqual(['heart', 'heart-copy']);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000094', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons).toEqual([icon]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000095', type: 'history.redo', payload: {} });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000096', type: 'icon.duplicate',
+      payload: { iconId: icon.id, newIconId: '0198e09b-a810-7000-8000-000000000097', idMap: {} } });
+    expect(dispatcher.project?.icons.map(item => item.name)).toEqual(['heart', 'heart-copy', 'heart-copy-2']);
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
+
   it('undoes and replays token and design-system transactions', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

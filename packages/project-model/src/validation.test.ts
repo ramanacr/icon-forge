@@ -54,6 +54,24 @@ describe('project validation', () => {
     expect(() => assertProject({ ...emptyProject, icons: [icon] })).toThrow();
   });
 
+  it('checks replacement nodes and variant targets in the global scene graph', () => {
+    const node = { id: '0198e09b-a810-7000-8000-000000000071', type: 'rect', visible: true, locked: false,
+      x: 1, y: 1, width: 8, height: 8, rx: 0, ry: 0 };
+    const icon = { id: '0198e09b-a810-7000-8000-000000000070', name: 'heart', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [node], accessibility: { kind: 'decorative' }, provenanceIds: [],
+      variants: [{ id: '0198e09b-a810-7000-8000-000000000072', name: 'small', dimensions: {},
+        overrides: [{ op: 'replaceNode', nodeId: node.id, node: { ...node, id: '0198e09b-a810-7000-8000-000000000073' } }] }] };
+    expect(() => assertProject({ ...emptyProject, icons: [icon] })).not.toThrow();
+    const duplicateReplacement = { ...icon, variants: [{ ...icon.variants[0]!, overrides: [
+      { ...icon.variants[0]!.overrides[0]!, node: { ...node, id: node.id } },
+    ] }] };
+    expect(() => assertProject({ ...emptyProject, icons: [duplicateReplacement] })).toThrow('Invalid or duplicate id');
+    const danglingTarget = { ...icon, variants: [{ ...icon.variants[0]!, overrides: [
+      { ...icon.variants[0]!.overrides[0]!, nodeId: '0198e09b-a810-7000-8000-000000000099' },
+    ] }] };
+    expect(() => assertProject({ ...emptyProject, icons: [danglingTarget] })).toThrow('Missing variant target');
+  });
+
   it('allows repeated component instances but rejects component cycles', () => {
     const componentId = '0198e09b-a810-7000-8000-000000000010';
     const component = { id: componentId, name: 'cross', parameters: [], nodes: [] as unknown[] };

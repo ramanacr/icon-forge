@@ -818,6 +818,95 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "icon.duplicate"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "iconId": {
+                  "$ref": "#/$defs/UUID"
+                },
+                "newIconId": {
+                  "$ref": "#/$defs/UUID"
+                },
+                "idMap": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/UUID"
+                  },
+                  "propertyNames": {
+                    "description": "Persisted v1 document types. SCHEMAS.md is the normative contract."
+                  }
+                }
+              },
+              "required": [
+                "iconId",
+                "newIconId",
+                "idMap"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "exportProfile.upsert"
             },
             "payload": {

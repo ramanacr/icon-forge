@@ -1,5 +1,6 @@
 import { assertProject, type ColorTokenV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type PaintV1, type ProjectV1,
   type SceneNodeV1, type UUID } from '@iconforge/project-model';
+import { duplicateIcon } from './duplicate.js';
 
 interface EnvelopeBase {
   commandVersion: '1.0';
@@ -22,6 +23,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'icon.rename'; payload: { iconId: UUID; name: string } }
   | { type: 'icon.updateMetadata'; payload: { iconId: UUID; patch: IconMetadataPatch } }
   | { type: 'icon.remove'; payload: { iconId: UUID } }
+  | { type: 'icon.duplicate'; payload: { iconId: UUID; newIconId: UUID; idMap: Record<UUID, UUID> } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -213,6 +215,14 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       const path = ['icons', String(index)];
       patches = [{ op: 'remove', path, value: removed }];
       inversePatches = [{ op: 'insert', path, value: removed }];
+    } else if (command.type === 'icon.duplicate') {
+      const copy = duplicateIcon(project, project.icons[index]!, command.payload.newIconId, command.payload.idMap);
+      iconId = copy.id;
+      const path = ['icons', String(icons.length)];
+      icons.push(copy);
+      count = { added: 1, updated: 0, removed: 0 };
+      patches = [{ op: 'insert', path, value: copy }];
+      inversePatches = [{ op: 'remove', path, value: copy }];
     } else if (command.type === 'icon.updateMetadata') {
       const patch = command.payload.patch;
       if (Object.keys(patch).length === 0) throw new TypeError('icon.metadata.empty-patch');

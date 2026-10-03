@@ -8,7 +8,9 @@ import { expect, test } from '@playwright/test';
 let outputDir: string;
 let server: Server;
 let baseUrl: string;
-type TestWindow = Window & { iconForgeLock?: { mode: 'writer' | 'readonly'; takeOver(): Promise<boolean>; close(): Promise<void> } };
+type TestWindow = Window & { iconForgeLock?: { mode: 'writer' | 'readonly'; takeOver(): Promise<boolean>; close(): Promise<void>;
+  publishRevision(revision: number): void; onRevision(callback: (revision: number) => void): () => void };
+  iconForgeRevisions?: number[] };
 
 test.beforeAll(async () => {
   outputDir = await mkdtemp(join(tmpdir(), 'iconforge-s06-'));
@@ -101,6 +103,30 @@ test('S-06 second tab is read-only until explicit takeover', async ({ browser })
   expect(await second.evaluate(() => (window as TestWindow).iconForgeLock!.mode)).toBe('writer');
   await second.evaluate(async () => (window as TestWindow).iconForgeLock!.close());
   await first.evaluate(async () => (window as TestWindow).iconForgeLock!.close());
+  await context.close();
+});
+
+test('S-06 read-only viewers receive committed revision announcements', async ({ browser }) => {
+  const context = await browser.newContext();
+  const writer = await context.newPage();
+  const viewer = await context.newPage();
+  await writer.goto(baseUrl);
+  await viewer.goto(baseUrl);
+  await writer.evaluate(async () => {
+    const { ProjectWriteLock } = await import(new URL('/persistence.js', location.origin).href);
+    (window as TestWindow).iconForgeLock = await ProjectWriteLock.open('0198e09b-a810-7000-8000-000000000070', async () => {});
+  });
+  await viewer.evaluate(async () => {
+    const { ProjectWriteLock } = await import(new URL('/persistence.js', location.origin).href);
+    const lock = await ProjectWriteLock.open('0198e09b-a810-7000-8000-000000000070', async () => {});
+    (window as TestWindow).iconForgeLock = lock;
+    (window as TestWindow).iconForgeRevisions = [];
+    lock.onRevision((revision: number) => (window as TestWindow).iconForgeRevisions!.push(revision));
+  });
+  await writer.evaluate(() => (window as TestWindow).iconForgeLock!.publishRevision(5));
+  await expect.poll(() => viewer.evaluate(() => (window as TestWindow).iconForgeRevisions)).toEqual([5]);
+  await writer.evaluate(async () => (window as TestWindow).iconForgeLock!.close());
+  await viewer.evaluate(async () => (window as TestWindow).iconForgeLock!.close());
   await context.close();
 });
 

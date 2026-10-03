@@ -5,6 +5,7 @@ export class ProjectWriteLock {
   private state: 'writer' | 'readonly' = 'readonly';
   private releaseHeld: (() => void) | null = null;
   private heldRequest: Promise<void> | null = null;
+  private readonly revisionListeners = new Set<(revision: number) => void>();
 
   private constructor(projectId: string, flush: () => Promise<void>) {
     this.name = `iconforge:project:${projectId}`;
@@ -21,6 +22,17 @@ export class ProjectWriteLock {
   }
 
   get mode(): 'writer' | 'readonly' { return this.state; }
+
+  onRevision(callback: (revision: number) => void): () => void {
+    this.revisionListeners.add(callback);
+    return () => { this.revisionListeners.delete(callback); };
+  }
+
+  publishRevision(revision: number): void {
+    if (this.state !== 'writer') throw new TypeError('project-lock.readonly');
+    if (!Number.isSafeInteger(revision) || revision < 0) throw new TypeError('project-lock.revision.invalid');
+    this.channel.postMessage({ type: 'revision', revision });
+  }
 
   private async tryAcquire(): Promise<boolean> {
     let decide!: (value: boolean) => void;
@@ -45,6 +57,11 @@ export class ProjectWriteLock {
   }
 
   private async onMessage(data: unknown): Promise<void> {
+    if (typeof data === 'object' && data !== null && 'type' in data && data.type === 'revision'
+      && 'revision' in data && Number.isSafeInteger(data.revision) && Number(data.revision) >= 0) {
+      if (this.state === 'readonly') for (const listener of this.revisionListeners) listener(Number(data.revision));
+      return;
+    }
     if (typeof data !== 'object' || data === null || !('type' in data) || data.type !== 'takeover' || this.state !== 'writer') return;
     try {
       await this.flush();
@@ -73,6 +90,7 @@ export class ProjectWriteLock {
 
   async close(): Promise<void> {
     if (this.state === 'writer') await this.release();
+    this.revisionListeners.clear();
     this.channel.close();
   }
 }

@@ -10,6 +10,24 @@ type SpikeResult = { domAvailable: boolean; canvasAvailable: boolean; areas?: Re
   invalidResult?: unknown; canonicalInputsUnchanged?: boolean; canonicalOperations?: unknown; error?: string };
 
 self.addEventListener('message', (event: MessageEvent) => {
+  if (event.data?.case === 'thin-overlap') {
+    const rectangle = (x: number) => [{ start: [x, 0] as [number, number], segments: [
+      { k: 'L' as const, to: [x + 10, 0] as [number, number] },
+      { k: 'L' as const, to: [x + 10, 10] as [number, number] },
+      { k: 'L' as const, to: [x, 10] as [number, number] },
+    ], closed: true }];
+    const engine = new PaperGeometryEngine();
+    const left = rectangle(0);
+    const right = rectangle(9.9);
+    const operations = {
+      union: engine.boolean(left, right, 'union'),
+      subtract: engine.boolean(left, right, 'subtract'),
+      intersect: engine.boolean(left, right, 'intersect'),
+      exclude: engine.boolean(left, right, 'exclude'),
+    };
+    self.postMessage({ operations, left, right });
+    return;
+  }
   if (event.data?.case === 'curved') {
     const engine = new PaperGeometryEngine();
     const radius = 10;

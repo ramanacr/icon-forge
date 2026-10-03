@@ -1,4 +1,4 @@
-import { assertProject, type ColorTokenV1, type DesignSystemV1, type IconV1, type PaintV1, type ProjectV1,
+import { assertProject, type ColorTokenV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type PaintV1, type ProjectV1,
   type SceneNodeV1, type UUID } from '@iconforge/project-model';
 
 interface EnvelopeBase {
@@ -22,6 +22,8 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'icon.rename'; payload: { iconId: UUID; name: string } }
   | { type: 'icon.updateMetadata'; payload: { iconId: UUID; patch: IconMetadataPatch } }
   | { type: 'icon.remove'; payload: { iconId: UUID } }
+  | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
+  | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
 
 export type IconMetadataPatch = Partial<Pick<IconV1, 'aliases' | 'tags' | 'accessibility'>> & {
@@ -154,6 +156,38 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     return { project: next, patches: [patch], inversePatches: [inversePatch],
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [project.id], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
+  }
+  if (command.type === 'exportProfile.upsert' || command.type === 'exportProfile.remove') {
+    const profileId = command.type === 'exportProfile.upsert' ? command.payload.profile.id : command.payload.profileId;
+    const index = project.exportProfiles.findIndex(profile => profile.id === profileId);
+    if (command.type === 'exportProfile.remove' && index < 0) throw new TypeError('export-profile.not-found');
+    const profiles = structuredClone(project.exportProfiles);
+    let patch: StructuralPatch;
+    let inversePatch: StructuralPatch;
+    let count: { added: number; updated: number; removed: number };
+    if (command.type === 'exportProfile.remove') {
+      const removed = profiles.splice(index, 1)[0]!;
+      patch = { op: 'remove', path: ['exportProfiles', String(index)], value: removed };
+      inversePatch = { op: 'insert', path: patch.path, value: removed };
+      count = { added: 0, updated: 0, removed: 1 };
+    } else if (index < 0) {
+      const profile = structuredClone(command.payload.profile);
+      profiles.push(profile);
+      patch = { op: 'insert', path: ['exportProfiles', String(profiles.length - 1)], value: profile };
+      inversePatch = { op: 'remove', path: patch.path, value: profile };
+      count = { added: 1, updated: 0, removed: 0 };
+    } else {
+      const before = profiles[index]!;
+      const after = structuredClone(command.payload.profile);
+      profiles[index] = after;
+      patch = { op: 'replace', path: ['exportProfiles', String(index)], before, after };
+      inversePatch = { op: 'replace', path: patch.path, before: after, after: before };
+      count = { added: 0, updated: 1, removed: 0 };
+    }
+    const next = assertProject({ ...project, exportProfiles: profiles, revision: project.revision + 1 });
+    return { project: next, patches: [patch], inversePatches: [inversePatch],
+      result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
+        changedIds: [profileId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
   }
   let icons: IconV1[];
   let count: { added: number; updated: number; removed: number };

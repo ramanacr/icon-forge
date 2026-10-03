@@ -119,4 +119,22 @@ describe('project command handlers', () => {
       iconId: icon.id, patch: { aliases: ['Not A Slug'] },
     } })).toThrow();
   });
+
+  it('upserts and removes an export profile with bounded inverse patches', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const profile = { id: '0198e09b-a810-7000-8000-000000000040', name: 'web-icons', target: 'svg' as const,
+      options: { precision: 3 as const, sizeAttrs: false, paintMode: 'currentColor' as const, metadata: false } };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'exportProfile.upsert', payload: { profile } });
+    expect(added.project.exportProfiles).toEqual([profile]);
+    expect(added.patches).toEqual([{ op: 'insert', path: ['exportProfiles', '0'], value: profile }]);
+    const changed = { ...profile, options: { ...profile.options, precision: 2 as const } };
+    const updated = applyProjectCommand(added.project, { ...envelope, type: 'exportProfile.upsert', payload: { profile: changed } });
+    expect(added.project.exportProfiles).toEqual([profile]);
+    expect(updated.patches).toEqual([{ op: 'replace', path: ['exportProfiles', '0'], before: profile, after: changed }]);
+    const removed = applyProjectCommand(updated.project, { ...envelope, type: 'exportProfile.remove', payload: { profileId: profile.id } });
+    expect(removed.project.exportProfiles).toEqual([]);
+    expect(removed.inversePatches).toEqual([{ op: 'insert', path: ['exportProfiles', '0'], value: changed }]);
+    expect(() => applyProjectCommand(removed.project, { ...envelope, type: 'exportProfile.remove',
+      payload: { profileId: profile.id } })).toThrow('export-profile.not-found');
+  });
 });

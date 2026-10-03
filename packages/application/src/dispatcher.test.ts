@@ -46,6 +46,23 @@ describe('project dispatcher', () => {
     expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
   });
 
+  it('undoes and replays export profile replacement', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const profile = { id: '0198e09b-a810-7000-8000-000000000060', name: 'web-icons', target: 'svg' as const,
+      options: { precision: 3 as const, sizeAttrs: false, paintMode: 'currentColor' as const, metadata: false } };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000061', type: 'exportProfile.upsert',
+      payload: { profile } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000062', type: 'exportProfile.upsert',
+      payload: { profile: { ...profile, options: { ...profile.options, precision: 2 } } } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000063', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.exportProfiles[0]).toEqual(profile);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000064', type: 'history.redo', payload: {} });
+    expect(dispatcher.project?.exportProfiles[0]?.target).toBe('svg');
+    expect(dispatcher.project?.exportProfiles[0]?.options).toMatchObject({ precision: 2 });
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
+
   it('undoes and replays token and design-system transactions', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

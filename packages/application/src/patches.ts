@@ -60,6 +60,23 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
         throw new TypeError('patch.op.unsupported');
       }
       current = { ...current, tokens };
+    } else if (patch.path[0] === 'exportProfiles' && patch.path.length === 2) {
+      if (current === null || !/^(0|[1-9]\d*)$/.test(patch.path[1]!)) throw new TypeError('patch.conflict');
+      const index = Number(patch.path[1]);
+      const profiles = structuredClone(current.exportProfiles);
+      if (patch.op === 'insert') {
+        if (index > profiles.length) throw new TypeError('patch.conflict');
+        profiles.splice(index, 0, structuredClone(patch.value as ProjectV1['exportProfiles'][number]));
+      } else if (patch.op === 'remove') {
+        if (index >= profiles.length || canonicalJson(profiles[index]) !== canonicalJson(patch.value)) throw new TypeError('patch.conflict');
+        profiles.splice(index, 1);
+      } else if (patch.op === 'replace') {
+        if (index >= profiles.length || canonicalJson(profiles[index]) !== canonicalJson(patch.before)) throw new TypeError('patch.conflict');
+        profiles[index] = structuredClone(patch.after as ProjectV1['exportProfiles'][number]);
+      } else {
+        throw new TypeError('patch.op.unsupported');
+      }
+      current = { ...current, exportProfiles: profiles };
     } else if (patch.op !== 'replace') {
       throw new TypeError('patch.op.unsupported');
     } else if (patch.path.length === 0) {

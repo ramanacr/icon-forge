@@ -811,6 +811,156 @@
             "projectId",
             "type"
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "exportProfile.upsert"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "profile": {
+                  "$ref": "#/$defs/ExportProfileV1"
+                }
+              },
+              "required": [
+                "profile"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "exportProfile.remove"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "profileId": {
+                  "$ref": "#/$defs/UUID"
+                }
+              },
+              "required": [
+                "profileId"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
         }
       ]
     },
@@ -2006,6 +2156,312 @@
           "additionalProperties": false
         }
       }
+    },
+    "ExportProfileV1": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "svg"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "precision": {
+                  "type": "number",
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                "sizeAttrs": {
+                  "type": "boolean"
+                },
+                "paintMode": {
+                  "type": "string",
+                  "enum": [
+                    "currentColor",
+                    "tokens",
+                    "resolved"
+                  ]
+                },
+                "metadata": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "precision",
+                "sizeAttrs",
+                "paintMode",
+                "metadata"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "sprite"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "idPrefix": {
+                  "type": "string"
+                },
+                "precision": {
+                  "type": "number",
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ]
+                }
+              },
+              "required": [
+                "idPrefix",
+                "precision"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "png"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "sizes": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "theme": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "dark"
+                  ]
+                },
+                "padding": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sizes",
+                "theme",
+                "padding"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "ico"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "sizes": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "enum": [
+                      16,
+                      24,
+                      32,
+                      48,
+                      64,
+                      128,
+                      256
+                    ]
+                  }
+                },
+                "theme": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "dark"
+                  ]
+                }
+              },
+              "required": [
+                "sizes",
+                "theme"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "font"
+            },
+            "options": {
+              "type": "object",
+              "properties": {
+                "family": {
+                  "type": "string"
+                },
+                "formats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "otf",
+                      "ttf",
+                      "woff2"
+                    ]
+                  }
+                },
+                "unitsPerEm": {
+                  "type": "number",
+                  "enum": [
+                    1000,
+                    1024,
+                    2048
+                  ]
+                },
+                "puaStart": {
+                  "type": "number"
+                },
+                "ligatures": {
+                  "type": "boolean"
+                },
+                "cssPrefix": {
+                  "type": "string"
+                },
+                "mergeLayers": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "family",
+                "formats",
+                "unitsPerEm",
+                "puaStart",
+                "ligatures",
+                "cssPrefix"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "$ref": "#/$defs/Slug"
+            },
+            "target": {
+              "type": "string",
+              "const": "project"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "target",
+            "options"
+          ],
+          "additionalProperties": false
+        }
+      ]
     },
     "HistoryCommand": {
       "anyOf": [

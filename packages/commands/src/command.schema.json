@@ -1369,6 +1369,174 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "node.add"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "iconId": {
+                  "$ref": "#/$defs/UUID"
+                },
+                "parentId": {
+                  "$ref": "#/$defs/UUID"
+                },
+                "index": {
+                  "type": "number"
+                },
+                "node": {
+                  "$ref": "#/$defs/SceneNodeV1"
+                }
+              },
+              "required": [
+                "iconId",
+                "index",
+                "node"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "node.remove"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "iconId": {
+                  "$ref": "#/$defs/UUID"
+                },
+                "nodeIds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/UUID"
+                  }
+                }
+              },
+              "required": [
+                "iconId",
+                "nodeIds"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "exportProfile.upsert"
             },
             "payload": {

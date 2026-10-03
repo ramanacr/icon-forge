@@ -1,6 +1,7 @@
 import { assertProject, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type PaintV1, type ProjectV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
+import { findNodePath, nodeArrayAt, removalOrder } from './scene-path.js';
 
 interface EnvelopeBase {
   commandVersion: '1.0';
@@ -30,6 +31,8 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'component.add'; payload: { component: ComponentV1 } }
   | { type: 'component.update'; payload: { component: ComponentV1 } }
   | { type: 'component.remove'; payload: { componentId: UUID } }
+  | { type: 'node.add'; payload: { iconId: UUID; parentId?: UUID; index: number; node: SceneNodeV1 } }
+  | { type: 'node.remove'; payload: { iconId: UUID; nodeIds: UUID[] } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -241,6 +244,59 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     return { project: next, patches: [patch], inversePatches: [inversePatch],
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [componentId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
+  }
+  if (command.type === 'node.add' || command.type === 'node.remove') {
+    const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);
+    if (iconIndex < 0) throw new TypeError('icon.not-found');
+    const icon = project.icons[iconIndex]!;
+    const icons = structuredClone(project.icons);
+    const copy = icons[iconIndex]!;
+    let patches: StructuralPatch[];
+    let inversePatches: StructuralPatch[];
+    let count: { added: number; updated: number; removed: number };
+    let changedIds: UUID[];
+    if (command.type === 'node.add') {
+      const parentPath = command.payload.parentId === undefined ? null : findNodePath(icon, command.payload.parentId);
+      if (command.payload.parentId !== undefined && parentPath === null) throw new TypeError('node.parent.not-found');
+      const containerPath = parentPath === null ? ['nodes'] : [...parentPath, 'children'];
+      const container = nodeArrayAt(copy, containerPath);
+      const index = command.payload.index;
+      if (!Number.isSafeInteger(index) || index < 0 || index > container.length) throw new TypeError('node.index.invalid');
+      const node = structuredClone(command.payload.node);
+      container.splice(index, 0, node);
+      const path = ['icons', String(iconIndex), ...containerPath, String(index)];
+      patches = [{ op: 'insert', path, value: node }];
+      inversePatches = [{ op: 'remove', path, value: node }];
+      count = { added: 1, updated: 0, removed: 0 };
+      changedIds = [icon.id, node.id];
+    } else {
+      const ids = command.payload.nodeIds;
+      if (ids.length === 0 || new Set(ids).size !== ids.length) throw new TypeError('node.remove.invalid-targets');
+      const paths = ids.map(id => {
+        const path = findNodePath(icon, id);
+        if (!path) throw new TypeError('node.not-found');
+        return path;
+      });
+      if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex
+        && path.length < other.length && path.every((part, offset) => part === other[offset])))) {
+        throw new TypeError('node.remove.overlap');
+      }
+      paths.sort(removalOrder);
+      const removalPatches = paths.map(path => {
+        const container = nodeArrayAt(copy, path.slice(0, -1));
+        const index = Number(path.at(-1));
+        const removed = container.splice(index, 1)[0]!;
+        return { op: 'remove' as const, path: ['icons', String(iconIndex), ...path], value: removed };
+      });
+      patches = removalPatches;
+      inversePatches = removalPatches.map(patch => ({ op: 'insert' as const, path: patch.path, value: patch.value })).reverse();
+      count = { added: 0, updated: 0, removed: paths.length };
+      changedIds = [icon.id, ...ids];
+    }
+    const next = assertProject({ ...project, icons, revision: project.revision + 1 });
+    return { project: next, patches, inversePatches,
+      result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
+        changedIds, patchSummary: { ...count, iconsAffected: [icon.id] }, diagnostics: [] } };
   }
   if (command.type === 'variant.add' || command.type === 'variant.update' || command.type === 'variant.remove') {
     const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);

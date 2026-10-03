@@ -1,5 +1,5 @@
 import { canonicalJson, type ProjectV1 } from '@iconforge/project-model';
-import type { StructuralPatch } from '@iconforge/commands';
+import { nodeArrayAt, type StructuralPatch } from '@iconforge/commands';
 
 /** Apply the project-owned structural patch subset currently emitted by handlers. */
 export function applyPatches(project: ProjectV1 | null, patches: readonly StructuralPatch[]): ProjectV1 | null {
@@ -20,6 +20,21 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
           throw new TypeError('patch.conflict');
         }
         icons[index] = { ...icons[index]!, name: patch.after };
+      } else if (patch.path[2] === 'nodes' && patch.path.length >= 4) {
+        if (index >= icons.length || !/^(0|[1-9]\d*)$/.test(patch.path.at(-1)!)) throw new TypeError('patch.conflict');
+        const nodes = nodeArrayAt(icons[index]!, patch.path.slice(2, -1));
+        const nodeIndex = Number(patch.path.at(-1));
+        if (patch.op === 'insert') {
+          if (nodeIndex > nodes.length) throw new TypeError('patch.conflict');
+          nodes.splice(nodeIndex, 0, structuredClone(patch.value as ProjectV1['icons'][number]['nodes'][number]));
+        } else if (patch.op === 'remove') {
+          if (nodeIndex >= nodes.length || canonicalJson(nodes[nodeIndex]) !== canonicalJson(patch.value)) {
+            throw new TypeError('patch.conflict');
+          }
+          nodes.splice(nodeIndex, 1);
+        } else {
+          throw new TypeError('patch.op.unsupported');
+        }
       } else if (patch.path.length === 3 && ['aliases', 'tags', 'accessibility', 'font'].includes(patch.path[2]!)) {
         if (index >= icons.length) throw new TypeError('patch.conflict');
         const field = patch.path[2]! as 'aliases' | 'tags' | 'accessibility' | 'font';

@@ -114,6 +114,29 @@ describe('project dispatcher', () => {
     expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
   });
 
+  it('undoes and replays a multi-node removal', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-0000000000e0', name: 'heart', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000e1', type: 'icon.add', payload: { icon } });
+    const rect = (id: string) => ({ id, type: 'rect' as const, visible: true, locked: false,
+      x: 0, y: 0, width: 8, height: 8, rx: 0, ry: 0 });
+    const first = rect('0198e09b-a810-7000-8000-0000000000e2');
+    const second = rect('0198e09b-a810-7000-8000-0000000000e3');
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000e4', type: 'node.add',
+      payload: { iconId: icon.id, index: 0, node: first } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000e5', type: 'node.add',
+      payload: { iconId: icon.id, index: 1, node: second } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000e6', type: 'node.remove',
+      payload: { iconId: icon.id, nodeIds: [first.id, second.id] } });
+    expect(dispatcher.project?.icons[0]?.nodes).toEqual([]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000e7', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]?.nodes).toEqual([first, second]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000e8', type: 'history.redo', payload: {} });
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
+
   it('undoes and replays token and design-system transactions', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

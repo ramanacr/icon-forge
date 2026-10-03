@@ -202,4 +202,33 @@ describe('project command handlers', () => {
     expect(removed.project.components).toEqual([]);
     expect(removed.inversePatches).toEqual([{ op: 'insert', path: ['components', '0'], value: changed }]);
   });
+
+  it('adds and removes top-level and nested nodes with stable inverse paths', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const addedIcon = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon } });
+    const rect = { id: '0198e09b-a810-7000-8000-0000000000d0', type: 'rect' as const, visible: true, locked: false,
+      x: 0, y: 0, width: 8, height: 8, rx: 0, ry: 0 };
+    const group = { id: '0198e09b-a810-7000-8000-0000000000d1', type: 'group' as const, visible: true, locked: false,
+      children: [] as IconV1['nodes'] };
+    const child = { ...rect, id: '0198e09b-a810-7000-8000-0000000000d2' };
+    const first = applyProjectCommand(addedIcon.project, { ...envelope, type: 'node.add',
+      payload: { iconId: icon.id, index: 0, node: rect } });
+    const second = applyProjectCommand(first.project, { ...envelope, type: 'node.add',
+      payload: { iconId: icon.id, index: 1, node: group } });
+    const third = applyProjectCommand(second.project, { ...envelope, type: 'node.add',
+      payload: { iconId: icon.id, parentId: group.id, index: 0, node: child } });
+    expect(third.project.icons[0]?.nodes).toMatchObject([{ id: rect.id }, { id: group.id, children: [{ id: child.id }] }]);
+    expect(third.patches).toEqual([{ op: 'insert', path: ['icons', '0', 'nodes', '1', 'children', '0'], value: child }]);
+    expect(() => applyProjectCommand(third.project, { ...envelope, type: 'node.remove',
+      payload: { iconId: icon.id, nodeIds: [group.id, child.id] } })).toThrow('node.remove.overlap');
+    const removed = applyProjectCommand(third.project, { ...envelope, type: 'node.remove',
+      payload: { iconId: icon.id, nodeIds: [rect.id, child.id] } });
+    expect(removed.project.icons[0]?.nodes).toMatchObject([{ id: group.id, children: [] }]);
+    expect(removed.patches.map(patch => patch.path)).toEqual([
+      ['icons', '0', 'nodes', '1', 'children', '0'], ['icons', '0', 'nodes', '0'],
+    ]);
+    expect(removed.inversePatches.map(patch => patch.path)).toEqual([
+      ['icons', '0', 'nodes', '0'], ['icons', '0', 'nodes', '1', 'children', '0'],
+    ]);
+  });
 });

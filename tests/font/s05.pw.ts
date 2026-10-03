@@ -1,5 +1,29 @@
 import { expect, test } from '@playwright/test';
+import { build } from 'esbuild';
+import { resolve } from 'node:path';
 import { buildOtfFont } from '../../packages/export-font/src/index.js';
+
+test('S-05 browser font construction matches Node byte for byte', async ({ page }) => {
+  const input = { family: 'IconForge Medical', unitsPerEm: 1000 as const, ligatures: true, glyphs: [{
+    name: 'medical-plus', codepoint: 0xe000, ligature: 'plus', viewBox: [0, 0, 24, 24] as [number, number, number, number],
+    path: [{ start: [6, 6] as [number, number], segments: [
+      { k: 'L' as const, to: [18, 6] as [number, number] }, { k: 'L' as const, to: [18, 18] as [number, number] },
+      { k: 'L' as const, to: [6, 18] as [number, number] },
+    ], closed: true }],
+  }] };
+  const nodeBytes = buildOtfFont(input);
+  const bundle = await build({ entryPoints: [resolve('packages/export-font/src/index.ts')], bundle: true,
+    write: false, minify: true, format: 'esm', platform: 'browser', target: 'es2022' });
+  await page.goto('about:blank');
+  const browserBytes = await page.evaluate(async ({ code, input }) => {
+    const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+    try {
+      const compiler = await import(url) as { buildOtfFont(value: typeof input): Uint8Array };
+      return Array.from(compiler.buildOtfFont(input));
+    } finally { URL.revokeObjectURL(url); }
+  }, { code: bundle.outputFiles[0]!.text, input });
+  expect(browserBytes).toEqual(Array.from(nodeBytes));
+});
 
 test('S-05 CFF font loads with FontFace and glyph matches filled SVG shape', async ({ page }) => {
   const font = buildOtfFont({ family: 'IconForge Medical', unitsPerEm: 1000, glyphs: [{

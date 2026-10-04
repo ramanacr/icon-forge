@@ -1,4 +1,5 @@
 import * as opentype from 'opentype.js';
+import type { WasmSource } from 'woff2-encode-wasm';
 import { quantize } from '@iconforge/project-model';
 
 export interface FilledFontGlyph {
@@ -151,4 +152,11 @@ export function buildOtfFont(input: OtfFontInput): Uint8Array {
   const bytes = new Uint8Array(font.toArrayBuffer());
   fixTimestamps(bytes);
   return bytes;
+}
+
+/** Encode the deterministic CFF font as WOFF2 using a caller-provided WASM asset. */
+export async function buildWoff2Font(input: OtfFontInput, wasmSource: WasmSource): Promise<Uint8Array> {
+  const { init, encode } = await import('woff2-encode-wasm');
+  await init(wasmSource);
+  return encode(buildOtfFont(input));
 }

@@ -1,5 +1,5 @@
 import paperCore from 'paper/dist/paper-core.js';
-import { quantize, type PathDataV1, type SubpathV1 } from '@iconforge/project-model';
+import { QUANTUM, quantize, type PathDataV1, type SubpathV1 } from '@iconforge/project-model';
 import type { BooleanOp, BooleanResult, IGeometryEngine } from '@iconforge/geometry';
 
 const paper = paperCore as unknown as typeof import('paper');
@@ -46,6 +46,26 @@ function fromPaperPath(item: PathItem): PathDataV1 {
   });
 }
 
+function collapsedByQuantization(subpath: SubpathV1): boolean {
+  const points = [subpath.start, ...subpath.segments.map(segment => segment.to)];
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+  for (const [x, y] of points) {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  }
+  if ((maxX - minX) * (maxY - minY) < QUANTUM * QUANTUM / 2) return true;
+  if (subpath.segments.every(segment => segment.k === 'L')) {
+    const origin = points[0]!;
+    const twiceArea = points.reduce((sum, point, index) => {
+      const next = points[(index + 1) % points.length]!;
+      return sum + (point[0] - origin[0]) * (next[1] - origin[1])
+        - (next[0] - origin[0]) * (point[1] - origin[1]);
+    }, 0);
+    return Math.abs(twiceArea) < QUANTUM * QUANTUM;
+  }
+  return false;
+}
+
 export class PaperGeometryEngine implements IGeometryEngine {
   boolean(left: PathDataV1, right: PathDataV1, op: BooleanOp): BooleanResult {
     if (!left.length || !right.length || [...left, ...right].some(subpath => !subpath.closed || !subpath.segments.length)) {
@@ -60,7 +80,11 @@ export class PaperGeometryEngine implements IGeometryEngine {
         : op === 'subtract' ? first.subtract(second, { insert: false })
           : op === 'intersect' ? first.intersect(second, { insert: false })
             : first.exclude(second, { insert: false });
-      return { path: fromPaperPath(output), diagnostics: [] };
+      const path = fromPaperPath(output);
+      if (path.some(collapsedByQuantization)) {
+        return { path: null, diagnostics: [{ code: 'boolean.unsupported-geometry', severity: 'error' }] };
+      }
+      return { path, diagnostics: [] };
     } catch {
       return { path: null, diagnostics: [{ code: 'boolean.unsupported-geometry', severity: 'error' }] };
     } finally {

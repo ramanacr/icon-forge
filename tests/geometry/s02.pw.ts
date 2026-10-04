@@ -105,6 +105,20 @@ test('S-02 Paper.js runs a Boolean in a DOM-free worker', async ({ page }) => {
   for (const [operation, iou] of Object.entries(iouByOperation)) expect(iou, operation).toBeGreaterThanOrEqual(0.999);
 });
 
+test('S-02 reports an intersection that collapses below coordinate quantum', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => new Promise<any>((resolve, reject) => {
+    const worker = new Worker('/worker.js', { type: 'module' });
+    worker.onmessage = event => { worker.terminate(); resolve(event.data); };
+    worker.onerror = event => { worker.terminate(); reject(new Error(event.message)); };
+    worker.postMessage({ case: 'near-degenerate' });
+  }));
+  expect(result.representable.diagnostics).toEqual([]);
+  expect(result.representable.path).toHaveLength(1);
+  expect(result.collapsed).toEqual({ path: null,
+    diagnostics: [{ code: 'boolean.unsupported-geometry', severity: 'error' }] });
+});
+
 test('S-02 curved Boolean output matches Canvas compositing', async ({ page }) => {
   await page.goto(baseUrl);
   const scores = await page.evaluate(async () => {

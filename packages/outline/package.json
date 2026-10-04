@@ -1,0 +1,11 @@
+{
+  "name": "@iconforge/outline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@iconforge/project-model": "workspace:*",
+    "@iconforge/outline-wasm": "workspace:*"
+  },
+  "exports": { ".": "./src/index.ts" }
+}

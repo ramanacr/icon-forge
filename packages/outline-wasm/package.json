@@ -1,0 +1,7 @@
+{
+  "name": "@iconforge/outline-wasm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./pkg/iconforge_outline_wasm.js" }
+}

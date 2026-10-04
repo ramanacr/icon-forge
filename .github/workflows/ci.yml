@@ -37,3 +37,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm test:parity
+
+  outline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.0
+          targets: wasm32-unknown-unknown
+          components: rustfmt
+      - run: cargo fmt --manifest-path packages/outline-wasm/Cargo.toml --check
+      - run: cargo test --locked --manifest-path packages/outline-wasm/Cargo.toml
+      - run: cargo install wasm-pack --version 0.15.0 --locked
+      - run: wasm-pack build packages/outline-wasm --target web --release --out-dir pkg
+      - run: git diff --exit-code -- packages/outline-wasm/pkg

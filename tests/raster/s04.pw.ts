@@ -20,6 +20,17 @@ const goldenHashes: Record<number, string> = {
   256: 'a5b8811f4c075a96d98676ae6c6def1064c68cc70c8278031173e25c34966233',
   512: '5a370fd637fa18077f14b828943a61bf079c248e2ca29598c9a2afbf8ead00b8',
 };
+const imageCorpus = [
+  { name: 'nested-hole', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#2468ac" fill-rule="evenodd" d="M2 2H22V22H2Z M8 8H16V16H8Z"/></svg>',
+    hashes: { 48: '8af170c8e09fe8367c0fbc370ea99b199deb62532b6f03b1f1bee9afac1aaea3',
+      128: '6bc8196c73925262c1bbd87f1b11b525559b964bdb5c71f7a38330be482b22c1' } },
+  { name: 'curved-stroke', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 19 C6 3 18 3 21 19" fill="none" stroke="#162c50" stroke-width="2" stroke-linecap="round"/></svg>',
+    hashes: { 48: '5bac7c53e7bd9b2799ee9fd76b56091c54301ec6477a08520b71ebaee7c25092',
+      128: '25495cfd149197830728b05202e7dec313176ad38d2a14d1c7747c62b34883e4' } },
+  { name: 'translucent-overlap', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="2" width="14" height="14" fill="#f04a31" opacity="0.6"/><rect x="8" y="8" width="14" height="14" fill="#1e72c8" opacity="0.6"/></svg>',
+    hashes: { 48: '1105e0e2c93e7777b2de33a1d546169690691aa89008525fbf08ddba41a1f4ae',
+      128: '0e6ecc340a986ac7fae8a924cfafac85978900d74b87ff46bc08d69c66ea25a8' } },
+];
 let outputDir: string;
 let server: Server;
 let baseUrl: string;
@@ -77,4 +88,26 @@ test('S-04 resvg worker and Node produce identical alpha-correct PNG bytes', asy
     expect(nodeHash).toBe(goldenHashes[item.size]);
   }
   expect(browser.results.at(-1).elapsedMs).toBeLessThanOrEqual(250);
+});
+
+test('S-04 varied SVG corpus has pinned Node and Chromium PNG hashes', async ({ page }) => {
+  const raster = await import(pathToFileURL(join(outputDir, 'raster.js')).href);
+  await raster.initializeRasterizer(await readFile(resolve('packages/export-raster/node_modules/@resvg/resvg-wasm/index_bg.wasm')));
+  await page.goto(baseUrl);
+  for (const fixture of imageCorpus) {
+    const browser = await page.evaluate(async ({ svg }) => new Promise<any>((resolve, reject) => {
+      const worker = new Worker('/worker.js', { type: 'module' });
+      worker.onmessage = event => { worker.terminate(); resolve(event.data); };
+      worker.onerror = event => { worker.terminate(); reject(new Error(event.message)); };
+      worker.postMessage({ svg, sizes: [48, 128] });
+    }), { svg: fixture.svg });
+    expect(browser.error, fixture.name).toBeUndefined();
+    for (const item of browser.results) {
+      const expected = fixture.hashes[item.size as 48 | 128];
+      const browserHash = createHash('sha256').update(Uint8Array.from(item.png)).digest('hex');
+      const nodeHash = createHash('sha256').update(raster.renderSvgToPng(fixture.svg, item.size).png).digest('hex');
+      expect(browserHash, `${fixture.name}/${item.size} browser`).toBe(expected);
+      expect(nodeHash, `${fixture.name}/${item.size} Node`).toBe(expected);
+    }
+  }
 });

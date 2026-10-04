@@ -10,6 +10,17 @@ type SpikeResult = { domAvailable: boolean; canvasAvailable: boolean; areas?: Re
   invalidResult?: unknown; canonicalInputsUnchanged?: boolean; canonicalOperations?: unknown; error?: string };
 
 self.addEventListener('message', (event: MessageEvent) => {
+  if (event.data?.case === 'near-degenerate') {
+    const rectangle = (x: number) => [{ start: [x, 0] as [number, number], segments: [
+      { k: 'L' as const, to: [x + 1, 0] as [number, number] },
+      { k: 'L' as const, to: [x + 1, 1] as [number, number] },
+      { k: 'L' as const, to: [x, 1] as [number, number] },
+    ], closed: true }];
+    const engine = new PaperGeometryEngine();
+    self.postMessage({ collapsed: engine.boolean(rectangle(0), rectangle(0.9999), 'intersect'),
+      representable: engine.boolean(rectangle(0), rectangle(0.999), 'intersect') });
+    return;
+  }
   if (event.data?.case === 'nested-hole') {
     const left = [
       { start: [0, 0] as [number, number], segments: [

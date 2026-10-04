@@ -1,0 +1,7 @@
+{
+  "name": "outline-wasm",
+  "tags": ["scope:infra", "type:adapter", "layer:outline-wasm"],
+  "targets": {
+    "test": { "command": "cargo test --locked --manifest-path packages/outline-wasm/Cargo.toml" }
+  }
+}

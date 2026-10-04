@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as fontkit from 'fontkit';
-import { buildOtfFont } from './index.js';
+import { readFileSync } from 'node:fs';
+import { buildOtfFont, buildWoff2Font } from './index.js';
 
 const input = { family: 'IconForge Medical', unitsPerEm: 1000 as const, glyphs: [{
   name: 'medical-plus', codepoint: 0xe000, viewBox: [0, 0, 24, 24] as [number, number, number, number],
@@ -12,6 +13,32 @@ const input = { family: 'IconForge Medical', unitsPerEm: 1000 as const, glyphs: 
 }] };
 
 describe('S-05 OTF/CFF font construction', () => {
+  it('encodes deterministic WOFF2 from the project font and preserves glyph mapping', async () => {
+    const source = readFileSync(new URL('../node_modules/woff2-encode-wasm/dist/encoder.wasm', import.meta.url));
+    const first = await buildWoff2Font(input, source);
+    const second = await buildWoff2Font(input, source);
+    expect(first).toEqual(second);
+    expect(Buffer.from(first.subarray(0, 4)).toString('ascii')).toBe('wOF2');
+    const parsed = fontkit.create(Buffer.from(first));
+    if ('fonts' in parsed) throw new Error('Expected a single WOFF2 font');
+    expect(parsed.unitsPerEm).toBe(1000);
+    expect(parsed.glyphForCodePoint(0xe000).name).toBe('medical-plus');
+    expect(parsed.glyphForCodePoint(0xe000).path.commands.length).toBeGreaterThan(3);
+    const original = fontkit.create(Buffer.from(buildOtfFont(input)));
+    if ('fonts' in original) throw new Error('Expected a single OTF font');
+    expect(parsed.glyphForCodePoint(0xe000).path.commands).toEqual(original.glyphForCodePoint(0xe000).path.commands);
+  });
+
+  it('preserves GSUB ligatures through WOFF2 encoding', async () => {
+    const source = readFileSync(new URL('../node_modules/woff2-encode-wasm/dist/encoder.wasm', import.meta.url));
+    const bytes = await buildWoff2Font({ ...input, ligatures: true,
+      glyphs: [{ ...input.glyphs[0]!, ligature: 'plus' }] }, source);
+    const parsed = fontkit.create(Buffer.from(bytes));
+    if ('fonts' in parsed) throw new Error('Expected a single WOFF2 font');
+    expect(parsed.layout('plus').glyphs).toHaveLength(1);
+    expect(parsed.layout('plus').glyphs[0]?.id).toBe(parsed.glyphForCodePoint(0xe000).id);
+  });
+
   it('writes deterministic CFF bytes with .notdef, space and a PUA glyph', () => {
     const first = buildOtfFont(input);
     const second = buildOtfFont(input);

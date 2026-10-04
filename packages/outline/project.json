@@ -1,0 +1,9 @@
+{
+  "name": "outline",
+  "tags": ["scope:infra", "type:adapter", "layer:outline"],
+  "implicitDependencies": ["project-model", "outline-wasm"],
+  "targets": {
+    "test": { "command": "vitest run packages/outline" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

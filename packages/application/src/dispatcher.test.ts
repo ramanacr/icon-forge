@@ -12,6 +12,32 @@ const create = { ...base, commandId: firstId, type: 'project.create' as const, p
 const rename = { ...base, commandId: secondId, type: 'project.rename' as const, payload: { name: 'Clinical' }, expectedRevision: 1 };
 
 describe('project dispatcher', () => {
+  it('undoes and replays a node reorder across sibling arrays', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const groupId = '0198e09b-a810-7000-8000-0000000000f1';
+    const leafId = '0198e09b-a810-7000-8000-0000000000f2';
+    const leaf: IconV1['nodes'][number] = { id: leafId, type: 'rect', visible: true, locked: false,
+      x: 0, y: 0, width: 8, height: 8, rx: 0, ry: 0 };
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-0000000000f0', name: 'box', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [],
+      nodes: [leaf, { id: groupId, type: 'group', visible: true, locked: false, children: [] }] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000f3',
+      type: 'icon.add', payload: { icon } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000f4',
+      type: 'node.reorder', payload: { iconId: icon.id, nodeId: leafId, parentId: groupId, index: 0 } });
+    expect(dispatcher.project?.icons[0]?.nodes).toHaveLength(1);
+    const group = dispatcher.project?.icons[0]?.nodes[0];
+    expect(group?.type).toBe('group');
+    if (group?.type !== 'group') throw new Error('Expected group');
+    expect(group.children).toEqual([leaf]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000f5',
+      type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]).toEqual(icon);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000f6',
+      type: 'history.redo', payload: {} });
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
   it('undoes and replays one selection transform transaction', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

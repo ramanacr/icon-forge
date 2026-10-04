@@ -33,6 +33,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'component.remove'; payload: { componentId: UUID } }
   | { type: 'node.add'; payload: { iconId: UUID; parentId?: UUID; index: number; node: SceneNodeV1 } }
   | { type: 'node.remove'; payload: { iconId: UUID; nodeIds: UUID[] } }
+  | { type: 'node.reorder'; payload: { iconId: UUID; nodeId: UUID; parentId?: UUID; index: number } }
   | { type: 'selection.transform'; payload: { iconId: UUID; nodeIds: UUID[]; matrix: MatrixV1 } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
@@ -246,7 +247,8 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [componentId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
   }
-  if (command.type === 'node.add' || command.type === 'node.remove' || command.type === 'selection.transform') {
+  if (command.type === 'node.add' || command.type === 'node.remove'
+    || command.type === 'node.reorder' || command.type === 'selection.transform') {
     const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);
     if (iconIndex < 0) throw new TypeError('icon.not-found');
     const icon = project.icons[iconIndex]!;
@@ -270,6 +272,33 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       inversePatches = [{ op: 'remove', path, value: node }];
       count = { added: 1, updated: 0, removed: 0 };
       changedIds = [icon.id, node.id];
+    } else if (command.type === 'node.reorder') {
+      const sourcePath = findNodePath(icon, command.payload.nodeId);
+      if (!sourcePath) throw new TypeError('node.not-found');
+      const parentPath = command.payload.parentId === undefined ? null : findNodePath(icon, command.payload.parentId);
+      if (command.payload.parentId !== undefined && !parentPath) throw new TypeError('node.parent.not-found');
+      if (parentPath && sourcePath.length <= parentPath.length
+        && sourcePath.every((part, offset) => part === parentPath[offset])) {
+        throw new TypeError('node.reorder.invalid-parent');
+      }
+      const source = nodeArrayAt(copy, sourcePath.slice(0, -1));
+      const removed = source.splice(Number(sourcePath.at(-1)), 1)[0]!;
+      const destinationParentPath = command.payload.parentId === undefined ? null
+        : findNodePath(copy, command.payload.parentId);
+      if (command.payload.parentId !== undefined && !destinationParentPath) throw new TypeError('node.parent.not-found');
+      const destinationPath = destinationParentPath === null ? ['nodes'] : [...destinationParentPath, 'children'];
+      const destination = nodeArrayAt(copy, destinationPath);
+      const index = command.payload.index;
+      if (!Number.isSafeInteger(index) || index < 0 || index > destination.length) throw new TypeError('node.index.invalid');
+      destination.splice(index, 0, removed);
+      const removePath = ['icons', String(iconIndex), ...sourcePath];
+      const insertPath = ['icons', String(iconIndex), ...destinationPath, String(index)];
+      patches = [{ op: 'remove', path: removePath, value: removed },
+        { op: 'insert', path: insertPath, value: removed }];
+      inversePatches = [{ op: 'remove', path: insertPath, value: removed },
+        { op: 'insert', path: removePath, value: removed }];
+      count = { added: 0, updated: 1, removed: 0 };
+      changedIds = [icon.id, removed.id];
     } else if (command.type === 'selection.transform') {
       const ids = command.payload.nodeIds;
       if (ids.length === 0 || new Set(ids).size !== ids.length) throw new TypeError('selection.invalid-targets');

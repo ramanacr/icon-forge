@@ -14,6 +14,40 @@ const icon: IconV1 = {
 };
 
 describe('project command handlers', () => {
+  it('reorders nodes across groups with patches measured after removal', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const firstId = '0198e09b-a810-7000-8000-0000000000f1';
+    const secondId = '0198e09b-a810-7000-8000-0000000000f2';
+    const leafId = '0198e09b-a810-7000-8000-0000000000f3';
+    const leaf = { id: leafId, type: 'rect' as const, visible: true, locked: false,
+      x: 0, y: 0, width: 8, height: 8, rx: 0, ry: 0 };
+    const nested = { ...icon, nodes: [
+      { id: firstId, type: 'group' as const, visible: true, locked: false, children: [leaf] },
+      { id: secondId, type: 'group' as const, visible: true, locked: false, children: [] },
+    ] };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon: nested } });
+    const moved = applyProjectCommand(added.project, { ...envelope, type: 'node.reorder',
+      payload: { iconId: icon.id, nodeId: leafId, parentId: secondId, index: 0 } });
+    expect(added.project.icons[0]).toEqual(nested);
+    expect((moved.project.icons[0]!.nodes[0] as typeof nested.nodes[0]).children).toEqual([]);
+    expect((moved.project.icons[0]!.nodes[1] as typeof nested.nodes[1]).children).toEqual([leaf]);
+    expect(moved.patches.map(patch => patch.path)).toEqual([
+      ['icons', '0', 'nodes', '0', 'children', '0'], ['icons', '0', 'nodes', '1', 'children', '0'],
+    ]);
+    expect(moved.inversePatches.map(patch => patch.op)).toEqual(['remove', 'insert']);
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.reorder',
+      payload: { iconId: icon.id, nodeId: firstId, parentId: firstId, index: 0 } }))
+      .toThrow('node.reorder.invalid-parent');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.reorder',
+      payload: { iconId: icon.id, nodeId: leafId, parentId: secondId, index: 2 } }))
+      .toThrow('node.index.invalid');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.reorder',
+      payload: { iconId: icon.id, nodeId: secondId, parentId: leafId, index: 0 } }))
+      .toThrow('node.parent.invalid');
+    const reordered = applyProjectCommand(added.project, { ...envelope, type: 'node.reorder',
+      payload: { iconId: icon.id, nodeId: firstId, index: 1 } });
+    expect(reordered.project.icons[0]!.nodes.map(node => node.id)).toEqual([secondId, firstId]);
+  });
   it('transforms a nested selection once with reversible node patches', () => {
     const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     const nodeId = '0198e09b-a810-7000-8000-0000000000e1';

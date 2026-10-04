@@ -211,7 +211,8 @@ Handler contract: `(project: ProjectV1, cmd: CommandEnvelope) → { project, pat
 | `icon.updateMetadata` | `{ iconId, patch }` | Tags, aliases, accessibility, font mapping. |
 | `node.add` / `node.remove` | `{ iconId, parentId?, index, node }` / `{ iconId, nodeIds }` | |
 | `node.update` | `{ iconId, nodeId, ops: NodeUpdateOp[] }` | Typed field ops; no generic merge. |
-| `node.reorder` / `node.group` / `node.ungroup` | | |
+| `node.reorder` | `{ iconId, nodeId, parentId?, index }` | Move a node to a destination sibling array; `index` is measured after removal. The destination parent must be a group outside the moved subtree. |
+| `node.group` / `node.ungroup` | | |
 | `selection.transform` | `{ iconId, nodeIds, matrix }` | Matrix is pre-computed and quantized by the adapter. |
 | `path.editSegments` | `{ iconId, nodeId, edits }` | Node editing in Expert Mode. |
 | `node.boolean` | `{ iconId, nodeIds, op: "union"\|"subtract"\|"intersect"\|"exclude", resultId }` | Inputs must be closed and stroke-free; else `boolean.invalid-input`. |

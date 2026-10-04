@@ -9,6 +9,37 @@ export interface SvgSerializeOptions {
   paintMode: 'currentColor' | 'tokens' | 'resolved';
   metadata: boolean;
   theme?: 'light' | 'dark';
+  variantId?: string;
+}
+
+function resolvedNodes(icon: IconV1, variantId: string | undefined): SceneNodeV1[] {
+  if (variantId === undefined) return icon.nodes;
+  const variant = icon.variants.find(candidate => candidate.id === variantId);
+  if (!variant) throw new TypeError('svg.variant.not-found');
+  const nodes = structuredClone(icon.nodes);
+  for (const override of variant.overrides) {
+    const apply = (siblings: SceneNodeV1[]): boolean => {
+      for (const [index, node] of siblings.entries()) {
+        if (node.id === override.nodeId) {
+          if (override.op === 'hide') siblings[index] = { ...node, visible: false };
+          else if (override.op === 'replaceNode') siblings[index] = structuredClone(override.node);
+          else if (override.op === 'setTransform') siblings[index] = { ...node, transform: [...override.transform] } as SceneNodeV1;
+          else if (override.op === 'setStroke') {
+            if (!['path', 'rect', 'ellipse', 'line', 'polyline'].includes(node.type)) throw new TypeError('svg.variant.incompatible');
+            siblings[index] = { ...node, stroke: override.stroke ?? undefined } as SceneNodeV1;
+          } else {
+            if (!['path', 'rect', 'ellipse', 'polyline'].includes(node.type)) throw new TypeError('svg.variant.incompatible');
+            siblings[index] = { ...node, fill: override.fill ?? undefined } as SceneNodeV1;
+          }
+          return true;
+        }
+        if (node.type === 'group' && apply(node.children)) return true;
+      }
+      return false;
+    };
+    if (!apply(nodes)) throw new TypeError('svg.variant.target-missing');
+  }
+  return nodes;
 }
 
 function escapeXml(value: string): string {
@@ -40,7 +71,13 @@ export function serializeIconSvg(projectInput: ProjectV1, iconInput: IconV1, opt
     const shared = (node.transform ? attr('transform', `matrix(${node.transform.map((part, index) => number(part, index < 4 ? 6 : options.precision)).join(' ')})`) : '')
       + (node.opacity === undefined ? '' : attr('opacity', number(node.opacity)));
     if (node.type === 'group') return `<g${shared}>${node.children.map(drawing).join('')}</g>`;
-    if (node.type === 'instance') throw new TypeError('svg.instance.unexpanded');
+    if (node.type === 'instance') {
+      const component = project.components.find(candidate => candidate.id === node.componentId);
+      if (!component) throw new TypeError('svg.instance.missing-component');
+      if (component.parameters.length > 0) throw new TypeError('svg.instance.parameters-unbound');
+      if (Object.keys(node.arguments).length > 0) throw new TypeError('svg.instance.arguments-unbound');
+      return `<g${shared}>${component.nodes.map(drawing).join('')}</g>`;
+    }
     const fill = 'fill' in node && node.fill ? attr('fill', paint(node.fill)) : attr('fill', 'none');
     const outline = 'stroke' in node && node.stroke ? stroke(node.stroke) : '';
     if (node.type === 'path') {
@@ -64,7 +101,7 @@ export function serializeIconSvg(projectInput: ProjectV1, iconInput: IconV1, opt
     const records = project.provenance.filter(record => icon.provenanceIds.includes(record.id));
     root += `<metadata>${escapeXml(canonicalJson(records))}</metadata>`;
   }
-  return `${root}${icon.nodes.map(drawing).join('')}</svg>\n`;
+  return `${root}${resolvedNodes(icon, options.variantId).map(drawing).join('')}</svg>\n`;
 }
 
 function pathData(subpath: SubpathV1, precision: number, number: (value: number, places?: number) => string): string {

@@ -83,6 +83,36 @@ test('S-01 canonical SVG fixture matches Node and the browser', async ({ page })
   expect(browserSvg).toBe(nodeSvg);
 });
 
+test('S-01 static component and selected variant SVG match Node and Chromium', async ({ page }) => {
+  const compiler = await import(pathToFileURL(join(outputDir, 'compiler.js')).href);
+  const id = (number: number): string => `0198e09b-a810-7000-8000-${number.toString(16).padStart(12, '0')}`;
+  const componentNode: SceneNodeV1 = { id: id(4), type: 'rect', visible: true, locked: false,
+    x: 2, y: 2, width: 20, height: 20, rx: 0, ry: 0, fill: { kind: 'color', value: '#334455' } };
+  const instance: SceneNodeV1 = { id: id(5), type: 'instance', visible: true, locked: false,
+    componentId: id(3), arguments: {} };
+  const project: ProjectV1 = { schemaVersion: '1.0', id: id(1), name: 'Variant corpus', revision: 1,
+    designSystem: { grid: { width: 24, height: 24 }, safeArea: { top: 2, right: 2, bottom: 2, left: 2 },
+      style: 'filled', stroke: { width: 1.75, cap: 'round', join: 'round', miterLimit: 4 }, cornerRadius: 2,
+      defaultPaintToken: 'currentColor', naming: { pattern: 'kebab', reserved: [] }, severities: {} },
+    tokens: [], components: [{ id: id(3), name: 'base', parameters: [], nodes: [componentNode] }],
+    exportProfiles: [], provenance: [], icons: [{ id: id(2), name: 'component-icon', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [instance], accessibility: { kind: 'decorative' }, provenanceIds: [],
+      variants: [{ id: id(6), name: 'shifted', dimensions: { state: 'shifted' },
+        overrides: [{ op: 'setTransform', nodeId: instance.id, transform: [1, 0, 0, 1, 2, 3] }] }] }] };
+  const options = { precision: 3 as const, paintMode: 'resolved' as const, sizeAttrs: false, metadata: false,
+    variantId: id(6) };
+  const before = structuredClone(project);
+  const nodeSvg: string = compiler.serializeIconSvg(project, project.icons[0], options);
+  expect(nodeSvg).toContain('<g transform="matrix(1 0 0 1 2 3)"><rect');
+  expect(project).toEqual(before);
+  await page.goto(baseUrl);
+  const browserSvg = await page.evaluate(async ({ project, options }) => {
+    const compiler = await import(new URL('/compiler.js', location.origin).href);
+    return compiler.serializeIconSvg(project, project.icons[0], options);
+  }, { project, options });
+  expect(browserSvg).toBe(nodeSvg);
+});
+
 test.afterAll(async () => {
   await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done()));
   await rm(outputDir, { recursive: true, force: true });

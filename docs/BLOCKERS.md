@@ -15,3 +15,9 @@ Phase 0 is still open. This log records work deferred because the current worksp
 | B-03 | npm registry access works. Rejected `woff2-encoder@2.0.0` because it requires JavaScript string evaluation. Pinned `woff2-encode-wasm@0.1.1` in the font package; lockfile records its tarball integrity. The encoder WASM SHA-256 is `749b5bd6a56b4e81e83de68470e7b60c2e535ad865cd21c4e22cef4f43f674c9`. Project OTF→WOFF2 output is deterministic, independently parsed by Fontkit, byte-identical in Node/Chromium, and loads with `FontFace` under CSP. Compiler bundle plus encoder WASM is about 395 KB gzip, below the 700 KB budget. | Complete the wider generated-font corpus and full S-08 round-trip verification. |
 
 These are environment dependencies, not permission requests. Local work that does not depend on them continues. The Phase 1 gate remains S-01 through S-06 passing or a documented adapter swap that satisfies the same acceptance criteria.
+
+## Specification gap
+
+| ID | Evidence | Pending decision |
+| --- | --- | --- |
+| B-05 | `SCHEMAS.md` says component parameters bind to stroke width, radius and visibility, but `ComponentV1` contains only parameter declarations, literal scene nodes and instance arguments. It has no field mapping a parameter to a node property. Static component instances and variants render; the serializer reports `svg.instance.parameters-unbound` for parameterized components. | Add an explicit, validated binding representation to the project schema and its migration rules before applying instance arguments during export. |

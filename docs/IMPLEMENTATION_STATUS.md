@@ -15,7 +15,7 @@ Environment-dependent blockers are tracked in [BLOCKERS.md](BLOCKERS.md).
 - Persistent-storage status request, quota-error classification, deterministic `.iconproj` ZIP with SHA-256 project and original hashes, and native-file/download save adapter. Chromium passes a 2,000-icon snapshot and archive round trip.
 - Pure `export-svg` serializer with escaped accessibility text, canonical paint and path output, precision fallback for narrow closed segments, selected variant overrides and static component expansion. Node/Chromium parity covers both the original golden fixture and a component/variant fixture. Parameterized component binding is deferred in [BLOCKERS.md](BLOCKERS.md). Archive extraction enforces path, entry count and byte limits before decompression.
 - CI checks for frozen installation, generated-schema drift, typecheck, unit tests and a three-browser Playwright parity fixture.
-- Chromium performance harness checks 100-icon IndexedDB snapshot open, 500-icon validation, 100 simple SVG serializations and p95 single-icon apply/undo against documented budgets with the required 10% tolerance.
+- Chromium performance harness checks 100-icon IndexedDB snapshot open, 500-icon validation, 100 simple SVG serializations and p95 single-icon apply/undo against documented budgets with the required 10% tolerance. CI runs the measurement separately from other browser tests to avoid competing CPU workloads; one parallel local run exceeded the apply budget at 66.1 ms p95 and the isolated rerun passed.
 
 ## Gates still open
 

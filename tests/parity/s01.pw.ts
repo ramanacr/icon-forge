@@ -213,6 +213,81 @@ test('Phase 1 transform gesture commits and replays identically in Node and Chro
   expect(browser).toEqual(node);
 });
 
+test('Phase 1 programmatic SVG renderer matches exported scene pixels', async ({ page }) => {
+  const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
+  const project: ProjectV1 = { schemaVersion: '1.0', id: id(91), name: 'Renderer fixture', revision: 1,
+    designSystem: { grid: { width: 24, height: 24 }, safeArea: { top: 2, right: 2, bottom: 2, left: 2 },
+      style: 'custom', stroke: { width: 1.75, cap: 'round', join: 'round', miterLimit: 4 }, cornerRadius: 2,
+      defaultPaintToken: 'currentColor', naming: { pattern: 'kebab', reserved: [] }, severities: {} },
+    tokens: [{ name: 'accent', light: '#123456', dark: '#fedcba' }], provenance: [], exportProfiles: [],
+    components: [{ id: id(92), name: 'corner', parameters: [{ name: 'radius', type: 'number', default: 1 }],
+      bindings: [{ parameter: 'radius', nodeId: id(93), field: 'rx' },
+        { parameter: 'radius', nodeId: id(93), field: 'ry' }],
+      nodes: [{ id: id(93), type: 'rect', visible: true, locked: false, x: 16, y: 15,
+        width: 6, height: 6, rx: 0, ry: 0, fill: { kind: 'token', token: 'accent' } }] }],
+    icons: [{ id: id(94), name: 'mixed-scene', aliases: [], tags: [], viewBox: [0, 0, 24, 24],
+      accessibility: { kind: 'informative', label: '<script>alert(1)</script>' }, provenanceIds: [],
+      variants: [{ id: id(95), name: 'alternate', dimensions: { state: 'alternate' },
+        overrides: [{ op: 'hide', nodeId: id(98) }, { op: 'setTransform', nodeId: id(96),
+          transform: [1, 0, 0, 1, 1, 0] }] }],
+      nodes: [
+        { id: id(96), type: 'group', visible: true, locked: false, children: [
+          { id: id(97), type: 'path', visible: true, locked: false, fillRule: 'evenodd',
+            fill: { kind: 'color', value: '#ff0000' }, path: [{ start: [2, 2], segments: [
+              { k: 'Q', c: [12, 0], to: [20, 2] }, { k: 'C', c1: [22, 8], c2: [10, 12], to: [2, 2] },
+            ], closed: true }] },
+        ] },
+        { id: id(98), type: 'ellipse', visible: true, locked: false, cx: 8, cy: 14,
+          rx: 3, ry: 2, fill: { kind: 'token', token: 'accent' } },
+        { id: id(99), type: 'line', visible: true, locked: false, x1: 1, y1: 20, x2: 12, y2: 20,
+          stroke: { paint: { kind: 'color', value: '#00ff00' }, width: 1, cap: 'round', join: 'round', miterLimit: 4 } },
+        { id: id(100), type: 'polyline', visible: true, locked: false, points: [2, 12, 5, 16, 8, 12],
+          closed: true, fill: { kind: 'color', value: '#0000ff' } },
+        { id: id(101), type: 'instance', visible: true, locked: false, componentId: id(92), arguments: { radius: 2 } },
+      ] }] };
+  const before = JSON.stringify(project);
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async ({ project, variantId }) => {
+    const editor = await import(new URL('/editor.js', location.origin).href);
+    const compiler = await import(new URL('/compiler.js', location.origin).href);
+    const svg = editor.renderIconSvg(document, project, project.icons[0], { variantId, theme: 'dark' }) as SVGSVGElement;
+    svg.setAttribute('width', '24');
+    svg.setAttribute('height', '24');
+    const source = new XMLSerializer().serializeToString(svg);
+    const exported = compiler.serializeIconSvg(project, project.icons[0],
+      { variantId, theme: 'dark', precision: 3, paintMode: 'resolved', sizeAttrs: true, metadata: false });
+    const raster = async (markup: string) => {
+      const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml' }));
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 96;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0, 96, 96);
+        return Array.from(context.getImageData(0, 0, 96, 96).data);
+      } finally { URL.revokeObjectURL(url); }
+    };
+    const actual = await raster(source);
+    const expected = await raster(exported);
+    return { samePixels: actual.every((value, index) => value === expected[index]),
+      opaquePixels: actual.filter((value, index) => index % 4 === 3 && value > 0).length,
+      nodeIds: Array.from(svg.querySelectorAll('[data-node-id]'), node => node.getAttribute('data-node-id')),
+      title: svg.querySelector('title')?.textContent,
+      scripts: svg.querySelectorAll('script').length,
+      instanceRadius: svg.querySelector('g[data-node-id] rect')?.getAttribute('rx'),
+    };
+  }, { project, variantId: id(95) });
+  expect(result.samePixels).toBe(true);
+  expect(result.opaquePixels).toBeGreaterThan(0);
+  expect(result.nodeIds).toEqual([id(96), id(97), id(99), id(100), id(101)]);
+  expect(result.title).toBe('<script>alert(1)</script>');
+  expect(result.scripts).toBe(0);
+  expect(result.instanceRadius).toBe('2');
+  expect(JSON.stringify(project)).toBe(before);
+});
+
 test.afterAll(async () => {
   await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done()));
   await rm(outputDir, { recursive: true, force: true });

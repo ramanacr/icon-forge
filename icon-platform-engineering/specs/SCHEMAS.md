@@ -110,6 +110,8 @@ type StrokeV1 = { paint: PaintV1; width: Coord; cap: LineCap; join: LineJoin; mi
 type MatrixV1 = [number, number, number, number, Coord, Coord];   // a b c d e f; a..d quantized to 1e-6
 ```
 
+Literal `PaintV1` color values are sRGB `#RRGGBB` or `#RRGGBBAA`. This excludes CSS `url(...)` and external resource references from the project model; `none` and token paints use their dedicated variants.
+
 Constraints: `rx ≤ width/2`, `ry ≤ height/2`; `polyline.points.length` even and ≥ 4; IDs unique across the whole project; `instance` cycles rejected; maximum nesting depth 32. Stroke `dash` is permitted in SVG/PNG/ICO output and is a **font-export error** (fonts cannot represent dashes without outlining every dash; diagnostic `font.dash-unsupported`).
 
 ## 4. Variants and components

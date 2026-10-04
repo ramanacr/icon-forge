@@ -54,6 +54,18 @@ describe('project validation', () => {
     expect(() => assertProject({ ...emptyProject, icons: [icon] })).toThrow();
   });
 
+  it('rejects literal paint references that could load external resources', () => {
+    const project = structuredClone(emptyProject);
+    project.icons = [{ id: '0198e09b-a810-7000-8000-000000000061', name: 'unsafe-paint',
+      aliases: [], tags: [], viewBox: [0, 0, 24, 24], variants: [],
+      accessibility: { kind: 'decorative' }, provenanceIds: [], nodes: [{
+        id: '0198e09b-a810-7000-8000-000000000062', type: 'rect', visible: true, locked: false,
+        x: 0, y: 0, width: 8, height: 8, rx: 0, ry: 0,
+        fill: { kind: 'color', value: 'url(https://example.com/paint.svg#color)' },
+      }] }];
+    expect(() => assertProject(project)).toThrow('Invalid literal color');
+  });
+
   it('checks replacement nodes and variant targets in the global scene graph', () => {
     const node = { id: '0198e09b-a810-7000-8000-000000000071', type: 'rect', visible: true, locked: false,
       x: 1, y: 1, width: 8, height: 8, rx: 0, ry: 0 };

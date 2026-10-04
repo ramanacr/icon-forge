@@ -41,6 +41,9 @@ export function assertProject(input: unknown): ProjectV1 {
     if (paint.kind === 'token' && !tokenNames.has(paint.token)) {
       throw new TypeError(`Missing paint token: ${paint.token}`);
     }
+    if (paint.kind === 'color' && !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(paint.value)) {
+      throw new TypeError('Invalid literal color');
+    }
   }
   const components = new Map(project.components.map(component => [component.id, component]));
   const parametersByComponent = new Map(project.components.map(component => {

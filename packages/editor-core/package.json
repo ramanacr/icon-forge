@@ -1,0 +1,12 @@
+{
+  "name": "@iconforge/editor-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@iconforge/application": "workspace:*",
+    "@iconforge/commands": "workspace:*",
+    "@iconforge/project-model": "workspace:*"
+  },
+  "exports": { ".": "./src/index.ts" }
+}

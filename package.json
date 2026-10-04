@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:parity": "playwright test",
     "typecheck": "tsc --noEmit",
-    "lint:boundaries": "eslint 'packages/**/*.ts'",
+    "lint:boundaries": "eslint 'packages/**/*.ts' 'apps/**/*.ts'",
     "nx": "nx"
   },
   "devDependencies": {

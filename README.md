@@ -6,8 +6,8 @@ Local-first icon-system platform: design consistent icon sets in Beginner or Exp
 With Node 24 and pnpm 11, run `pnpm install --frozen-lockfile` and `pnpm --filter @iconforge/cli build`. Then compile a `.iconproj` with a saved SVG export profile:
 
 ```text
-node packages/cli/dist/iconforge.mjs compile ./medical.iconproj --profile web-svg --out ./dist
-node packages/cli/dist/iconforge.mjs compile ./medical.iconproj --profile web-svg --out ./dist --check
+node apps/cli/dist/iconforge.mjs compile ./medical.iconproj --profile web-svg --out ./dist
+node apps/cli/dist/iconforge.mjs compile ./medical.iconproj --profile web-svg --out ./dist --check
 ```
 
 Compilation writes one SVG per icon and `manifest.json` into a new output directory. `--check` compares existing files with a fresh deterministic build and leaves them untouched. Phase 0 conformance gates remain open; see [implementation status](docs/IMPLEMENTATION_STATUS.md).

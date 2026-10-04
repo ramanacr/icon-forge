@@ -11,5 +11,5 @@
     "types": ["node", "vitest/globals"],
     "noEmit": true
   },
-  "include": ["packages/**/*.ts", "tests/**/*.ts", "playwright.config.ts"]
+  "include": ["packages/**/*.ts", "apps/**/*.ts", "tests/**/*.ts", "playwright.config.ts"]
 }

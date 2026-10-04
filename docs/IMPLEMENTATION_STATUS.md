@@ -5,7 +5,8 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 ## Phase 1 kickoff
 
 - A pure SVG profile compiler now creates sorted per-icon SVG artifacts and a deterministic hash manifest from a validated project and saved SVG export profile. The Node CLI reads `.iconproj`, compiles into a new output directory, and supports `--check` against existing output. Unit tests compare CLI output to the pure compiler, and Chromium checks artifact and manifest byte parity with Node.
-- Remaining walking skeleton work includes the programmatic editor renderer, selection and bounds, snapping and grid, gesture-level transaction integration, autosave UX, and the representative edit/undo/export workflow. The Phase 0 conformance and Windows picker items below remain open.
+- The framework-independent editor core now holds transform preview frames outside the project journal, validates the selected nodes at gesture start, and commits one `selection.transform` command at pointer-up. Identity and cancelled gestures write nothing; stale revisions reject a commit. Undo and replay tests cover a 100-frame preview.
+- Remaining walking skeleton work includes the programmatic editor renderer, selection and bounds, snapping and grid, wiring gesture commits to the UI, autosave UX, and the representative edit/undo/export workflow. The Phase 0 conformance and Windows picker items below remain open.
 
 Environment-dependent blockers are tracked in [BLOCKERS.md](BLOCKERS.md).
 

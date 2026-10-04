@@ -31,12 +31,13 @@ test.beforeAll(async () => {
       model: resolve('packages/project-model/src/index.ts'),
       compiler: resolve('packages/export-svg/src/index.ts'),
       profileCompiler: resolve('packages/compiler-core/src/index.ts'),
+      editor: resolve('packages/editor-core/src/index.ts'),
     },
     outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
   });
   server = createServer(async (request, response) => {
     const name = request.url?.slice(1);
-    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js', 'compiler.js', 'profileCompiler.js'].includes(name ?? '')) {
+    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js', 'compiler.js', 'profileCompiler.js', 'editor.js'].includes(name ?? '')) {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>');
       return;
     }
@@ -170,6 +171,46 @@ test('Phase 1 SVG profile artifacts and manifest match Node and Chromium', async
   }, project);
   expect(browser.svg).toBe(new TextDecoder().decode(build.artifacts['box.svg']));
   expect(browser.manifest).toBe(new TextDecoder().decode(build.manifestBytes));
+});
+
+test('Phase 1 transform gesture commits and replays identically in Node and Chromium', async ({ page }) => {
+  const application = await import(pathToFileURL(join(outputDir, 'application.js')).href);
+  const editor = await import(pathToFileURL(join(outputDir, 'editor.js')).href);
+  const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
+  const base = { commandVersion: '1.0', projectId: id(71), issuedAt: '2026-10-04T00:00:00Z', actor: { kind: 'user' } };
+  const create = { ...base, commandId: id(72), type: 'project.create', payload: { id: id(71), name: 'Gesture parity' } };
+  const add = { ...base, commandId: id(73), type: 'icon.add', payload: { icon: {
+    id: id(74), name: 'box', aliases: [], tags: [], viewBox: [0, 0, 24, 24], variants: [],
+    provenanceIds: [], accessibility: { kind: 'decorative' }, nodes: [
+      { id: id(75), type: 'rect', visible: true, locked: false, x: 2, y: 2, width: 8, height: 8, rx: 0, ry: 0 },
+    ],
+  } } };
+  const request = { ...base, commandId: id(76), iconId: id(74), nodeIds: [id(75)] };
+  const run = (Application: typeof application, Editor: typeof editor) => {
+    const dispatcher = new Application.ProjectDispatcher();
+    dispatcher.dispatch(create);
+    dispatcher.dispatch(add);
+    const gesture = new Editor.TransformGesture(dispatcher, request);
+    gesture.update([1, 0, 0, 1, 1.25, 2.5]);
+    gesture.commit();
+    return { project: dispatcher.project, journal: dispatcher.journal,
+      replay: Application.ProjectDispatcher.replay(null, dispatcher.journal).project };
+  };
+  const node = run(application, editor);
+  await page.goto(baseUrl);
+  const browser = await page.evaluate(async ({ create, add, request }) => {
+    const application = await import(new URL('/application.js', location.origin).href);
+    const editor = await import(new URL('/editor.js', location.origin).href);
+    const dispatcher = new application.ProjectDispatcher();
+    dispatcher.dispatch(create);
+    dispatcher.dispatch(add);
+    const gesture = new editor.TransformGesture(dispatcher, request);
+    gesture.update([1, 0, 0, 1, 1.25, 2.5]);
+    gesture.commit();
+    return { project: dispatcher.project, journal: dispatcher.journal,
+      replay: application.ProjectDispatcher.replay(null, dispatcher.journal).project };
+  }, { create, add, request });
+  expect(browser).toEqual(node);
 });
 
 test.afterAll(async () => {

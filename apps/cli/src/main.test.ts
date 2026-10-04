@@ -46,7 +46,7 @@ describe('CLI compile', () => {
     expect(await runCli(command)).toBe(2);
     expect(await readFile(join(out, 'box.svg'), 'utf8')).toBe('changed');
     error.mockRestore();
-    execFileSync(process.execPath, ['packages/cli/build.mjs', join(root, 'iconforge.mjs')], { cwd: process.cwd() });
+    execFileSync(process.execPath, ['apps/cli/build.mjs', join(root, 'iconforge.mjs')], { cwd: process.cwd() });
     const output = execFileSync(process.execPath, [join(root, 'iconforge.mjs'), 'compile', input,
       '--profile', 'web-svg', '--out', join(root, 'node-output')], { cwd: process.cwd() });
     expect(output).toHaveLength(0);

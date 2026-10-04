@@ -1,0 +1,9 @@
+{
+  "name": "editor-core",
+  "tags": ["scope:core", "type:lib", "layer:editor-core"],
+  "implicitDependencies": ["application", "commands", "project-model"],
+  "targets": {
+    "test": { "command": "vitest run packages/editor-core" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

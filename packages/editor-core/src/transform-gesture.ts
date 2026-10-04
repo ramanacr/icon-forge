@@ -3,7 +3,8 @@ import type { ProjectCommand } from '@iconforge/commands';
 import { quantizeMatrix, type MatrixV1, type UUID } from '@iconforge/project-model';
 
 type TransformCommand = Extract<ProjectCommand, { type: 'selection.transform' }>;
-export type TransformGestureRequest = Omit<TransformCommand, 'type' | 'payload' | 'expectedRevision' | 'dryRun'> & {
+export type TransformGestureRequest = Pick<TransformCommand,
+  'commandVersion' | 'commandId' | 'projectId' | 'issuedAt' | 'actor'> & {
   iconId: UUID;
   nodeIds: UUID[];
 };
@@ -24,9 +25,10 @@ export class TransformGesture {
 
   constructor(private readonly dispatcher: ProjectDispatcher, request: TransformGestureRequest) {
     const input = structuredClone(request);
-    const { iconId, nodeIds, ...envelope } = input;
-    this.command = { ...envelope, type: 'selection.transform', expectedRevision: dispatcher.revision,
-      payload: { iconId, nodeIds, matrix: [...IDENTITY] } };
+    this.command = { commandVersion: input.commandVersion, commandId: input.commandId,
+      projectId: input.projectId, issuedAt: input.issuedAt, actor: input.actor,
+      type: 'selection.transform', expectedRevision: dispatcher.revision,
+      payload: { iconId: input.iconId, nodeIds: input.nodeIds, matrix: [...IDENTITY] } };
     dispatcher.dispatch({ ...this.command, dryRun: true });
   }
 

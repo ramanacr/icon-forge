@@ -69,4 +69,14 @@ describe('transform gesture', () => {
     expect(app.journal).toHaveLength(3);
     expect(() => gesture.commit()).toThrow('gesture.finished');
   });
+
+  it('ignores extra runtime fields when constructing the commit command', () => {
+    const app = dispatcher();
+    const input = { ...base, commandId: id(14), iconId: icon.id, nodeIds: [icon.nodes[0]!.id],
+      dryRun: true, expectedRevision: 999 };
+    const gesture = new TransformGesture(app, input);
+    gesture.update([1, 0, 0, 1, 2, 0]);
+    expect(gesture.commit()?.status).toBe('applied');
+    expect(app.journal).toHaveLength(3);
+  });
 });

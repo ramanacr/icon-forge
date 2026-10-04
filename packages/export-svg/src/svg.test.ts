@@ -110,6 +110,38 @@ describe('canonical SVG serializer', () => {
       .toThrow('svg.instance.parameters-unbound');
   });
 
+  it('applies bounded parameter bindings and defaults to cloned component nodes', () => {
+    const modified = structuredClone(project);
+    const componentId = '0198e09b-a810-7000-8000-000000000014';
+    const rectId = '0198e09b-a810-7000-8000-000000000015';
+    modified.components = [{ id: componentId, name: 'parameterized', parameters: [
+      { name: 'radius', type: 'number', default: 1, min: 0, max: 4 },
+      { name: 'show', type: 'boolean', default: true },
+    ], bindings: [
+      { parameter: 'radius', nodeId: rectId, field: 'rx' },
+      { parameter: 'radius', nodeId: rectId, field: 'ry' },
+      { parameter: 'show', nodeId: rectId, field: 'visible' },
+    ], nodes: [{ id: rectId, type: 'rect', visible: true, locked: false, x: 0, y: 0,
+      width: 8, height: 8, rx: 0, ry: 0 }] }];
+    modified.icons[0]!.nodes = [
+      { id: '0198e09b-a810-7000-8000-000000000016', type: 'instance', visible: true, locked: false,
+        componentId, arguments: { radius: 3 } },
+      { id: '0198e09b-a810-7000-8000-000000000017', type: 'instance', visible: true, locked: false,
+        componentId, arguments: { show: false } },
+    ];
+    const before = structuredClone(modified);
+    const svg = serializeIconSvg(modified, modified.icons[0]!,
+      { precision: 3, paintMode: 'tokens', sizeAttrs: false, metadata: false });
+    expect(svg).toContain('rx="3" ry="3"');
+    expect(svg).not.toContain('rx="1" ry="1"');
+    expect(modified).toEqual(before);
+    const first = modified.icons[0]!.nodes[0]!;
+    if (first.type !== 'instance') throw new Error('Expected instance');
+    first.arguments.radius = 5;
+    expect(() => serializeIconSvg(modified, modified.icons[0]!,
+      { precision: 3, paintMode: 'tokens', sizeAttrs: false, metadata: false })).toThrow('Component argument invalid');
+  });
+
   it('rejects arguments supplied to a static component during project validation', () => {
     const modified = structuredClone(project);
     modified.components = [{ id: '0198e09b-a810-7000-8000-000000000004', name: 'base', parameters: [], nodes: [] }];

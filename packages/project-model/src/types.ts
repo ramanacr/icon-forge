@@ -102,6 +102,7 @@ export interface ComponentV1 {
   id: UUID;
   name: Slug;
   parameters: { name: string; type: 'number' | 'string' | 'boolean'; default: ParamValueV1; min?: number; max?: number }[];
+  bindings?: { parameter: string; nodeId: UUID; field: 'stroke.width' | 'rx' | 'ry' | 'visible' }[];
   nodes: SceneNodeV1[];
 }
 

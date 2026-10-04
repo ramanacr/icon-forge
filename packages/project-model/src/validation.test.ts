@@ -88,6 +88,25 @@ describe('project validation', () => {
     expect(() => assertProject({ ...emptyProject, components: [cyclic], icons: [icon] })).toThrow();
   });
 
+  it('rejects invalid and duplicate component field bindings', () => {
+    const project = structuredClone(emptyProject);
+    const componentId = '0198e09b-a810-7000-8000-000000000021';
+    const nodeId = '0198e09b-a810-7000-8000-000000000022';
+    project.components = [{ id: componentId, name: 'bounded', parameters: [
+      { name: 'radius', type: 'number', default: 1 }, { name: 'show', type: 'boolean', default: true },
+    ], bindings: [{ parameter: 'radius', nodeId, field: 'rx' }], nodes: [
+      { id: nodeId, type: 'rect', visible: true, locked: false, x: 0, y: 0, width: 8, height: 8, rx: 0, ry: 0 },
+    ] }];
+    expect(() => assertProject(project)).not.toThrow();
+    const component = project.components[0]!;
+    component.bindings!.push({ parameter: 'show', nodeId, field: 'rx' });
+    expect(() => assertProject(project)).toThrow('Component binding invalid');
+    component.bindings![1] = { parameter: 'radius', nodeId, field: 'rx' };
+    expect(() => assertProject(project)).toThrow('Component binding duplicate');
+    component.bindings![1] = { parameter: 'radius', nodeId: componentId, field: 'ry' };
+    expect(() => assertProject(project)).toThrow('Component binding invalid');
+  });
+
   it('validates component parameter declarations and instance argument values', () => {
     const project = structuredClone(emptyProject);
     const componentId = '0198e09b-a810-7000-8000-000000000060';

@@ -74,8 +74,37 @@ export function serializeIconSvg(projectInput: ProjectV1, iconInput: IconV1, opt
     if (node.type === 'instance') {
       const component = project.components.find(candidate => candidate.id === node.componentId);
       if (!component) throw new TypeError('svg.instance.missing-component');
-      if (component.parameters.length > 0) throw new TypeError('svg.instance.parameters-unbound');
-      return `<g${shared}>${component.nodes.map(drawing).join('')}</g>`;
+      if (component.parameters.some(parameter => !component.bindings?.some(binding => binding.parameter === parameter.name))) {
+        throw new TypeError('svg.instance.parameters-unbound');
+      }
+      const nodes = structuredClone(component.nodes);
+      const findNode = (siblings: SceneNodeV1[], id: string): SceneNodeV1 | undefined => {
+        for (const child of siblings) {
+          if (child.id === id) return child;
+          if (child.type === 'group') {
+            const found = findNode(child.children, id);
+            if (found) return found;
+          }
+        }
+        return undefined;
+      };
+      for (const binding of component.bindings ?? []) {
+        const parameter = component.parameters.find(candidate => candidate.name === binding.parameter)!;
+        const value = node.arguments[parameter.name] ?? parameter.default;
+        const target = findNode(nodes, binding.nodeId)!;
+        if (binding.field === 'visible') target.visible = value as boolean;
+        else if (binding.field === 'stroke.width') {
+          if (typeof value !== 'number' || value < 0) throw new TypeError('svg.instance.argument.invalid-geometry');
+          if ('stroke' in target && target.stroke) target.stroke.width = value;
+        } else if (binding.field === 'rx' || binding.field === 'ry') {
+          if (typeof value !== 'number' || value < 0 || (target.type === 'rect'
+            && value > (binding.field === 'rx' ? target.width : target.height) / 2)) {
+            throw new TypeError('svg.instance.argument.invalid-geometry');
+          }
+          if (target.type === 'rect' || target.type === 'ellipse') target[binding.field] = value;
+        }
+      }
+      return `<g${shared}>${nodes.map(drawing).join('')}</g>`;
     }
     const fill = 'fill' in node && node.fill ? attr('fill', paint(node.fill)) : attr('fill', 'none');
     const outline = 'stroke' in node && node.stroke ? stroke(node.stroke) : '';

@@ -282,6 +282,35 @@
             "additionalProperties": false
           }
         },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "parameter": {
+                "type": "string"
+              },
+              "nodeId": {
+                "$ref": "#/$defs/UUID"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "stroke.width",
+                  "rx",
+                  "ry",
+                  "visible"
+                ]
+              }
+            },
+            "required": [
+              "parameter",
+              "nodeId",
+              "field"
+            ],
+            "additionalProperties": false
+          }
+        },
         "nodes": {
           "type": "array",
           "items": {

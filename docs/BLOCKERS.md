@@ -7,24 +7,19 @@ Phase 0 is still open. This log records work deferred because the current worksp
 | B-01 | S-01, S-02, S-04, S-05, S-06 cross-engine verification | Chromium is available at `/usr/bin/chromium`; Playwright Firefox and WebKit binaries are absent. Retried both downloads on 2026-10-04 with writable caches. The proxy returned HTTP 403 `Domain forbidden` for `cdn.playwright.dev` and `playwright.download.prss.microsoft.com`. The CI workflow is configured for three engines but has not produced a verified run here. | Per user direction, defer Firefox/WebKit verification until the Windows 11 local environment is available. Run parity and durability suites there and record golden hashes and engine-specific failures. Playwright WebKit checks are distinct from Safari device checks. |
 | B-04 | S-06 real native file picker | Chromium verifies the actual download fallback and archive round trip. On 2026-10-04 the user identified a Windows 11 local checkout, but this chat's executable workspace still reports Linux at `/workspace/icon-forge`; no Windows terminal or mount is exposed, and the desktop terminal-opening tool was unavailable when tried. | Attach a local Windows session or checkout to this chat, then run the native picker and download fallback flows in Chrome or Edge on Windows 11; record observed behavior and recovery UX. |
 
-## Resolved setup blockers
+## Resolved setup and specification blockers
 
 | ID | Resolution | Still to implement or verify |
 | --- | --- | --- |
 | B-02 | Rust 1.99.0, Cargo, rustfmt, the `wasm32-unknown-unknown` target and `wasm-pack` 0.15.0 are installed under `/workspace/.cache`. `clang` is absent but is not needed for this Rust WASM target. The Rust/WASM outline adapter and Node/Chromium conformance fixtures now run. | No toolchain blocker remains. Finish integration with the font compiler and broaden the fixture corpus during Phase 0 work. |
 | B-03 | npm registry access works. Rejected `woff2-encoder@2.0.0` because it requires JavaScript string evaluation. Pinned `woff2-encode-wasm@0.1.1` in the font package; lockfile records its tarball integrity. The encoder WASM SHA-256 is `749b5bd6a56b4e81e83de68470e7b60c2e535ad865cd21c4e22cef4f43f674c9`. Project OTF→WOFF2 output is deterministic, independently parsed by Fontkit, byte-identical in Node/Chromium, and loads with `FontFace` under CSP. Compiler bundle plus encoder WASM is about 395 KB gzip, below the 700 KB budget. | Complete the wider generated-font corpus and full S-08 round-trip verification. |
+| B-05 | `ComponentV1.bindings` now maps declared parameters to a node's stroke width, radius or visibility. Validation checks parameter types, target compatibility and duplicate target fields. SVG export applies defaults and instance arguments to a copy; existing documents without bindings retain their schema shape, and parameterized documents without bindings still receive `svg.instance.parameters-unbound`. | Broaden the binding fixture corpus during Phase 0 conformance work. |
 
 These are environment dependencies, not permission requests. Local work that does not depend on them continues. The Phase 1 gate remains S-01 through S-06 passing or a documented adapter swap that satisfies the same acceptance criteria.
 
 ## Optional final device check
 
 Safari on macOS or iPadOS, including installed and noninstalled behavior, may be checked if a device becomes available. It is not required for Phase 0 or Phase 1 and is not a blocker for the Windows 11 workflow. Playwright WebKit remains part of the required cross-engine suite.
-
-## Specification gap
-
-| ID | Evidence | Pending decision |
-| --- | --- | --- |
-| B-05 | `SCHEMAS.md` says component parameters bind to stroke width, radius and visibility, but `ComponentV1` contains only parameter declarations, literal scene nodes and instance arguments. It has no field mapping a parameter to a node property. Parameter declarations, defaults, ranges and instance arguments are now validated; static component instances and variants render. The serializer reports `svg.instance.parameters-unbound` for parameterized components. | Add an explicit, validated binding representation to the project schema and its migration rules before applying instance arguments during export. |
 
 ## Conformance gap
 

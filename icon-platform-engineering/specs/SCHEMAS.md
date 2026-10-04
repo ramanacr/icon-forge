@@ -133,9 +133,12 @@ type ParamValueV1 = number | string | boolean;
 type ComponentV1 = {
   id: UUID; name: Slug;
   parameters: { name: string; type: "number" | "string" | "boolean"; default: ParamValueV1; min?: number; max?: number }[];
-  nodes: SceneNodeV1[];                       // V1: parameters bind only to stroke width, radius and visibility
+  bindings?: { parameter: string; nodeId: UUID; field: "stroke.width" | "rx" | "ry" | "visible" }[];
+  nodes: SceneNodeV1[];                       // V1: numeric parameters bind to stroke width/radius; boolean to visibility
 };
 ```
+
+Bindings target nodes owned by the component, including nodes in nested groups. Each target field may be bound once. Numeric parameters bind to `stroke.width`, `rx` or `ry`; boolean parameters bind to `visible`. The target must support the field and already have a stroke for `stroke.width`. Instance arguments override defaults without changing stored component nodes; export rejects geometry that violates node constraints. `bindings` is optional for existing v1 documents, so opening them needs no migration. A parameter with no binding still produces `svg.instance.parameters-unbound` at export.
 
 ## 5. Export profiles and provenance
 

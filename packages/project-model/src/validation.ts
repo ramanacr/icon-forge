@@ -60,6 +60,30 @@ export function assertProject(input: unknown): ProjectV1 {
       if (!validValue(parameter.default)) throw new TypeError('Component parameter invalid');
       parameters.set(parameter.name, parameter);
     }
+    const nodesById = new Map<string, SceneNodeV1>();
+    const indexNodes = (nodes: SceneNodeV1[]): void => {
+      for (const node of nodes) {
+        nodesById.set(node.id, node);
+        if (node.type === 'group') indexNodes(node.children);
+      }
+    };
+    indexNodes(component.nodes);
+    const boundFields = new Set<string>();
+    for (const binding of component.bindings ?? []) {
+      const parameter = parameters.get(binding.parameter);
+      const node = nodesById.get(binding.nodeId);
+      const numeric = binding.field !== 'visible';
+      if (!parameter || !node || parameter.type !== (numeric ? 'number' : 'boolean')) {
+        throw new TypeError('Component binding invalid');
+      }
+      if (binding.field === 'stroke.width' && (!('stroke' in node) || !node.stroke)
+        || (binding.field === 'rx' || binding.field === 'ry') && node.type !== 'rect' && node.type !== 'ellipse') {
+        throw new TypeError('Component binding invalid');
+      }
+      const target = `${binding.nodeId}:${binding.field}`;
+      if (boundFields.has(target)) throw new TypeError('Component binding duplicate');
+      boundFields.add(target);
+    }
     return [component.id, parameters] as const;
   }));
   function checkNodes(nodes: SceneNodeV1[], depth: number): void {

@@ -12,6 +12,14 @@ export function renderIconSvg(document: Document, input: ProjectV1, iconInput: I
   const project = assertProject(input);
   const icon = project.icons.find(candidate => candidate.id === iconInput.id);
   if (!icon || canonicalJson(icon) !== canonicalJson(iconInput)) throw new TypeError('renderer.icon.not-in-project');
+  const baseNodeIds = new Set<string>();
+  const collectIds = (nodes: SceneNodeV1[]): void => {
+    for (const node of nodes) {
+      baseNodeIds.add(node.id);
+      if (node.type === 'group') collectIds(node.children);
+    }
+  };
+  collectIds(icon.nodes);
   const element = <K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] =>
     document.createElementNS(SVG_NS, tag);
   const n = canonicalNumber;
@@ -46,7 +54,7 @@ export function renderIconSvg(document: Document, input: ProjectV1, iconInput: I
     const tag = node.type === 'group' || node.type === 'instance' ? 'g'
       : node.type === 'polyline' && node.closed ? 'polygon' : node.type;
     const target = element(tag);
-    if (selectable) target.setAttribute('data-node-id', node.id);
+    if (selectable && baseNodeIds.has(node.id)) target.setAttribute('data-node-id', node.id);
     if (node.role) target.setAttribute('data-role', node.role);
     if (node.transform) target.setAttribute('transform', `matrix(${node.transform.map(n).join(' ')})`);
     if (node.opacity !== undefined) target.setAttribute('opacity', n(node.opacity));

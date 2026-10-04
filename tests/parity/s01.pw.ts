@@ -229,7 +229,9 @@ test('Phase 1 programmatic SVG renderer matches exported scene pixels', async ({
       accessibility: { kind: 'informative', label: '<script>alert(1)</script>' }, provenanceIds: [],
       variants: [{ id: id(95), name: 'alternate', dimensions: { state: 'alternate' },
         overrides: [{ op: 'hide', nodeId: id(98) }, { op: 'setTransform', nodeId: id(96),
-          transform: [1, 0, 0, 1, 1, 0] }] }],
+          transform: [1, 0, 0, 1, 1, 0] }, { op: 'replaceNode', nodeId: id(99),
+          node: { id: id(102), type: 'line', visible: true, locked: false, x1: 1, y1: 20, x2: 12, y2: 20,
+            stroke: { paint: { kind: 'color', value: '#00ff00' }, width: 1, cap: 'round', join: 'round', miterLimit: 4 } } }] }],
       nodes: [
         { id: id(96), type: 'group', visible: true, locked: false, children: [
           { id: id(97), type: 'path', visible: true, locked: false, fillRule: 'evenodd',
@@ -281,7 +283,7 @@ test('Phase 1 programmatic SVG renderer matches exported scene pixels', async ({
   }, { project, variantId: id(95) });
   expect(result.samePixels).toBe(true);
   expect(result.opaquePixels).toBeGreaterThan(0);
-  expect(result.nodeIds).toEqual([id(96), id(97), id(99), id(100), id(101)]);
+  expect(result.nodeIds).toEqual([id(96), id(97), id(100), id(101)]);
   expect(result.title).toBe('<script>alert(1)</script>');
   expect(result.scripts).toBe(0);
   expect(result.instanceRadius).toBe('2');

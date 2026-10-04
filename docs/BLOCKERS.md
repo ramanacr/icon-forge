@@ -5,7 +5,7 @@ Phase 0 is still open. This log records work deferred because the current worksp
 | ID | Affected gate | Evidence in this workspace | Next pass |
 | --- | --- | --- | --- |
 | B-01 | S-01, S-02, S-04, S-05, S-06 cross-engine verification | Chromium is available at `/usr/bin/chromium`; Playwright Firefox and WebKit binaries are absent. Retried both downloads on 2026-10-04 with writable caches. The proxy returned HTTP 403 `Domain forbidden` for `cdn.playwright.dev` and `playwright.download.prss.microsoft.com`. The CI workflow is configured for three engines but has not produced a verified run here. | Per user direction, defer Firefox/WebKit verification until the Windows 11 local environment is available. Run parity and durability suites there and record golden hashes and engine-specific failures. Playwright WebKit checks are distinct from Safari device checks. |
-| B-04 | S-06 real native file picker | This Linux workspace cannot verify a real native file picker. Chromium verifies the actual download fallback and archive round trip. | Run the native picker and download fallback flows in Chrome or Edge on Windows 11; record observed behavior and recovery UX. |
+| B-04 | S-06 real native file picker | Chromium verifies the actual download fallback and archive round trip. On 2026-10-04 the user identified a Windows 11 local checkout, but this chat's executable workspace still reports Linux at `/workspace/icon-forge`; no Windows terminal or mount is exposed, and the desktop terminal-opening tool was unavailable when tried. | Attach a local Windows session or checkout to this chat, then run the native picker and download fallback flows in Chrome or Edge on Windows 11; record observed behavior and recovery UX. |
 
 ## Resolved setup blockers
 
@@ -24,7 +24,7 @@ Safari on macOS or iPadOS, including installed and noninstalled behavior, may be
 
 | ID | Evidence | Pending decision |
 | --- | --- | --- |
-| B-05 | `SCHEMAS.md` says component parameters bind to stroke width, radius and visibility, but `ComponentV1` contains only parameter declarations, literal scene nodes and instance arguments. It has no field mapping a parameter to a node property. Static component instances and variants render; the serializer reports `svg.instance.parameters-unbound` for parameterized components. | Add an explicit, validated binding representation to the project schema and its migration rules before applying instance arguments during export. |
+| B-05 | `SCHEMAS.md` says component parameters bind to stroke width, radius and visibility, but `ComponentV1` contains only parameter declarations, literal scene nodes and instance arguments. It has no field mapping a parameter to a node property. Parameter declarations, defaults, ranges and instance arguments are now validated; static component instances and variants render. The serializer reports `svg.instance.parameters-unbound` for parameterized components. | Add an explicit, validated binding representation to the project schema and its migration rules before applying instance arguments during export. |
 
 ## Conformance gap
 

@@ -75,7 +75,6 @@ export function serializeIconSvg(projectInput: ProjectV1, iconInput: IconV1, opt
       const component = project.components.find(candidate => candidate.id === node.componentId);
       if (!component) throw new TypeError('svg.instance.missing-component');
       if (component.parameters.length > 0) throw new TypeError('svg.instance.parameters-unbound');
-      if (Object.keys(node.arguments).length > 0) throw new TypeError('svg.instance.arguments-unbound');
       return `<g${shared}>${component.nodes.map(drawing).join('')}</g>`;
     }
     const fill = 'fill' in node && node.fill ? attr('fill', paint(node.fill)) : attr('fill', 'none');

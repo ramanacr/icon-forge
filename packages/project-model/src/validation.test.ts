@@ -88,6 +88,38 @@ describe('project validation', () => {
     expect(() => assertProject({ ...emptyProject, components: [cyclic], icons: [icon] })).toThrow();
   });
 
+  it('validates component parameter declarations and instance argument values', () => {
+    const project = structuredClone(emptyProject);
+    const componentId = '0198e09b-a810-7000-8000-000000000060';
+    project.components = [{ id: componentId, name: 'adjustable', parameters: [
+      { name: 'weight', type: 'number', default: 2, min: 0, max: 4 },
+      { name: 'shown', type: 'boolean', default: true },
+    ], nodes: [] }];
+    project.icons = [{ id: '0198e09b-a810-7000-8000-000000000061', name: 'adjustable-icon', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [],
+      nodes: [{ id: '0198e09b-a810-7000-8000-000000000062', type: 'instance', visible: true, locked: false,
+        componentId, arguments: { weight: 3 } }] }];
+    expect(() => assertProject(project)).not.toThrow();
+    const instance = project.icons[0]!.nodes[0]!;
+    if (instance.type !== 'instance') throw new Error('Expected instance');
+    instance.arguments.weight = 5;
+    expect(() => assertProject(project)).toThrow('Component argument invalid');
+    instance.arguments = { weight: 'heavy' };
+    expect(() => assertProject(project)).toThrow('Component argument invalid');
+    instance.arguments = { unknown: 1 };
+    expect(() => assertProject(project)).toThrow('Component argument unknown');
+    instance.arguments = {};
+    project.components[0]!.parameters[1]!.default = 'yes';
+    expect(() => assertProject(project)).toThrow('Component parameter invalid');
+    project.components[0]!.parameters[1]!.default = true;
+    project.components[0]!.parameters.push({ name: 'weight', type: 'number', default: 1 });
+    expect(() => assertProject(project)).toThrow('Component parameter duplicate');
+    project.components[0]!.parameters.pop();
+    project.components[0]!.parameters[0]!.min = 4;
+    project.components[0]!.parameters[0]!.max = 2;
+    expect(() => assertProject(project)).toThrow('Component parameter invalid');
+  });
+
   it('accepts a font profile that explicitly merges duotone layers', () => {
     const profile = {
       id: '0198e09b-a810-7000-8000-000000000020', name: 'web-font', target: 'font',

@@ -110,13 +110,13 @@ describe('canonical SVG serializer', () => {
       .toThrow('svg.instance.parameters-unbound');
   });
 
-  it('rejects arguments supplied to a static component', () => {
+  it('rejects arguments supplied to a static component during project validation', () => {
     const modified = structuredClone(project);
     modified.components = [{ id: '0198e09b-a810-7000-8000-000000000004', name: 'base', parameters: [], nodes: [] }];
     modified.icons[0]!.nodes = [{ id: '0198e09b-a810-7000-8000-000000000005', type: 'instance', visible: true, locked: false,
       componentId: modified.components[0]!.id, arguments: { unused: 2 } }];
     expect(() => serializeIconSvg(modified, modified.icons[0]!,
       { precision: 3, paintMode: 'tokens', sizeAttrs: false, metadata: false }))
-      .toThrow('svg.instance.arguments-unbound');
+      .toThrow('Component argument unknown');
   });
 });

@@ -43,6 +43,25 @@ export function assertProject(input: unknown): ProjectV1 {
     }
   }
   const components = new Map(project.components.map(component => [component.id, component]));
+  const parametersByComponent = new Map(project.components.map(component => {
+    const parameters = new Map<string, typeof component.parameters[number]>();
+    for (const parameter of component.parameters) {
+      if (!parameter.name.trim() || parameters.has(parameter.name)) throw new TypeError('Component parameter duplicate');
+      if (parameter.type !== 'number' && (parameter.min !== undefined || parameter.max !== undefined)) {
+        throw new TypeError('Component parameter invalid');
+      }
+      if (parameter.min !== undefined && parameter.max !== undefined && parameter.min > parameter.max) {
+        throw new TypeError('Component parameter invalid');
+      }
+      const validValue = (value: typeof parameter.default): boolean => typeof value === parameter.type
+        && (parameter.type !== 'number' || (typeof value === 'number' && Number.isFinite(value)
+          && (parameter.min === undefined || value >= parameter.min)
+          && (parameter.max === undefined || value <= parameter.max)));
+      if (!validValue(parameter.default)) throw new TypeError('Component parameter invalid');
+      parameters.set(parameter.name, parameter);
+    }
+    return [component.id, parameters] as const;
+  }));
   function checkNodes(nodes: SceneNodeV1[], depth: number): void {
     if (depth > 32) throw new TypeError('Scene nesting exceeds 32');
     for (const node of nodes) {
@@ -63,6 +82,16 @@ export function assertProject(input: unknown): ProjectV1 {
       if (node.type === 'instance') {
         const component = components.get(node.componentId);
         if (!component) throw new TypeError(`Missing component: ${node.componentId}`);
+        const parameters = parametersByComponent.get(node.componentId)!;
+        for (const [name, value] of Object.entries(node.arguments)) {
+          const parameter = parameters.get(name);
+          if (!parameter) throw new TypeError('Component argument unknown');
+          if (typeof value !== parameter.type || (parameter.type === 'number' && typeof value === 'number'
+            && ((parameter.min !== undefined && value < parameter.min)
+              || (parameter.max !== undefined && value > parameter.max)))) {
+            throw new TypeError('Component argument invalid');
+          }
+        }
       }
     }
   }

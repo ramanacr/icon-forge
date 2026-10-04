@@ -12,6 +12,34 @@ const create = { ...base, commandId: firstId, type: 'project.create' as const, p
 const rename = { ...base, commandId: secondId, type: 'project.rename' as const, payload: { name: 'Clinical' }, expectedRevision: 1 };
 
 describe('project dispatcher', () => {
+  it('undoes and replays sibling grouping and ungrouping as single transactions', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const groupId = '0198e09b-a810-7000-8000-0000000000d0';
+    const nodes: IconV1['nodes'] = [0xd1, 0xd2, 0xd3].map((number, index) => ({
+      id: `0198e09b-a810-7000-8000-${number.toString(16).padStart(12, '0')}`,
+      type: 'rect', visible: true, locked: false, x: index * 4, y: 0, width: 2, height: 2, rx: 0, ry: 0,
+    }));
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-0000000000d4', name: 'boxes', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [], nodes };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000d5',
+      type: 'icon.add', payload: { icon } });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000d6',
+      type: 'node.group', payload: { iconId: icon.id, nodeIds: [nodes[2]!.id, nodes[0]!.id], groupId, index: 1 } });
+    expect(dispatcher.project?.icons[0]?.nodes[1]).toMatchObject({ type: 'group', children: [nodes[0], nodes[2]] });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000d7',
+      type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]).toEqual(icon);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000d8',
+      type: 'history.redo', payload: {} });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000d9',
+      type: 'node.ungroup', payload: { iconId: icon.id, groupId } });
+    expect(dispatcher.project?.icons[0]?.nodes.map(node => node.id)).toEqual([nodes[1]!.id, nodes[0]!.id, nodes[2]!.id]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000da',
+      type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]?.nodes[1]).toMatchObject({ type: 'group', children: [nodes[0], nodes[2]] });
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+  });
   it('undoes and replays a node reorder across sibling arrays', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

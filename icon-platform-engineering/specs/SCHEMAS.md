@@ -212,7 +212,8 @@ Handler contract: `(project: ProjectV1, cmd: CommandEnvelope) → { project, pat
 | `node.add` / `node.remove` | `{ iconId, parentId?, index, node }` / `{ iconId, nodeIds }` | |
 | `node.update` | `{ iconId, nodeId, ops: NodeUpdateOp[] }` | Typed field ops; no generic merge. |
 | `node.reorder` | `{ iconId, nodeId, parentId?, index }` | Move a node to a destination sibling array; `index` is measured after removal. The destination parent must be a group outside the moved subtree. |
-| `node.group` / `node.ungroup` | | |
+| `node.group` | `{ iconId, nodeIds, groupId, index }` | Selected nodes must be siblings. Creates a neutral group (visible, unlocked, no transform/opacity/role) at `index` in that sibling array after selected nodes are removed. Child order follows scene order. |
+| `node.ungroup` | `{ iconId, groupId }` | Expands a neutral group at its current position. Rejects groups with visual properties or variant references to the group ID. |
 | `selection.transform` | `{ iconId, nodeIds, matrix }` | Matrix is pre-computed and quantized by the adapter. |
 | `path.editSegments` | `{ iconId, nodeId, edits }` | Node editing in Expert Mode. |
 | `node.boolean` | `{ iconId, nodeIds, op: "union"\|"subtract"\|"intersect"\|"exclude", resultId }` | Inputs must be closed and stroke-free; else `boolean.invalid-input`. |

@@ -14,6 +14,45 @@ const icon: IconV1 = {
 };
 
 describe('project command handlers', () => {
+  it('groups nonadjacent siblings in scene order and expands them without changing source', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const ids = [0xf1, 0xf2, 0xf3].map(number => `0198e09b-a810-7000-8000-${number.toString(16).padStart(12, '0')}`);
+    const nodes = ids.map((nodeId, index) => ({ id: nodeId, type: 'rect' as const,
+      visible: true, locked: false, x: index * 4, y: 0, width: 2, height: 2, rx: 0, ry: 0 }));
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon: { ...icon, nodes } } });
+    const groupId = '0198e09b-a810-7000-8000-0000000000d0';
+    const grouped = applyProjectCommand(added.project, { ...envelope, type: 'node.group',
+      payload: { iconId: icon.id, nodeIds: [ids[2]!, ids[0]!], groupId, index: 1 } });
+    const groupedNodes = grouped.project.icons[0]!.nodes;
+    expect(groupedNodes.map(node => node.id)).toEqual([ids[1], groupId]);
+    expect(groupedNodes[1]).toMatchObject({ type: 'group', children: [nodes[0], nodes[2]] });
+    expect(added.project.icons[0]!.nodes).toEqual(nodes);
+    expect(grouped.patches.map(patch => patch.op)).toEqual(['remove', 'remove', 'insert']);
+    const expanded = applyProjectCommand(grouped.project, { ...envelope, type: 'node.ungroup',
+      payload: { iconId: icon.id, groupId } });
+    expect(expanded.project.icons[0]!.nodes.map(node => node.id)).toEqual([ids[1], ids[0], ids[2]]);
+    expect(expanded.inversePatches.map(patch => patch.op)).toEqual(['remove', 'remove', 'insert']);
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.group',
+      payload: { iconId: icon.id, nodeIds: [ids[0]!, ids[0]!], groupId, index: 0 } }))
+      .toThrow('node.group.invalid-targets');
+    expect(() => applyProjectCommand(grouped.project, { ...envelope, type: 'node.group',
+      payload: { iconId: icon.id, nodeIds: [ids[1]!, ids[0]!], groupId: '0198e09b-a810-7000-8000-0000000000d1', index: 0 } }))
+      .toThrow('node.group.not-siblings');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.group',
+      payload: { iconId: icon.id, nodeIds: [ids[0]!], groupId, index: 3 } }))
+      .toThrow('node.index.invalid');
+    const namedGroup = structuredClone(grouped.project);
+    const namedNode = namedGroup.icons[0]!.nodes[1]!;
+    if (namedNode.type !== 'group') throw new Error('Expected group');
+    namedNode.name = 'preserved-name';
+    expect(() => applyProjectCommand(namedGroup, { ...envelope, type: 'node.ungroup',
+      payload: { iconId: icon.id, groupId } })).toThrow('node.ungroup.non-neutral');
+    const referencedGroup = structuredClone(grouped.project);
+    referencedGroup.icons[0]!.variants.push({ id: '0198e09b-a810-7000-8000-0000000000d2',
+      name: 'small', dimensions: { size: 16 }, overrides: [{ op: 'hide', nodeId: groupId }] });
+    expect(() => applyProjectCommand(referencedGroup, { ...envelope, type: 'node.ungroup',
+      payload: { iconId: icon.id, groupId } })).toThrow('node.group.in-use');
+  });
   it('reorders nodes across groups with patches measured after removal', () => {
     const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     const firstId = '0198e09b-a810-7000-8000-0000000000f1';

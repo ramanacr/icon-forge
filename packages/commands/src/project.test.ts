@@ -14,6 +14,32 @@ const icon: IconV1 = {
 };
 
 describe('project command handlers', () => {
+  it('transforms a nested selection once with reversible node patches', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const nodeId = '0198e09b-a810-7000-8000-0000000000e1';
+    const groupId = '0198e09b-a810-7000-8000-0000000000e2';
+    const nested = { ...icon, nodes: [{ id: groupId, type: 'group' as const, visible: true, locked: false,
+      children: [{ id: nodeId, type: 'rect' as const, visible: true, locked: false,
+        x: 0, y: 0, width: 8, height: 8, rx: 0, ry: 0, transform: [2, 0, 0, 2, 1, 1] as [number, number, number, number, number, number] }] }] };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon: nested } });
+    const moved = applyProjectCommand(added.project, { ...envelope, type: 'selection.transform',
+      payload: { iconId: icon.id, nodeIds: [nodeId], matrix: [1, 0, 0, 1, 3, 4] } });
+    const group = moved.project.icons[0]!.nodes[0]!;
+    if (group.type !== 'group') throw new Error('Expected group');
+    expect(group.children[0]!.transform).toEqual([2, 0, 0, 2, 4, 5]);
+    expect(added.project.icons[0]).toEqual(nested);
+    expect(moved.patches[0]?.path).toEqual(['icons', '0', 'nodes', '0', 'children', '0']);
+    expect(moved.inversePatches[0]).toMatchObject({ op: 'replace', path: moved.patches[0]!.path });
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'selection.transform',
+      payload: { iconId: icon.id, nodeIds: [groupId, nodeId], matrix: [1, 0, 0, 1, 1, 0] } }))
+      .toThrow('selection.overlap');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'selection.transform',
+      payload: { iconId: icon.id, nodeIds: [nodeId], matrix: [1, 0, 0, 1, 0.0001, 0] } }))
+      .toThrow('selection.matrix.invalid');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'selection.transform',
+      payload: { iconId: icon.id, nodeIds: [nodeId, nodeId], matrix: [1, 0, 0, 1, 1, 0] } }))
+      .toThrow('selection.invalid-targets');
+  });
   it('creates a valid project using only command data and defaults', () => {
     const result = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     expect(result.project.id).toBe(id);

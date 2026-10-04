@@ -1,4 +1,4 @@
-import { assertProject, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type PaintV1, type ProjectV1,
+import { assertProject, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 import { findNodePath, nodeArrayAt, removalOrder } from './scene-path.js';
@@ -33,6 +33,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'component.remove'; payload: { componentId: UUID } }
   | { type: 'node.add'; payload: { iconId: UUID; parentId?: UUID; index: number; node: SceneNodeV1 } }
   | { type: 'node.remove'; payload: { iconId: UUID; nodeIds: UUID[] } }
+  | { type: 'selection.transform'; payload: { iconId: UUID; nodeIds: UUID[]; matrix: MatrixV1 } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -245,7 +246,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [componentId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
   }
-  if (command.type === 'node.add' || command.type === 'node.remove') {
+  if (command.type === 'node.add' || command.type === 'node.remove' || command.type === 'selection.transform') {
     const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);
     if (iconIndex < 0) throw new TypeError('icon.not-found');
     const icon = project.icons[iconIndex]!;
@@ -269,6 +270,39 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       inversePatches = [{ op: 'remove', path, value: node }];
       count = { added: 1, updated: 0, removed: 0 };
       changedIds = [icon.id, node.id];
+    } else if (command.type === 'selection.transform') {
+      const ids = command.payload.nodeIds;
+      if (ids.length === 0 || new Set(ids).size !== ids.length) throw new TypeError('selection.invalid-targets');
+      const matrix = command.payload.matrix;
+      if (matrix.length !== 6 || matrix.some(value => !Number.isFinite(value))) throw new TypeError('selection.matrix.invalid');
+      const normalized = quantizeMatrix(matrix);
+      if (matrix.some((value, offset) => value !== normalized[offset])) throw new TypeError('selection.matrix.invalid');
+      const paths = ids.map(id => {
+        const path = findNodePath(icon, id);
+        if (!path) throw new TypeError('node.not-found');
+        return path;
+      });
+      if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex
+        && path.length < other.length && path.every((part, offset) => part === other[offset])))) {
+        throw new TypeError('selection.overlap');
+      }
+      const transformPatches = paths.map(path => {
+        const container = nodeArrayAt(copy, path.slice(0, -1));
+        const index = Number(path.at(-1));
+        const before = container[index]!;
+        const [a, b, c, d, e, f] = matrix;
+        const [g, h, i, j, k, l] = before.transform ?? [1, 0, 0, 1, 0, 0];
+        const transform = quantizeMatrix([a * g + c * h, b * g + d * h, a * i + c * j, b * i + d * j,
+          a * k + c * l + e, b * k + d * l + f]);
+        const after = { ...before, transform };
+        container[index] = after;
+        return { op: 'replace' as const, path: ['icons', String(iconIndex), ...path], before, after };
+      });
+      patches = transformPatches;
+      inversePatches = transformPatches.map(patch => ({ op: 'replace' as const, path: patch.path,
+        before: patch.after, after: patch.before })).reverse();
+      count = { added: 0, updated: ids.length, removed: 0 };
+      changedIds = [icon.id, ...ids];
     } else {
       const ids = command.payload.nodeIds;
       if (ids.length === 0 || new Set(ids).size !== ids.length) throw new TypeError('node.remove.invalid-targets');

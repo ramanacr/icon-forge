@@ -32,6 +32,11 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
             throw new TypeError('patch.conflict');
           }
           nodes.splice(nodeIndex, 1);
+        } else if (patch.op === 'replace') {
+          if (nodeIndex >= nodes.length || canonicalJson(nodes[nodeIndex]) !== canonicalJson(patch.before)) {
+            throw new TypeError('patch.conflict');
+          }
+          nodes[nodeIndex] = structuredClone(patch.after as ProjectV1['icons'][number]['nodes'][number]);
         } else {
           throw new TypeError('patch.op.unsupported');
         }

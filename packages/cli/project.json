@@ -1,0 +1,9 @@
+{
+  "name": "cli",
+  "tags": ["scope:automation", "type:app", "layer:cli"],
+  "implicitDependencies": ["compiler-core", "persistence"],
+  "targets": {
+    "test": { "command": "vitest run packages/cli" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

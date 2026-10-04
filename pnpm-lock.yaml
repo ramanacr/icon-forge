@@ -57,6 +57,22 @@ importers:
         specifier: 2.4.0
         version: 2.4.0
 
+  packages/cli:
+    dependencies:
+      '@iconforge/compiler-core':
+        specifier: workspace:*
+        version: link:../compiler-core
+      '@iconforge/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@iconforge/project-model':
+        specifier: workspace:*
+        version: link:../project-model
+    devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+
   packages/commands:
     dependencies:
       '@iconforge/project-model':
@@ -65,6 +81,18 @@ importers:
       ajv:
         specifier: 8.17.1
         version: 8.17.1
+
+  packages/compiler-core:
+    dependencies:
+      '@iconforge/export-svg':
+        specifier: workspace:*
+        version: link:../export-svg
+      '@iconforge/project-model':
+        specifier: workspace:*
+        version: link:../project-model
+      '@noble/hashes':
+        specifier: 2.4.0
+        version: 2.4.0
 
   packages/export-font:
     dependencies:

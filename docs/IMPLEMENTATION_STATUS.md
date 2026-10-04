@@ -1,6 +1,11 @@
 # Implementation status
 
-Phase 0 is in progress. The v4 engineering package remains the design authority.
+Phase 0 is in progress. At the user's direction, Phase 1 independent work has started before the formal S-01 through S-06 gate closes. The v4 engineering package remains the design authority; the Phase 1 exit is not yet met.
+
+## Phase 1 kickoff
+
+- A pure SVG profile compiler now creates sorted per-icon SVG artifacts and a deterministic hash manifest from a validated project and saved SVG export profile. The Node CLI reads `.iconproj`, compiles into a new output directory, and supports `--check` against existing output. Unit tests compare CLI output to the pure compiler, and Chromium checks artifact and manifest byte parity with Node.
+- Remaining walking skeleton work includes the programmatic editor renderer, selection and bounds, snapping and grid, gesture-level transaction integration, autosave UX, and the representative edit/undo/export workflow. The Phase 0 conformance and Windows picker items below remain open.
 
 Environment-dependent blockers are tracked in [BLOCKERS.md](BLOCKERS.md).
 

@@ -20,6 +20,7 @@ jobs:
       - run: pnpm schema:check
       - run: pnpm typecheck
       - run: pnpm lint:boundaries
+      - run: pnpm --filter @iconforge/cli build
       - run: pnpm test
 
   parity:

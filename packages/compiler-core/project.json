@@ -1,0 +1,9 @@
+{
+  "name": "compiler-core",
+  "tags": ["scope:core", "type:lib", "layer:compiler-core"],
+  "implicitDependencies": ["project-model", "export-svg"],
+  "targets": {
+    "test": { "command": "vitest run packages/compiler-core" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@iconforge/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "iconforge": "./dist/iconforge.mjs" },
+  "files": ["dist"],
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": {
+    "@iconforge/compiler-core": "workspace:*",
+    "@iconforge/persistence": "workspace:*",
+    "@iconforge/project-model": "workspace:*"
+  },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

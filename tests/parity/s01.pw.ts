@@ -30,12 +30,13 @@ test.beforeAll(async () => {
       application: resolve('packages/application/src/index.ts'),
       model: resolve('packages/project-model/src/index.ts'),
       compiler: resolve('packages/export-svg/src/index.ts'),
+      profileCompiler: resolve('packages/compiler-core/src/index.ts'),
     },
     outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
   });
   server = createServer(async (request, response) => {
     const name = request.url?.slice(1);
-    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js', 'compiler.js'].includes(name ?? '')) {
+    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js', 'compiler.js', 'profileCompiler.js'].includes(name ?? '')) {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>');
       return;
     }
@@ -139,6 +140,36 @@ test('S-01 parameterized component SVG matches Node and Chromium', async ({ page
     return compiler.serializeIconSvg(project, project.icons[0], options);
   }, { project, options });
   expect(browserSvg).toBe(nodeSvg);
+});
+
+test('Phase 1 SVG profile artifacts and manifest match Node and Chromium', async ({ page }) => {
+  const application = await import(pathToFileURL(join(outputDir, 'application.js')).href);
+  const compiler = await import(pathToFileURL(join(outputDir, 'profileCompiler.js')).href);
+  const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
+  const base = { commandVersion: '1.0', projectId: id(51), issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' } };
+  const dispatcher = new application.ProjectDispatcher();
+  dispatcher.dispatch({ ...base, commandId: id(52), type: 'project.create', payload: { id: id(51), name: 'CLI parity' } });
+  dispatcher.dispatch({ ...base, commandId: id(53), type: 'icon.add', payload: { icon: {
+    id: id(54), name: 'box', aliases: [], tags: [], viewBox: [0, 0, 24, 24], variants: [],
+    provenanceIds: [], accessibility: { kind: 'decorative' }, nodes: [
+      { id: id(55), type: 'rect', visible: true, locked: false, x: 2, y: 2, width: 20, height: 20, rx: 1, ry: 1 },
+    ],
+  } } });
+  dispatcher.dispatch({ ...base, commandId: id(56), type: 'exportProfile.upsert', payload: { profile: {
+    id: id(57), name: 'web-svg', target: 'svg',
+    options: { precision: 3, sizeAttrs: false, paintMode: 'currentColor', metadata: false },
+  } } });
+  const project: ProjectV1 = dispatcher.project;
+  const build = compiler.compileSvgProfile(project, 'web-svg');
+  await page.goto(baseUrl);
+  const browser = await page.evaluate(async project => {
+    const module = await import(new URL('/profileCompiler.js', location.origin).href);
+    const output = module.compileSvgProfile(project, 'web-svg');
+    return { svg: new TextDecoder().decode(output.artifacts['box.svg']),
+      manifest: new TextDecoder().decode(output.manifestBytes) };
+  }, project);
+  expect(browser.svg).toBe(new TextDecoder().decode(build.artifacts['box.svg']));
+  expect(browser.manifest).toBe(new TextDecoder().decode(build.manifestBytes));
 });
 
 test.afterAll(async () => {

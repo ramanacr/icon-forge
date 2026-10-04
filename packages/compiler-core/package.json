@@ -1,0 +1,12 @@
+{
+  "name": "@iconforge/compiler-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@iconforge/project-model": "workspace:*",
+    "@iconforge/export-svg": "workspace:*",
+    "@noble/hashes": "2.4.0"
+  },
+  "exports": { ".": "./src/index.ts" }
+}

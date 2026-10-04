@@ -6,6 +6,8 @@
       "@iconforge/application": ["./packages/application/src/index.ts"],
       "@iconforge/persistence": ["./packages/persistence/src/index.ts"],
       "@iconforge/export-svg": ["./packages/export-svg/src/index.ts"],
+      "@iconforge/compiler-core": ["./packages/compiler-core/src/index.ts"],
+      "@iconforge/cli": ["./packages/cli/src/main.ts"],
       "@iconforge/geometry": ["./packages/geometry/src/index.ts"],
       "@iconforge/geometry-paper": ["./packages/geometry-paper/src/index.ts"],
       "@iconforge/export-raster": ["./packages/export-raster/src/index.ts"],

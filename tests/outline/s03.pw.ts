@@ -96,6 +96,104 @@ test('S-03 outlined caps and joins match Canvas stroke raster at 96 px', async (
   }
 });
 
+test('S-03 quadratic and cubic outlines match Canvas curves at 96 px', async ({ page }, testInfo) => {
+  test.fail(testInfo.project.name === 'chromium', 'B-06: curved stroke raster IoU is below the S-03 threshold');
+  const wasm = readFileSync(resolve('packages/outline-wasm/pkg/iconforge_outline_wasm_bg.wasm'));
+  const engine = await WasmOutlineEngine.create(wasm);
+  const fixtures = [
+    { name: 'quadratic arch', path: [{ start: [3, 18] as [number, number], segments: [
+      { k: 'Q' as const, c: [12, 1] as [number, number], to: [21, 18] as [number, number] },
+    ], closed: false }] },
+    { name: 'cubic inflection', path: [{ start: [3, 16] as [number, number], segments: [
+      { k: 'C' as const, c1: [4, 1] as [number, number], c2: [20, 23] as [number, number],
+        to: [21, 7] as [number, number] },
+    ], closed: false }] },
+  ];
+  for (const fixture of fixtures) {
+    const result = engine.outline(fixture.path, { width: 2, cap: 'round', join: 'round', miterLimit: 4 });
+    expect(result.diagnostics).toEqual([]);
+    const iou = await page.evaluate(({ fixture, result }) => {
+      const create = () => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 96; return canvas; };
+      const actual = create().getContext('2d')!; const expected = create().getContext('2d')!;
+      actual.scale(4, 4); expected.scale(4, 4);
+      actual.beginPath();
+      for (const contour of result.path ?? []) {
+        actual.moveTo(...contour.start);
+        for (const segment of contour.segments) actual.lineTo(...segment.to);
+        actual.closePath();
+      }
+      actual.fill();
+      expected.lineWidth = 2; expected.lineCap = 'round'; expected.lineJoin = 'round';
+      expected.beginPath();
+      for (const path of fixture.path) {
+        expected.moveTo(...path.start);
+        for (const segment of path.segments) {
+          if (segment.k === 'Q') expected.quadraticCurveTo(...segment.c, ...segment.to);
+          else expected.bezierCurveTo(...segment.c1, ...segment.c2, ...segment.to);
+        }
+      }
+      expected.stroke();
+      const x = actual.getImageData(0, 0, 96, 96).data;
+      const y = expected.getImageData(0, 0, 96, 96).data;
+      let intersection = 0; let union = 0;
+      for (let index = 3; index < x.length; index += 4) {
+        const first = x[index]! > 127; const second = y[index]! > 127;
+        if (first && second) intersection++;
+        if (first || second) union++;
+      }
+      return intersection / union;
+    }, { fixture, result });
+    expect.soft(iou, fixture.name).toBeGreaterThanOrEqual(0.995);
+  }
+});
+
+test('S-03 fill-only evenodd hole matches Canvas at 96 px', async ({ page }) => {
+  const wasm = readFileSync(resolve('packages/outline-wasm/pkg/iconforge_outline_wasm_bg.wasm'));
+  const engine = await WasmOutlineEngine.create(wasm);
+  const fills = [
+    { start: [3, 3] as [number, number], segments: [
+      { k: 'L' as const, to: [21, 3] as [number, number] }, { k: 'L' as const, to: [21, 21] as [number, number] },
+      { k: 'L' as const, to: [3, 21] as [number, number] },
+    ], closed: true },
+    { start: [8, 8] as [number, number], segments: [
+      { k: 'L' as const, to: [16, 8] as [number, number] }, { k: 'L' as const, to: [16, 16] as [number, number] },
+      { k: 'L' as const, to: [8, 16] as [number, number] },
+    ], closed: true },
+  ];
+  const result = engine.outline([], { width: 1, cap: 'butt', join: 'miter', miterLimit: 4 }, fills, 'evenodd');
+  expect(result.diagnostics).toEqual([]);
+  expect(result.path).toHaveLength(2);
+  const iou = await page.evaluate(({ fills, result }) => {
+    const create = () => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 96; return canvas; };
+    const actual = create().getContext('2d')!; const expected = create().getContext('2d')!;
+    actual.scale(4, 4); expected.scale(4, 4);
+    actual.beginPath();
+    for (const contour of result.path ?? []) {
+      actual.moveTo(...contour.start);
+      for (const segment of contour.segments) actual.lineTo(...segment.to);
+      actual.closePath();
+    }
+    actual.fill();
+    expected.beginPath();
+    for (const path of fills) {
+      expected.moveTo(...path.start);
+      for (const segment of path.segments) expected.lineTo(...segment.to);
+      expected.closePath();
+    }
+    expected.fill('evenodd');
+    const x = actual.getImageData(0, 0, 96, 96).data;
+    const y = expected.getImageData(0, 0, 96, 96).data;
+    let intersection = 0; let union = 0;
+    for (let index = 3; index < x.length; index += 4) {
+      const first = x[index]! > 127; const second = y[index]! > 127;
+      if (first && second) intersection++;
+      if (first || second) union++;
+    }
+    return intersection / union;
+  }, { fills, result });
+  expect(iou).toBeGreaterThanOrEqual(0.995);
+});
+
 test('S-03 closed, reversal, dot and overlap contours match Canvas at 96 px', async ({ page }) => {
   const wasm = readFileSync(resolve('packages/outline-wasm/pkg/iconforge_outline_wasm_bg.wasm'));
   const engine = await WasmOutlineEngine.create(wasm);

@@ -25,3 +25,9 @@ Safari on macOS or iPadOS, including installed and noninstalled behavior, may be
 | ID | Evidence | Pending decision |
 | --- | --- | --- |
 | B-05 | `SCHEMAS.md` says component parameters bind to stroke width, radius and visibility, but `ComponentV1` contains only parameter declarations, literal scene nodes and instance arguments. It has no field mapping a parameter to a node property. Static component instances and variants render; the serializer reports `svg.instance.parameters-unbound` for parameterized components. | Add an explicit, validated binding representation to the project schema and its migration rules before applying instance arguments during export. |
+
+## Conformance gap
+
+| ID | Evidence | Next pass |
+| --- | --- | --- |
+| B-06 | The new S-03 Chromium curved-stroke fixture compares the Rust/WASM outline to Canvas at 96 px. Its quadratic arch reaches raster IoU about 0.982 and cubic inflection about 0.986, below the required 0.995. Raising contour sampling from 16 to 64 steps and tiny-skia stroke resolution from 1 to 4 did not materially improve it. The strict fixture is marked as an expected failure for Chromium. | Investigate curve stroking or raster boundary differences with a geometric reference; repair the adapter or record an S-03 adapter swap. Remove the expected-failure mark only after both cases pass 0.995. |

@@ -1,10 +1,12 @@
 import {
   assertProject, canonicalJson, canonicalNumber, instantiateComponentNodes, resolveVariantNodes,
-  type IconV1, type PaintV1, type ProjectV1, type SceneNodeV1, type StrokeV1, type SubpathV1,
+  type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type SceneNodeV1, type StrokeV1, type SubpathV1,
 } from '@iconforge/project-model';
+import { SelectionModel } from './selection.js';
+import type { TransformPreview } from './transform-gesture.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-export interface RenderIconOptions { variantId?: string; theme?: 'light' | 'dark' }
+export interface RenderIconOptions { variantId?: string; theme?: 'light' | 'dark'; preview?: TransformPreview }
 
 /** Build an interactive SVG DOM tree directly from the validated model. */
 export function renderIconSvg(document: Document, input: ProjectV1, iconInput: IconV1,
@@ -12,6 +14,15 @@ export function renderIconSvg(document: Document, input: ProjectV1, iconInput: I
   const project = assertProject(input);
   const icon = project.icons.find(candidate => candidate.id === iconInput.id);
   if (!icon || canonicalJson(icon) !== canonicalJson(iconInput)) throw new TypeError('renderer.icon.not-in-project');
+  const preview = options.preview;
+  if (preview) {
+    if (preview.iconId !== icon.id || preview.revision !== project.revision
+      || preview.matrix.length !== 6 || preview.matrix.some(value => !Number.isFinite(value))) {
+      throw new TypeError('renderer.preview.invalid');
+    }
+    new SelectionModel().replace(project, icon.id, preview.nodeIds);
+  }
+  const previewIds = new Set(preview?.nodeIds ?? []);
   const baseNodeIds = new Set<string>();
   const collectIds = (nodes: SceneNodeV1[]): void => {
     for (const node of nodes) {
@@ -23,6 +34,12 @@ export function renderIconSvg(document: Document, input: ProjectV1, iconInput: I
   const element = <K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] =>
     document.createElementNS(SVG_NS, tag);
   const n = canonicalNumber;
+  const compose = (left: MatrixV1, right: MatrixV1): MatrixV1 => {
+    const [a, b, c, d, e, f] = left;
+    const [g, h, i, j, k, l] = right;
+    return [a * g + c * h, b * g + d * h, a * i + c * j, b * i + d * j,
+      a * k + c * l + e, b * k + d * l + f];
+  };
   const paint = (value: PaintV1): string => {
     if (value.kind === 'none') return 'none';
     if (value.kind === 'color') return value.value;
@@ -56,7 +73,9 @@ export function renderIconSvg(document: Document, input: ProjectV1, iconInput: I
     const target = element(tag);
     if (selectable && baseNodeIds.has(node.id)) target.setAttribute('data-node-id', node.id);
     if (node.role) target.setAttribute('data-role', node.role);
-    if (node.transform) target.setAttribute('transform', `matrix(${node.transform.map(n).join(' ')})`);
+    const transform = preview && selectable && baseNodeIds.has(node.id) && previewIds.has(node.id)
+      ? compose(preview.matrix, node.transform ?? [1, 0, 0, 1, 0, 0]) : node.transform;
+    if (transform) target.setAttribute('transform', `matrix(${transform.map(n).join(' ')})`);
     if (node.opacity !== undefined) target.setAttribute('opacity', n(node.opacity));
     if (node.type === 'group' || node.type === 'instance') {
       const children = node.type === 'group' ? node.children : instantiateComponentNodes(project, node);

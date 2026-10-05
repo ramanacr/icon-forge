@@ -10,6 +10,7 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 - A separate ephemeral selection model orders IDs by scene order, rejects missing/duplicate/ancestor-overlapping targets, and reconciles deletions without journaling. Variant replacement geometry renders but has no base-scene selection ID until variant editing commands exist.
 - A pure geometry query now computes bounds for visible scene nodes, nested affine transforms, quadratic and cubic extrema, ellipses, variants and component bindings. It leaves the project unchanged and excludes stroke expansion.
 - Pure grid helpers now provide bounded overlay guide positions and independent-axis point snapping with a caller-supplied screen tolerance converted to icon units. They keep preview coordinates out of the project journal.
+- The native SVG renderer now accepts a revision-bound transform preview and composes it with an existing node transform. Chromium verifies that the preview leaves project and journal unchanged and matches the one-command committed rendering.
 - Remaining walking skeleton work includes wiring geometry, renderer, selection and gesture commits to the UI, autosave UX, and the representative edit/undo/export workflow. The Phase 0 conformance and Windows picker items below remain open.
 
 Environment-dependent blockers are tracked in [BLOCKERS.md](BLOCKERS.md).

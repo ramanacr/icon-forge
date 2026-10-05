@@ -211,7 +211,8 @@ test('Phase 1 transform gesture commits and replays identically in Node and Chro
   const add = { ...base, commandId: id(73), type: 'icon.add', payload: { icon: {
     id: id(74), name: 'box', aliases: [], tags: [], viewBox: [0, 0, 24, 24], variants: [],
     provenanceIds: [], accessibility: { kind: 'decorative' }, nodes: [
-      { id: id(75), type: 'rect', visible: true, locked: false, x: 2, y: 2, width: 8, height: 8, rx: 0, ry: 0 },
+      { id: id(75), type: 'rect', visible: true, locked: false, transform: [2, 0, 0, 2, 3, 4],
+        x: 2, y: 2, width: 8, height: 8, rx: 0, ry: 0 },
     ],
   } } };
   const request = { ...base, commandId: id(76), iconId: id(74), nodeIds: [id(75)] };
@@ -235,11 +236,23 @@ test('Phase 1 transform gesture commits and replays identically in Node and Chro
     dispatcher.dispatch(add);
     const gesture = new editor.TransformGesture(dispatcher, request);
     gesture.update([1, 0, 0, 1, 1.25, 2.5]);
+    const beforePreview = JSON.stringify(dispatcher.project);
+    const journalSize = dispatcher.journal.length;
+    const preview = editor.renderIconSvg(document, dispatcher.project, dispatcher.project.icons[0],
+      { preview: gesture.preview });
+    const previewTransform = preview.querySelector('[data-node-id]')?.getAttribute('transform');
+    const previewUnjournaled = JSON.stringify(dispatcher.project) === beforePreview && dispatcher.journal.length === journalSize;
     gesture.commit();
+    const committed = editor.renderIconSvg(document, dispatcher.project, dispatcher.project.icons[0]);
+    const committedTransform = committed.querySelector('[data-node-id]')?.getAttribute('transform');
     return { project: dispatcher.project, journal: dispatcher.journal,
-      replay: application.ProjectDispatcher.replay(null, dispatcher.journal).project };
+      replay: application.ProjectDispatcher.replay(null, dispatcher.journal).project,
+      previewTransform, committedTransform, previewUnjournaled };
   }, { create, add, request });
-  expect(browser).toEqual(node);
+  expect(browser.previewUnjournaled).toBe(true);
+  expect(browser.previewTransform).toBe('matrix(2 0 0 2 4.25 6.5)');
+  expect(browser.committedTransform).toBe(browser.previewTransform);
+  expect({ project: browser.project, journal: browser.journal, replay: browser.replay }).toEqual(node);
 });
 
 test('Phase 1 programmatic SVG renderer matches exported scene pixels', async ({ page }) => {

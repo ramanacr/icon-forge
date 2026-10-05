@@ -17,6 +17,7 @@ export function snapPointToGrid(point: Point, spacing: Point, origin: Point = [0
   const snapped: [boolean, boolean] = [false, false];
   for (const axis of [0, 1] as const) {
     const candidate = origin[axis] + Math.round((point[axis] - origin[axis]) / spacing[axis]) * spacing[axis];
+    if (!Number.isFinite(candidate)) throw new TypeError('grid.range.invalid');
     snapped[axis] = Math.abs(point[axis] - candidate) <= tolerance;
     target[axis] = snapped[axis] ? candidate : point[axis];
   }
@@ -32,6 +33,7 @@ export function gridGuides(viewBox: ViewBox, spacing: Point, origin: Point = [0,
   const lines = (start: number, size: number, step: number, offset: number): number[] => {
     const first = Math.ceil((start - offset) / step);
     const last = Math.floor((start + size - offset) / step);
+    if (!Number.isFinite(first) || !Number.isFinite(last)) throw new TypeError('grid.range.invalid');
     if (last - first + 1 > 4096) throw new TypeError('grid.too-many-guides');
     const result: number[] = [];
     for (let index = first; index <= last; index++) result.push(offset + index * step);

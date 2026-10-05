@@ -16,5 +16,7 @@ describe('ephemeral grid geometry', () => {
     expect(() => snapPointToGrid([0, 0], [0, 1])).toThrow('grid.spacing.invalid');
     expect(() => snapPointToGrid([0, 0], [1, 1], [0, 0], -1)).toThrow('grid.tolerance.invalid');
     expect(() => gridGuides([0, 0, 10000, 1], [1, 1])).toThrow('grid.too-many-guides');
+    expect(() => snapPointToGrid([1e308, 0], [1e-308, 1])).toThrow('grid.range.invalid');
+    expect(() => gridGuides([1e308, 0, 1, 1], [1e-308, 1])).toThrow('grid.range.invalid');
   });
 });

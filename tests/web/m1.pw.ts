@@ -261,6 +261,29 @@ test('M1 layer selection groups and ungroups shapes with undo and redo', async (
   await expect(page.locator('svg [data-node-id]')).toHaveCount(2);
 });
 
+test('M1 selected layers delete as one reversible saved command', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Add ellipse' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('button', { name: 'Ellipse layer' }).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Delete selection' }).click();
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Rectangle layer' }).focus();
+  await page.keyboard.press('Delete');
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(1);
+});
+
 test('M1 shape appearance edits are reversible and exported', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

@@ -46,6 +46,7 @@ import type { BrowserWorkspace } from './workspace.js';
             <button type="button" (click)="runRedo()" [disabled]="!canEdit()">Redo</button>
             <button type="button" (click)="runGroup()" [disabled]="!canEdit() || !canGroup()">Group selection</button>
             <button type="button" (click)="runUngroup()" [disabled]="!canEdit() || !canUngroup()">Ungroup selection</button>
+            <button type="button" (click)="runDeleteSelection()" [disabled]="!canEdit() || !selected()">Delete selection</button>
             <button type="button" (click)="toggleGrid()" [disabled]="!hasIcon()">{{ showGrid() ? 'Hide grid' : 'Show grid' }}</button>
           </div>
           <div class="stage">
@@ -254,6 +255,7 @@ export class App implements OnInit, OnDestroy {
   runRecover(): void { void this.run(() => this.workspace.recover()); }
   runGroup(): void { void this.run(() => this.workspace.groupSelected()); }
   runUngroup(): void { void this.run(() => this.workspace.ungroupSelected()); }
+  runDeleteSelection(): void { void this.run(() => this.workspace.removeSelected()); }
   runAppearance(mode: 'filled' | 'outline'): void { void this.run(() => this.workspace.setSelectedAppearance(mode)); }
   runPosition(x: string, y: string): void {
     if (!x.trim() || !y.trim()) { this.error.set('Enter both position values'); return; }
@@ -279,6 +281,12 @@ export class App implements OnInit, OnDestroy {
 
   onLayerKeydown(id: string, event: KeyboardEvent): void {
     if (!this.canEdit()) return;
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      if (!this.workspace.selection.snapshot.nodeIds.includes(id)) this.workspace.select(id);
+      void this.run(() => this.workspace.removeSelected());
+      return;
+    }
     const move: Record<string, [number, number]> = {
       ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
     };

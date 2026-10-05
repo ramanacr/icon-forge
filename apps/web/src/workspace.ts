@@ -262,6 +262,15 @@ export class BrowserWorkspace {
     this.selection.replace(this.project!, icon.id, children);
   }
 
+  async removeSelected(): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    const nodeIds = this.selection.snapshot.nodeIds;
+    if (!project || !icon || nodeIds.length === 0) return;
+    await this.persist({ ...this.base(project.id), type: 'node.remove',
+      payload: { iconId: icon.id, nodeIds } });
+  }
+
   async setSelectedAppearance(mode: 'filled' | 'outline'): Promise<void> {
     const project = this.project;
     const icon = this.icon;

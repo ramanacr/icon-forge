@@ -52,7 +52,7 @@ h2 { margin: 0 0 18px; font-size: 15px; }
 .layer { padding-left: 20px; }
 .asset.active, .layer.active { background: var(--selection-surface); border-color: var(--selection-border); }
 .studio { display: flex; flex-direction: column; min-width: 0; }
-.toolbar { display: flex; gap: var(--space-2); padding: 13px 18px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); }
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 13px 18px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); }
 .stage { flex: 1; display: grid; place-items: center; position: relative; min-height: 400px; background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px); background-size: 20px 20px; }
 .canvas { width: min(65vh, 70vw, 520px); aspect-ratio: 1; display: grid; place-items: center; background: var(--surface); box-shadow: var(--elevation-canvas); color: var(--canvas-ink); }
 .canvas svg { width: 80%; height: 80%; overflow: visible; touch-action: none; }

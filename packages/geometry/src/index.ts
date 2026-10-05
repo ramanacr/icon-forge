@@ -1,4 +1,5 @@
 import type { PathDataV1 } from '@iconforge/project-model';
+export { iconGeometryBounds, type Bounds } from './bounds.js';
 
 export type BooleanOp = 'union' | 'subtract' | 'intersect' | 'exclude';
 export interface GeometryDiagnostic { code: 'boolean.invalid-input' | 'boolean.unsupported-geometry'; severity: 'error' }

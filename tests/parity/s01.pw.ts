@@ -32,12 +32,13 @@ test.beforeAll(async () => {
       compiler: resolve('packages/export-svg/src/index.ts'),
       profileCompiler: resolve('packages/compiler-core/src/index.ts'),
       editor: resolve('packages/editor-core/src/index.ts'),
+      geometry: resolve('packages/geometry/src/index.ts'),
     },
     outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
   });
   server = createServer(async (request, response) => {
     const name = request.url?.slice(1);
-    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js', 'compiler.js', 'profileCompiler.js', 'editor.js'].includes(name ?? '')) {
+    if (!['quantization.js', 'canonical.js', 'application.js', 'model.js', 'compiler.js', 'profileCompiler.js', 'editor.js', 'geometry.js'].includes(name ?? '')) {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>');
       return;
     }
@@ -171,6 +172,34 @@ test('Phase 1 SVG profile artifacts and manifest match Node and Chromium', async
   }, project);
   expect(browser.svg).toBe(new TextDecoder().decode(build.artifacts['box.svg']));
   expect(browser.manifest).toBe(new TextDecoder().decode(build.manifestBytes));
+});
+
+test('Phase 1 bounds and grid queries match Node and Chromium', async ({ page }) => {
+  const geometry = await import(pathToFileURL(join(outputDir, 'geometry.js')).href);
+  const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
+  const project: ProjectV1 = { schemaVersion: '1.0', id: id(101), name: 'Geometry parity', revision: 1,
+    designSystem: { grid: { width: 24, height: 24 }, safeArea: { top: 2, right: 2, bottom: 2, left: 2 },
+      style: 'filled', stroke: { width: 1, cap: 'round', join: 'round', miterLimit: 4 }, cornerRadius: 0,
+      defaultPaintToken: 'currentColor', naming: { pattern: 'kebab', reserved: [] }, severities: {} },
+    tokens: [], components: [], exportProfiles: [], provenance: [], icons: [{ id: id(102), name: 'curve',
+      aliases: [], tags: [], viewBox: [0, 0, 24, 24], accessibility: { kind: 'decorative' },
+      provenanceIds: [], variants: [], nodes: [{ id: id(103), type: 'path', visible: true, locked: false,
+        transform: [0, 1, -1, 0, 5, 0], fillRule: 'nonzero',
+        path: [{ start: [0, 0], segments: [{ k: 'Q', c: [10, 20], to: [20, 0] }], closed: false }] }] }] };
+  const query = (Geometry: typeof geometry) => ({
+    bounds: Geometry.iconGeometryBounds(project, project.icons[0]),
+    snap: Geometry.snapPointToGrid([2.9, -2.1], [2, 2], [0, 0], 0.2),
+    guides: Geometry.gridGuides([-1, -2, 5, 4], [2, 2]),
+  });
+  const node = query(geometry);
+  await page.goto(baseUrl);
+  const browser = await page.evaluate(async input => {
+    const geometry = await import(new URL('/geometry.js', location.origin).href);
+    return { bounds: geometry.iconGeometryBounds(input, input.icons[0]),
+      snap: geometry.snapPointToGrid([2.9, -2.1], [2, 2], [0, 0], 0.2),
+      guides: geometry.gridGuides([-1, -2, 5, 4], [2, 2]) };
+  }, project);
+  expect(browser).toEqual(node);
 });
 
 test('Phase 1 transform gesture commits and replays identically in Node and Chromium', async ({ page }) => {

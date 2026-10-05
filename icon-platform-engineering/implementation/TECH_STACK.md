@@ -27,7 +27,7 @@ IconForge is a **TypeScript-first, local-first web application** whose framework
 | Archive | fflate † behind `IArchiveService` | Deterministic entries; streaming limits. |
 | Persistence | IndexedDB via Dexie behind `IProjectRepository`; File System Access API adapter; Web Locks; BroadcastChannel | ADR-020/021. |
 | Background work | Dedicated + pooled Web Workers (Comlink-style RPC, or hand-rolled typed messaging) | Off-main-thread import/compile/validation. |
-| PWA | Angular service worker | Offline shell; install improves storage durability on Safari. |
+| PWA | Angular service worker | Offline shell; installed apps can improve storage durability where supported. |
 | Unit/component tests | Vitest (Angular 21+ default runner) | |
 | Property tests | fast-check | Transforms, quantization, serialization, migrations. |
 | E2E / cross-engine | Playwright (Chromium, Firefox, WebKit) | Includes cross-engine golden-hash parity. |

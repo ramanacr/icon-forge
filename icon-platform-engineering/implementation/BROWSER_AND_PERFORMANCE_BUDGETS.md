@@ -1,7 +1,7 @@
 # Browser Support and Performance Budgets
 
 ## Browser matrix
-Current and previous major stable Chrome/Edge and Firefox are required browser targets. Playwright WebKit remains a required engine for cross-engine parity and smoke checks on the available Windows 11 test environment. Safari on macOS and iPadOS is an optional final device compatibility target; no Safari support is claimed until device testing is completed. Mobile phones: browse and preview only.
+Current and previous major stable Chrome/Edge and Firefox are required browser targets. Playwright WebKit remains a required engine for cross-engine parity and smoke checks on the available Windows 11 test environment. Safari device verification is outside the project test plan and no Safari support is claimed. Mobile phones: browse and preview only.
 
 Required capabilities (detected at startup; missing → explicit message, never corruption): ES2022, Web Workers (module), WebAssembly, IndexedDB, Web Locks, `BroadcastChannel`, `CompressionStream` optional. File System Access API is progressive enhancement (download fallback). If a WASM module fails to load, the dependent export is disabled with a diagnostic; editing continues.
 

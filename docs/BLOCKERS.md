@@ -4,7 +4,7 @@ Phase 0 is still open. This log records work deferred because the current worksp
 
 | ID | Affected gate | Evidence in this workspace | Next pass |
 | --- | --- | --- | --- |
-| B-01 | S-01, S-02, S-04, S-05, S-06 cross-engine verification | Chromium is available at `/usr/bin/chromium`; Playwright Firefox and WebKit binaries are absent. Retried the pinned Playwright download on 2026-10-05 with a writable cache. All Firefox mirrors returned HTTP 403 `Domain forbidden` (`cdn.playwright.dev` and `playwright.download.prss.microsoft.com`), so installation stopped before WebKit. The system package index has no `firefox-esr` candidate. The CI workflow is configured for three engines but has not produced a verified run here. | Per user direction, defer Firefox/WebKit verification until the Windows 11 local environment is available. Run parity and durability suites there and record golden hashes and engine-specific failures. Playwright WebKit checks are distinct from Safari device checks. |
+| B-01 | S-01, S-02, S-04, S-05, S-06 cross-engine verification | Chromium is available at `/usr/bin/chromium`; Playwright Firefox and WebKit binaries are absent. Retried the pinned Playwright download on 2026-10-05 with a writable cache. All Firefox mirrors returned HTTP 403 `Domain forbidden` (`cdn.playwright.dev` and `playwright.download.prss.microsoft.com`), so installation stopped before WebKit. The system package index has no `firefox-esr` candidate. The CI workflow is configured for three engines but has not produced a verified run here. | Per user direction, defer Firefox/WebKit verification until the Windows 11 local environment is available. Run parity and durability suites there and record golden hashes and engine-specific failures. |
 | B-04 | S-06 real native file picker | Chromium verifies the actual download fallback and archive round trip. Rechecked on 2026-10-05: this chat still executes on Linux at `/workspace/icon-forge`; its app terminal has no connected session, and no Windows terminal or mount is exposed. | Attach a local Windows session or checkout to this chat, then run the native picker and download fallback flows in Chrome or Edge on Windows 11; record observed behavior and recovery UX. |
 
 ## Resolved setup and specification blockers
@@ -16,10 +16,6 @@ Phase 0 is still open. This log records work deferred because the current worksp
 | B-05 | `ComponentV1.bindings` now maps declared parameters to a node's stroke width, radius or visibility. Validation checks parameter types, target compatibility and duplicate target fields. SVG export applies defaults and instance arguments to a copy; existing documents without bindings retain their schema shape, and parameterized documents without bindings still receive `svg.instance.parameters-unbound`. | Broaden the binding fixture corpus during Phase 0 conformance work. |
 
 These are environment dependencies, not permission requests. Local work that does not depend on them continues. The Phase 1 gate remains S-01 through S-06 passing or a documented adapter swap that satisfies the same acceptance criteria.
-
-## Optional final device check
-
-Safari on macOS or iPadOS, including installed and noninstalled behavior, may be checked if a device becomes available. It is not required for Phase 0 or Phase 1 and is not a blocker for the Windows 11 workflow. Playwright WebKit remains part of the required cross-engine suite.
 
 ## Conformance gap
 

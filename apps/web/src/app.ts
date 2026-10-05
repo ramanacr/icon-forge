@@ -143,9 +143,17 @@ export class App implements OnInit, OnDestroy {
     this.activeIconId.set(icon?.id ?? null);
     const selectedIds = this.workspace.selection.snapshot.nodeIds;
     this.selected.set(selectedIds.length > 0);
-    this.layers.set(icon?.nodes.map(node => ({ id: node.id,
-      label: node.name ?? (node.type === 'rect' ? 'Rectangle' : node.type[0]!.toUpperCase() + node.type.slice(1)),
-      selected: selectedIds.includes(node.id) })) ?? []);
+    const layerBases = icon?.nodes.map(node => ({ id: node.id,
+      label: node.name ?? (node.type === 'rect' ? 'Rectangle' : node.type[0]!.toUpperCase() + node.type.slice(1)) })) ?? [];
+    const totals = new Map<string, number>();
+    for (const layer of layerBases) totals.set(layer.label, (totals.get(layer.label) ?? 0) + 1);
+    const sequence = new Map<string, number>();
+    this.layers.set(layerBases.map(layer => {
+      const number = (sequence.get(layer.label) ?? 0) + 1;
+      sequence.set(layer.label, number);
+      return { id: layer.id, label: totals.get(layer.label)! > 1 ? `${layer.label} ${number}` : layer.label,
+        selected: selectedIds.includes(layer.id) };
+    }));
     this.canGroup.set(selectedIds.length > 1 && selectedIds.every(id => icon?.nodes.some(node => node.id === id)));
     this.canUngroup.set(this.workspace.canUngroupSelection);
     this.canStyle.set(this.workspace.styleableSelection);

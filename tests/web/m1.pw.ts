@@ -1,10 +1,12 @@
 import { createServer, type Server } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { extname, join, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { ProjectDispatcher } from '@iconforge/application';
 import { compileSvgProfile } from '@iconforge/compiler-core';
-import type { SavedProject } from '@iconforge/persistence';
+import { encodeProjectArchive, type SavedProject } from '@iconforge/persistence';
 
 const root = resolve('dist/web/browser');
 let server: Server;
@@ -278,4 +280,64 @@ test('M1 inspector color and stroke width changes survive export and reload', as
   await expect(rect).toHaveAttribute('stroke-width', '2.5');
   await page.reload();
   await expect(rect).toHaveAttribute('stroke-width', '2.5');
+});
+
+test('M1 repeated shapes have distinct keyboard-accessible layer names', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const first = page.getByRole('button', { name: 'Rectangle 1 layer' });
+  const second = page.getByRole('button', { name: 'Rectangle 2 layer' });
+  await expect(first).toBeVisible();
+  await expect(second).toBeVisible();
+  await second.focus();
+  await second.press('ArrowRight');
+  await expect(page.locator('svg rect[data-node-id]').nth(0)).not.toHaveAttribute('transform');
+  await expect(page.locator('svg rect[data-node-id]').nth(1)).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
+});
+
+test('M1 composite browser icon exports byte-identically through the CLI', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Add ellipse' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByLabel('Fill color').fill('#336699');
+  await page.getByRole('button', { name: 'Apply fill color' }).click();
+  await page.getByRole('button', { name: 'Ellipse layer' }).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Group selection', exact: true }).click();
+  await page.getByRole('button', { name: 'Move right' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const download = await downloadPromise;
+  const browserSvg = await readFile((await download.path())!);
+  const saved = await page.evaluate(async () => {
+    const id = localStorage.getItem('iconforge:last-project')!;
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const get = db.transaction('projects', 'readonly').objectStore('projects').get(id);
+    const row = await new Promise<unknown>((resolve, reject) => {
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    db.close();
+    return row;
+  }) as SavedProject;
+  const project = ProjectDispatcher.replay(saved.snapshot, saved.journal).project!;
+  const dir = await mkdtemp(join(tmpdir(), 'iconforge-m1-cli-'));
+  try {
+    const archivePath = join(dir, 'project.iconproj');
+    const out = join(dir, 'out');
+    await writeFile(archivePath, await encodeProjectArchive(project));
+    execFileSync(process.execPath, ['apps/cli/dist/iconforge.mjs', 'compile', archivePath,
+      '--profile', 'web-svg', '--out', out], { cwd: process.cwd() });
+    expect(await readFile(join(out, 'icon-1.svg'))).toEqual(browserSvg);
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

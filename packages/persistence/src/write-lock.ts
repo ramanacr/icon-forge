@@ -6,6 +6,7 @@ export class ProjectWriteLock {
   private releaseHeld: (() => void) | null = null;
   private heldRequest: Promise<void> | null = null;
   private readonly revisionListeners = new Set<(revision: number) => void>();
+  private readonly modeListeners = new Set<(mode: 'writer' | 'readonly') => void>();
 
   private constructor(projectId: string, flush: () => Promise<void>) {
     this.name = `iconforge:project:${projectId}`;
@@ -22,6 +23,16 @@ export class ProjectWriteLock {
   }
 
   get mode(): 'writer' | 'readonly' { return this.state; }
+
+  onModeChange(callback: (mode: 'writer' | 'readonly') => void): () => void {
+    this.modeListeners.add(callback);
+    return () => { this.modeListeners.delete(callback); };
+  }
+
+  private setMode(mode: 'writer' | 'readonly'): void {
+    this.state = mode;
+    for (const listener of this.modeListeners) listener(mode);
+  }
 
   onRevision(callback: (revision: number) => void): () => void {
     this.revisionListeners.add(callback);
@@ -40,7 +51,7 @@ export class ProjectWriteLock {
     const acquired = new Promise<boolean>((resolve, reject) => { decide = resolve; fail = reject; });
     this.heldRequest = navigator.locks.request(this.name, { mode: 'exclusive', ifAvailable: true }, async lock => {
       if (!lock) { decide(false); return; }
-      this.state = 'writer';
+      this.setMode('writer');
       decide(true);
       await new Promise<void>(resolve => { this.releaseHeld = resolve; });
     });
@@ -53,7 +64,7 @@ export class ProjectWriteLock {
     this.releaseHeld = null;
     await this.heldRequest;
     this.heldRequest = null;
-    this.state = 'readonly';
+    this.setMode('readonly');
   }
 
   private async onMessage(data: unknown): Promise<void> {
@@ -91,6 +102,7 @@ export class ProjectWriteLock {
   async close(): Promise<void> {
     if (this.state === 'writer') await this.release();
     this.revisionListeners.clear();
+    this.modeListeners.clear();
     this.channel.close();
   }
 }

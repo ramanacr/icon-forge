@@ -2,6 +2,9 @@ import { createServer, type Server } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { ProjectDispatcher } from '@iconforge/application';
+import { compileSvgProfile } from '@iconforge/compiler-core';
+import type { SavedProject } from '@iconforge/persistence';
 
 const root = resolve('dist/web/browser');
 let server: Server;
@@ -49,9 +52,152 @@ test('M1 browser workflow creates, edits, undoes, exports, and reloads an icon',
   await page.getByRole('button', { name: 'Export SVG' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('icon-1.svg');
-  expect(await readFile(await download.path()!, 'utf8')).toContain('matrix(1 0 0 1 1 0)');
+  const downloaded = await readFile(await download.path()!);
+  expect(downloaded.toString('utf8')).toContain('matrix(1 0 0 1 1 0)');
+  const saved = await page.evaluate(async () => {
+    const id = localStorage.getItem('iconforge:last-project')!;
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = db.transaction('projects', 'readonly');
+    const get = transaction.objectStore('projects').get(id);
+    const row = await new Promise<unknown>((resolve, reject) => {
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    db.close();
+    return row;
+  }) as SavedProject;
+  const replayed = ProjectDispatcher.replay(saved.snapshot, saved.journal);
+  const expected = compileSvgProfile(replayed.project!, 'web-svg').artifacts['icon-1.svg'];
+  expect(downloaded.equals(Buffer.from(expected!))).toBe(true);
   await page.reload();
   await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
   await expect(page.getByText('Saved in browser only')).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('M1 primitive tools and snapped pointer drag commit one reversible edit', async ({ page }) => {
+  test.setTimeout(15_000);
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add ellipse' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await expect(page.locator('svg ellipse[data-node-id]')).toHaveCount(1);
+  await expect(page.locator('svg line[data-node-id]')).toHaveCount(1);
+  const ellipse = page.locator('svg ellipse[data-node-id]');
+  const shape = await ellipse.boundingBox();
+  const svg = await page.locator('.canvas svg').boundingBox();
+  expect(shape && svg).toBeTruthy();
+  const startX = shape!.x + shape!.width / 2;
+  const startY = shape!.y + shape!.height / 4;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + svg!.width * 4.2 / 24, startY + svg!.height * 3.2 / 24, { steps: 4 });
+  await expect(ellipse).toHaveAttribute('transform', 'matrix(1 0 0 1 4 3)');
+  await page.mouse.up();
+  await expect(ellipse).toHaveAttribute('transform', 'matrix(1 0 0 1 4 3)');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(ellipse).not.toHaveAttribute('transform');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(ellipse).toHaveAttribute('transform', 'matrix(1 0 0 1 4 3)');
+});
+
+test('M1 second tab can take over a read-only project', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  const viewer = await page.context().newPage();
+  await viewer.goto(baseUrl);
+  await expect(viewer.getByText('Read only in this tab')).toBeVisible();
+  await expect(viewer.getByRole('button', { name: 'Add rectangle' })).toBeDisabled();
+  await viewer.getByRole('button', { name: 'Take over editing' }).click();
+  await expect(viewer.getByText('Saved in browser only')).toBeVisible();
+  await viewer.getByRole('button', { name: 'Add rectangle' }).click();
+  await expect(viewer.locator('svg rect[data-node-id]')).toHaveCount(1);
+  await page.bringToFront();
+  await expect(page.getByText('Read only in this tab')).toBeVisible();
+  await viewer.close();
+});
+
+test('M1 damaged journal tail offers explicit recovery of valid edits', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.evaluate(async () => {
+    const id = localStorage.getItem('iconforge:last-project')!;
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = db.transaction('projects', 'readwrite');
+    const store = transaction.objectStore('projects');
+    const get = store.get(id);
+    const row = await new Promise<{ revision: number; journal: { checksum: string }[] }>((resolve, reject) => {
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    row.journal.push({ ...row.journal.at(-1)!, checksum: '0'.repeat(64) });
+    row.revision++;
+    store.put(row);
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  });
+  await page.reload();
+  await expect(page.getByText('Recovery needed')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add rectangle' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Recover valid edits' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(1);
+  await expect(page.getByText('Recovered valid edits')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(1);
+  await expect(page.getByText('Saved in browser only')).toBeVisible();
+});
+
+test('M1 grid and safe-area guides are editor-only overlays', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await expect(page.locator('svg [data-editor-grid] line')).toHaveCount(50);
+  await expect(page.locator('svg [data-safe-area]')).toHaveAttribute('x', '2');
+  await page.getByRole('button', { name: 'Hide grid' }).click();
+  await expect(page.locator('svg [data-editor-grid]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show grid' }).click();
+  await expect(page.locator('svg [data-editor-grid] line')).toHaveCount(50);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const download = await downloadPromise;
+  const exported = await readFile(await download.path()!, 'utf8');
+  expect(exported).not.toContain('data-editor-grid');
+  expect(exported).not.toContain('data-safe-area');
+});
+
+test('M1 layer selection groups and ungroups shapes with undo and redo', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Add ellipse' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('button', { name: 'Ellipse layer' }).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Group selection', exact: true }).click();
+  await expect(page.locator('svg g[data-node-id]')).toHaveCount(1);
+  await expect(page.locator('svg g[data-node-id] [data-node-id]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg g[data-node-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('svg g[data-node-id]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Group layer' }).click();
+  await page.getByRole('button', { name: 'Ungroup selection' }).click();
+  await expect(page.locator('svg g[data-node-id]')).toHaveCount(0);
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(2);
 });

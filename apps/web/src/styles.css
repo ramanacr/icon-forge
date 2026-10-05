@@ -16,13 +16,17 @@ button:focus-visible { outline: 3px solid #4371e5; outline-offset: 2px; }
 .inspector { border-left: 1px solid #d9e0ed; }
 h2 { margin: 0 0 18px; font-size: 15px; }
 .sidebar > button { width: 100%; text-align: left; margin-bottom: 8px; }
+.layers-heading { margin-top: 28px; }
+.layer { padding-left: 20px; }
 .asset.active { background: #eaf0ff; border-color: #7392e9; }
 .studio { display: flex; flex-direction: column; min-width: 0; }
 .toolbar { display: flex; gap: 8px; padding: 13px 18px; background: #fff; border-bottom: 1px solid #d9e0ed; }
 .stage { flex: 1; display: grid; place-items: center; position: relative; min-height: 400px; background-image: radial-gradient(#ccd4e5 1px, transparent 1px); background-size: 20px 20px; }
 .canvas { width: min(65vh, 70vw, 520px); aspect-ratio: 1; display: grid; place-items: center; background: white; box-shadow: 0 12px 45px #25345424; color: #253b69; }
-.canvas svg { width: 80%; height: 80%; overflow: visible; }
+.canvas svg { width: 80%; height: 80%; overflow: visible; touch-action: none; }
 .canvas [data-node-id] { cursor: pointer; }
+.canvas [data-editor-grid] line { stroke: #ccd7ec; stroke-width: .035; }
+.canvas [data-safe-area] { fill: none; stroke: #94abe2; stroke-width: .12; stroke-dasharray: .35 .25; }
 .canvas [data-selected] { stroke: #4773e0; stroke-width: .35px; }
 .empty { position: absolute; top: 14px; color: #5a6a85; }
 .hint { color: #69758c; font-size: 13px; }

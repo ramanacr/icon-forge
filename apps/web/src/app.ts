@@ -58,6 +58,8 @@ import type { BrowserWorkspace } from './workspace.js';
         <aside class="inspector" aria-label="Selection inspector">
           <h2>Selection</h2>
           <p>{{ selected() ? 'Shape selected' : 'Select a shape on the canvas' }}</p>
+          <button type="button" (click)="runAppearance('filled')" [disabled]="!canEdit() || !canStyle()">Fill shape</button>
+          <button type="button" (click)="runAppearance('outline')" [disabled]="!canEdit() || !canStyle()">Outline shape</button>
           <p class="hint">24 × 24 icon grid · drag snaps to whole units</p>
         </aside>
       </div>
@@ -81,6 +83,7 @@ export class App implements OnInit, OnDestroy {
   readonly canEdit = signal(false);
   readonly canGroup = signal(false);
   readonly canUngroup = signal(false);
+  readonly canStyle = signal(false);
   readonly readOnly = signal(false);
   readonly needsRecovery = signal(false);
   readonly showGrid = signal(true);
@@ -125,6 +128,7 @@ export class App implements OnInit, OnDestroy {
       selected: selectedIds.includes(node.id) })) ?? []);
     this.canGroup.set(selectedIds.length > 1 && selectedIds.every(id => icon?.nodes.some(node => node.id === id)));
     this.canUngroup.set(selectedIds.length === 1 && Boolean(icon?.nodes.some(node => node.id === selectedIds[0] && node.type === 'group')));
+    this.canStyle.set(this.workspace.styleableSelection);
     this.hasIcon.set(Boolean(icon));
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
     this.needsRecovery.set(this.workspace.needsRecovery);
@@ -204,6 +208,7 @@ export class App implements OnInit, OnDestroy {
   runRecover(): void { void this.run(() => this.workspace.recover()); }
   runGroup(): void { void this.run(() => this.workspace.groupSelected()); }
   runUngroup(): void { void this.run(() => this.workspace.ungroupSelected()); }
+  runAppearance(mode: 'filled' | 'outline'): void { void this.run(() => this.workspace.setSelectedAppearance(mode)); }
   toggleGrid(): void { this.showGrid.update(value => !value); this.refresh(); }
   runMoveRight(): void { void this.run(() => this.workspace.moveRight()); }
   runUndo(): void { void this.run(() => this.workspace.undo()); }

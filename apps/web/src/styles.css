@@ -30,5 +30,6 @@ h2 { margin: 0 0 18px; font-size: 15px; }
 .canvas [data-selected] { stroke: #4773e0; stroke-width: .35px; }
 .empty { position: absolute; top: 14px; color: #5a6a85; }
 .hint { color: #69758c; font-size: 13px; }
+.inspector button { display: block; width: 100%; margin-bottom: 8px; }
 .error { margin: 0; padding: 10px 20px; background: #fbe8e7; color: #902b2b; }
 @media (max-width: 850px) { .layout { grid-template-columns: 155px minmax(0, 1fr); } .inspector { display: none; } .topbar { flex-wrap: wrap; height: auto; padding: 12px; } .toolbar { flex-wrap: wrap; } }

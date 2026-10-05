@@ -1455,6 +1455,92 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "node.update"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "iconId": {
+                  "$ref": "#/$defs/UUID"
+                },
+                "nodeId": {
+                  "$ref": "#/$defs/UUID"
+                },
+                "ops": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/NodeUpdateOp"
+                  }
+                }
+              },
+              "required": [
+                "iconId",
+                "nodeId",
+                "ops"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "node.remove"
             },
             "payload": {
@@ -3303,6 +3389,59 @@
         "nodes"
       ],
       "additionalProperties": false
+    },
+    "NodeUpdateOp": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "setFill"
+            },
+            "fill": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PaintV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "fill"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "setStroke"
+            },
+            "stroke": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StrokeV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "stroke"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Explicit node field operations; callers cannot merge arbitrary scene data."
     },
     "ExportProfileV1": {
       "anyOf": [

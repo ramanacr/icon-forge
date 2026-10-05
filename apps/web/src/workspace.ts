@@ -39,6 +39,23 @@ export class BrowserWorkspace {
   get preview() { return this.drag?.preview; }
   get needsRecovery(): boolean { return this.recovery !== null; }
   get guides() { return this.icon ? gridGuides(this.icon.viewBox, [1, 1]) : null; }
+  get styleableSelection(): boolean {
+    const selectedIds = this.selection.snapshot.nodeIds;
+    if (selectedIds.length !== 1) return false;
+    const find = (nodes: SceneNodeV1[]): SceneNodeV1 | null => {
+      for (const node of nodes) {
+        if (node.id === selectedIds[0]) return node;
+        if (node.type === 'group') {
+          const nested = find(node.children);
+          if (nested) return nested;
+        }
+      }
+      return null;
+    };
+    const node = find(this.icon?.nodes ?? []);
+    return Boolean(node && !node.locked && (node.type === 'rect' || node.type === 'ellipse'
+      || node.type === 'path' || node.type === 'polyline'));
+  }
 
   private base(projectId: string) {
     return { commandVersion: '1.0' as const, commandId: uuidV7(), projectId,
@@ -221,6 +238,20 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(project.id), type: 'node.ungroup',
       payload: { iconId: icon.id, groupId: group.id } });
     this.selection.replace(this.project!, icon.id, children);
+  }
+
+  async setSelectedAppearance(mode: 'filled' | 'outline'): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    const nodeId = this.selection.snapshot.nodeIds[0];
+    if (!project || !icon || !nodeId || !this.styleableSelection) return;
+    const paint = { kind: 'token' as const, token: project.designSystem.defaultPaintToken };
+    await this.persist({ ...this.base(project.id), type: 'node.update', payload: {
+      iconId: icon.id, nodeId, ops: mode === 'outline'
+        ? [{ op: 'setFill', fill: { kind: 'none' } },
+          { op: 'setStroke', stroke: { paint, ...project.designSystem.stroke } }]
+        : [{ op: 'setFill', fill: paint }, { op: 'setStroke', stroke: null }],
+    } });
   }
 
   beginDrag(nodeId: string): void {

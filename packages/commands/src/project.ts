@@ -1,4 +1,4 @@
-import { assertProject, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1,
+import { assertProject, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type StrokeV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 import { findNodePath, nodeArrayAt, removalOrder } from './scene-path.js';
@@ -32,6 +32,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'component.update'; payload: { component: ComponentV1 } }
   | { type: 'component.remove'; payload: { componentId: UUID } }
   | { type: 'node.add'; payload: { iconId: UUID; parentId?: UUID; index: number; node: SceneNodeV1 } }
+  | { type: 'node.update'; payload: { iconId: UUID; nodeId: UUID; ops: NodeUpdateOp[] } }
   | { type: 'node.remove'; payload: { iconId: UUID; nodeIds: UUID[] } }
   | { type: 'node.reorder'; payload: { iconId: UUID; nodeId: UUID; parentId?: UUID; index: number } }
   | { type: 'node.group'; payload: { iconId: UUID; nodeIds: UUID[]; groupId: UUID; index: number } }
@@ -40,6 +41,11 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
+
+/** Explicit node field operations; callers cannot merge arbitrary scene data. */
+export type NodeUpdateOp =
+  | { op: 'setFill'; fill: PaintV1 | null }
+  | { op: 'setStroke'; stroke: StrokeV1 | null };
 
 export type IconMetadataPatch = Partial<Pick<IconV1, 'aliases' | 'tags' | 'accessibility'>> & {
   /** Explicit null removes the optional font mapping. */
@@ -249,7 +255,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [componentId], patchSummary: { ...count, iconsAffected: [] }, diagnostics: [] } };
   }
-  if (command.type === 'node.add' || command.type === 'node.remove'
+  if (command.type === 'node.add' || command.type === 'node.update' || command.type === 'node.remove'
     || command.type === 'node.reorder' || command.type === 'node.group'
     || command.type === 'node.ungroup' || command.type === 'selection.transform') {
     const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);
@@ -275,6 +281,42 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       inversePatches = [{ op: 'remove', path, value: node }];
       count = { added: 1, updated: 0, removed: 0 };
       changedIds = [icon.id, node.id];
+    } else if (command.type === 'node.update') {
+      const path = findNodePath(icon, command.payload.nodeId);
+      if (!path) throw new TypeError('node.not-found');
+      const container = nodeArrayAt(copy, path.slice(0, -1));
+      const index = Number(path.at(-1));
+      const before = container[index]!;
+      if (before.locked) throw new TypeError('node.update.locked');
+      const ops = command.payload.ops;
+      if (!ops.length) throw new TypeError('node.update.empty');
+      if (new Set(ops.map(op => op.op)).size !== ops.length) throw new TypeError('node.update.duplicate-op');
+      const after = structuredClone(before) as unknown as Record<string, unknown>;
+      for (const op of ops) {
+        if (op.op === 'setFill') {
+          if (before.type !== 'rect' && before.type !== 'ellipse'
+            && before.type !== 'path' && before.type !== 'polyline') {
+            throw new TypeError('node.update.fill.unsupported');
+          }
+          if (op.fill === null) delete after.fill;
+          else after.fill = structuredClone(op.fill);
+        } else {
+          if (before.type !== 'line' && before.type !== 'rect' && before.type !== 'ellipse'
+            && before.type !== 'path' && before.type !== 'polyline') {
+            throw new TypeError('node.update.stroke.unsupported');
+          }
+          if (op.stroke === null) {
+            if (before.type === 'line') throw new TypeError('node.update.stroke.required');
+            delete after.stroke;
+          } else after.stroke = structuredClone(op.stroke);
+        }
+      }
+      container[index] = after as unknown as SceneNodeV1;
+      const patchPath = ['icons', String(iconIndex), ...path];
+      patches = [{ op: 'replace', path: patchPath, before, after }];
+      inversePatches = [{ op: 'replace', path: patchPath, before: after, after: before }];
+      count = { added: 0, updated: 1, removed: 0 };
+      changedIds = [icon.id, before.id];
     } else if (command.type === 'node.group') {
       const ids = command.payload.nodeIds;
       if (ids.length === 0 || new Set(ids).size !== ids.length) throw new TypeError('node.group.invalid-targets');

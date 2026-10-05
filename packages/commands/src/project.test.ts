@@ -14,6 +14,39 @@ const icon: IconV1 = {
 };
 
 describe('project command handlers', () => {
+  it('updates typed fill and stroke fields as one reversible node patch', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const nodeId = '0198e09b-a810-7000-8000-0000000000e9';
+    const rect = { id: nodeId, type: 'rect' as const, visible: true, locked: false,
+      x: 4, y: 4, width: 16, height: 16, rx: 0, ry: 0,
+      fill: { kind: 'token' as const, token: 'currentColor' } };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add', payload: { icon: { ...icon, nodes: [rect] } } });
+    const changed = applyProjectCommand(added.project, { ...envelope, type: 'node.update',
+      payload: { iconId: icon.id, nodeId, ops: [
+        { op: 'setFill', fill: { kind: 'none' } },
+        { op: 'setStroke', stroke: { paint: { kind: 'token', token: 'currentColor' }, width: 1.75,
+          cap: 'round', join: 'round', miterLimit: 4 } },
+      ] } });
+    expect(changed.project.icons[0]!.nodes[0]).toMatchObject({ fill: { kind: 'none' }, stroke: { width: 1.75 } });
+    expect(changed.patches).toHaveLength(1);
+    const patch = changed.patches[0]!;
+    if (patch.op !== 'replace') throw new Error('Expected replace patch');
+    expect(changed.inversePatches).toEqual([{ op: 'replace', path: patch.path,
+      before: patch.after, after: rect }]);
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.update',
+      payload: { iconId: icon.id, nodeId, ops: [{ op: 'setFill', fill: { kind: 'none' } },
+        { op: 'setFill', fill: { kind: 'token', token: 'currentColor' } }] } })).toThrow('node.update.duplicate-op');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.update',
+      payload: { iconId: icon.id, nodeId, ops: [] } })).toThrow('node.update.empty');
+    const withLine = applyProjectCommand(added.project, { ...envelope, type: 'node.add',
+      payload: { iconId: icon.id, index: 1, node: { id: '0198e09b-a810-7000-8000-0000000000ea',
+        type: 'line', visible: true, locked: false, x1: 0, y1: 0, x2: 8, y2: 8,
+        stroke: { paint: { kind: 'token', token: 'currentColor' }, width: 1,
+          cap: 'round', join: 'round', miterLimit: 4 } } } });
+    expect(() => applyProjectCommand(withLine.project, { ...envelope, type: 'node.update',
+      payload: { iconId: icon.id, nodeId: '0198e09b-a810-7000-8000-0000000000ea',
+        ops: [{ op: 'setStroke', stroke: null }] } })).toThrow('node.update.stroke.required');
+  });
   it('groups nonadjacent siblings in scene order and expands them without changing source', () => {
     const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     const ids = [0xf1, 0xf2, 0xf3].map(number => `0198e09b-a810-7000-8000-${number.toString(16).padStart(12, '0')}`);

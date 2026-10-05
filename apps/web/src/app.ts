@@ -31,7 +31,7 @@ import type { BrowserWorkspace } from './workspace.js';
             @for (layer of layers(); track layer.id) {
               <button type="button" class="layer" [class.active]="layer.selected"
                 [attr.aria-label]="layer.label + ' layer'" [attr.aria-pressed]="layer.selected"
-                (click)="chooseLayer(layer.id, $event)">{{ layer.label }}</button>
+                (click)="chooseLayer(layer.id, $event)" (keydown)="onLayerKeydown(layer.id, $event)">{{ layer.label }}</button>
             }
           }
         </aside>
@@ -220,6 +220,19 @@ export class App implements OnInit, OnDestroy {
   chooseLayer(id: string, event: MouseEvent): void {
     this.workspace.select(id, event.shiftKey);
     this.refresh();
+  }
+
+  onLayerKeydown(id: string, event: KeyboardEvent): void {
+    if (!this.canEdit()) return;
+    const move: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+    };
+    const delta = move[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    this.workspace.select(id);
+    this.refresh();
+    void this.run(() => this.workspace.translateSelected(delta[0], delta[1]));
   }
 
   onCanvasClick(event: MouseEvent): void {

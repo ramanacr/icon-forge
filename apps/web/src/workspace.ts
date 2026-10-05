@@ -299,15 +299,17 @@ export class BrowserWorkspace {
     if (gesture && id) await this.commitGesture(gesture, id);
   }
 
-  async moveRight(): Promise<void> {
+  async translateSelected(dx: number, dy: number): Promise<void> {
     const project = this.project;
     const icon = this.icon;
     const nodeIds = this.selection.snapshot.nodeIds;
     if (!project || !icon || !nodeIds.length || !this.writable) return;
     const gesture = new TransformGesture(this.dispatcher, { ...this.base(project.id), iconId: icon.id, nodeIds });
-    gesture.update([1, 0, 0, 1, 1, 0]);
+    gesture.update([1, 0, 0, 1, dx, dy]);
     await this.commitGesture(gesture, project.id);
   }
+
+  async moveRight(): Promise<void> { await this.translateSelected(1, 0); }
 
   async undo(): Promise<void> {
     const project = this.project;

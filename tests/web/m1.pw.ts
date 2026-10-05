@@ -222,3 +222,18 @@ test('M1 shape appearance edits are reversible and exported', async ({ page }) =
   const download = await downloadPromise;
   expect(await readFile(await download.path()!, 'utf8')).toContain('stroke="currentColor"');
 });
+
+test('M1 keyboard layer controls move a shape through journalled commands', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const layer = page.getByRole('button', { name: 'Rectangle layer' });
+  await layer.focus();
+  await layer.press('ArrowRight');
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
+  await layer.press('ArrowUp');
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 -1)');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
+});

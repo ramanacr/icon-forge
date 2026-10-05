@@ -253,3 +253,29 @@ test('M1 numeric inspector applies a precise reversible position', async ({ page
   await page.getByRole('button', { name: 'Redo' }).click();
   await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 3.5 -2.25)');
 });
+
+test('M1 inspector color and stroke width changes survive export and reload', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByLabel('Fill color').fill('#cc3344');
+  await page.getByRole('button', { name: 'Apply fill color' }).click();
+  const rect = page.locator('svg rect[data-node-id]');
+  await expect(rect).toHaveAttribute('fill', '#cc3344');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const download = await downloadPromise;
+  expect(await readFile(await download.path()!, 'utf8')).toContain('#cc3344');
+  await page.getByRole('button', { name: 'Outline shape' }).click();
+  await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('2.5');
+  await page.getByRole('button', { name: 'Apply stroke width' }).click();
+  await expect(rect).toHaveAttribute('stroke-width', '2.5');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rect).toHaveAttribute('stroke-width', '1.75');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(rect).toHaveAttribute('stroke-width', '2.5');
+  await page.reload();
+  await expect(rect).toHaveAttribute('stroke-width', '2.5');
+});

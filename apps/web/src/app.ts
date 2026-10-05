@@ -66,6 +66,14 @@ import type { BrowserWorkspace } from './workspace.js';
           </div>
           <button type="button" (click)="runAppearance('filled')" [disabled]="!canEdit() || !canStyle()">Fill shape</button>
           <button type="button" (click)="runAppearance('outline')" [disabled]="!canEdit() || !canStyle()">Outline shape</button>
+          <div class="appearance-fields">
+            <label>Fill color <input #fillColor type="color" [value]="currentFillColor()" [disabled]="!canEdit() || !canStyle()"></label>
+            <button type="button" (click)="runFillColor(fillColor.value)" [disabled]="!canEdit() || !canStyle()">Apply fill color</button>
+            <label>Stroke width <input #strokeWidth type="number" step="0.001" min="0.001"
+              [value]="currentStrokeWidth()" [disabled]="!canEdit() || !canEditStroke()"></label>
+            <button type="button" (click)="runStrokeWidth(strokeWidth.value)"
+              [disabled]="!canEdit() || !canEditStroke()">Apply stroke width</button>
+          </div>
           <p class="hint">24 × 24 icon grid · drag snaps to whole units</p>
         </aside>
       </div>
@@ -93,6 +101,9 @@ export class App implements OnInit, OnDestroy {
   readonly canPosition = signal(false);
   readonly xPosition = signal(0);
   readonly yPosition = signal(0);
+  readonly currentFillColor = signal('#000000');
+  readonly currentStrokeWidth = signal(1.75);
+  readonly canEditStroke = signal(false);
   readonly readOnly = signal(false);
   readonly needsRecovery = signal(false);
   readonly showGrid = signal(true);
@@ -142,6 +153,9 @@ export class App implements OnInit, OnDestroy {
     this.canPosition.set(Boolean(position && !this.workspace.selectedNode?.locked));
     this.xPosition.set(position?.[0] ?? 0);
     this.yPosition.set(position?.[1] ?? 0);
+    this.currentFillColor.set(this.workspace.fillColor);
+    this.currentStrokeWidth.set(this.workspace.strokeWidth ?? project?.designSystem.stroke.width ?? 1.75);
+    this.canEditStroke.set(this.workspace.strokeWidth !== null && !this.workspace.selectedNode?.locked);
     this.hasIcon.set(Boolean(icon));
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
     this.needsRecovery.set(this.workspace.needsRecovery);
@@ -225,6 +239,11 @@ export class App implements OnInit, OnDestroy {
   runPosition(x: string, y: string): void {
     if (!x.trim() || !y.trim()) { this.error.set('Enter both position values'); return; }
     void this.run(() => this.workspace.setPosition(Number(x), Number(y)));
+  }
+  runFillColor(color: string): void { void this.run(() => this.workspace.setFillColor(color)); }
+  runStrokeWidth(width: string): void {
+    if (!width.trim()) { this.error.set('Enter a stroke width'); return; }
+    void this.run(() => this.workspace.setStrokeWidth(Number(width)));
   }
   toggleGrid(): void { this.showGrid.update(value => !value); this.refresh(); }
   runMoveRight(): void { void this.run(() => this.workspace.moveRight()); }

@@ -4,7 +4,7 @@ import { compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
 import { DexieProjectRepository, ProjectWriteLock, requestPersistentStorage } from '@iconforge/persistence';
-import { quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
+import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
 
 const POINTER = 'iconforge:last-project';
 
@@ -69,6 +69,14 @@ export class BrowserWorkspace {
     const node = this.selectedNode;
     return Boolean(node && !node.locked && (node.type === 'rect' || node.type === 'ellipse'
       || node.type === 'path' || node.type === 'polyline'));
+  }
+  get fillColor(): string {
+    const node = this.selectedNode;
+    return node && 'fill' in node && node.fill?.kind === 'color' ? node.fill.value : '#000000';
+  }
+  get strokeWidth(): number | null {
+    const node = this.selectedNode;
+    return node && 'stroke' in node && node.stroke ? node.stroke.width : null;
   }
 
   private base(projectId: string) {
@@ -265,6 +273,31 @@ export class BrowserWorkspace {
         ? [{ op: 'setFill', fill: { kind: 'none' } },
           { op: 'setStroke', stroke: { paint, ...project.designSystem.stroke } }]
         : [{ op: 'setFill', fill: paint }, { op: 'setStroke', stroke: null }],
+    } });
+  }
+
+  async setFillColor(color: string): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    const node = this.selectedNode;
+    if (!project || !icon || !node || !this.styleableSelection) throw new TypeError('Select a fillable shape');
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new TypeError('Fill color must be a hex color');
+    await this.persist({ ...this.base(project.id), type: 'node.update', payload: {
+      iconId: icon.id, nodeId: node.id, ops: [{ op: 'setFill', fill: { kind: 'color', value: color.toLowerCase() } }],
+    } });
+  }
+
+  async setStrokeWidth(width: number): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    const node = this.selectedNode;
+    if (!project || !icon || !node || node.locked || !('stroke' in node) || !node.stroke) {
+      throw new TypeError('Select a stroked shape');
+    }
+    if (!Number.isFinite(width) || width <= 0) throw new TypeError('Stroke width must be positive');
+    const stroke = { ...node.stroke, width: quantize(width) };
+    await this.persist({ ...this.base(project.id), type: 'node.update', payload: {
+      iconId: icon.id, nodeId: node.id, ops: [{ op: 'setStroke', stroke }],
     } });
   }
 

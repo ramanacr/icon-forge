@@ -1,0 +1,25 @@
+{
+  "name": "@iconforge/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "ng build web",
+    "start": "ng serve web --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@angular/common": "22.0.0",
+    "@angular/compiler": "22.0.0",
+    "@angular/core": "22.0.0",
+    "@angular/platform-browser": "22.0.0",
+    "@iconforge/application": "workspace:*",
+    "@iconforge/commands": "workspace:*",
+    "@iconforge/compiler-core": "workspace:*",
+    "@iconforge/editor-core": "workspace:*",
+    "@iconforge/geometry": "workspace:*",
+    "@iconforge/persistence": "workspace:*",
+    "@iconforge/project-model": "workspace:*",
+    "rxjs": "7.8.2",
+    "tslib": "2.8.1"
+  }
+}

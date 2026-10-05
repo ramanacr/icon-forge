@@ -11,7 +11,8 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 - A pure geometry query now computes bounds for visible scene nodes, nested affine transforms, quadratic and cubic extrema, ellipses, variants and component bindings. It leaves the project unchanged and excludes stroke expansion.
 - Pure grid helpers now provide bounded overlay guide positions and independent-axis point snapping with a caller-supplied screen tolerance converted to icon units. They keep preview coordinates out of the project journal.
 - The native SVG renderer now accepts a revision-bound transform preview and composes it with an existing node transform. Chromium verifies that the preview leaves project and journal unchanged and matches the one-command committed rendering.
-- Remaining walking skeleton work includes wiring geometry, renderer, selection and gesture commits to the UI, autosave UX, and the representative edit/undo/export workflow. The Phase 0 conformance and Windows picker items below remain open.
+- An Angular 22 browser shell now wires project and icon creation, rectangle placement, renderer selection, one-command transform gestures, undo/redo, revision-checked IndexedDB journal saves, Web Lock single-writer mode, journal replay on reload, and SVG profile export. A Chromium E2E test covers create → edit → undo/redo → downloaded SVG → reload under the production CSP. The initial shell is 127 KB raw JavaScript and CSS; editor code loads on demand. The Phase 0 conformance and Windows picker items below remain open.
+- Remaining Phase 1 work includes richer primitive and gesture controls, grid snapping in the UI, explicit durability/recovery controls, editor accessibility checks, and a broader representative icon corpus.
 
 Environment-dependent blockers are tracked in [BLOCKERS.md](BLOCKERS.md).
 

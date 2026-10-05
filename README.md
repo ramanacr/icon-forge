@@ -1,6 +1,12 @@
 # icon-forge
 Local-first icon-system platform: design consistent icon sets in Beginner or Expert mode, validate them against set-wide rules, and compile deterministically to SVG, sprites, PNG, ICO and icon fonts. Angular + TypeScript core, Rust/WASM geometry, CLI and MCP automation.
 
+## Phase 1 browser editor
+
+With Node 24 and pnpm 11, run `pnpm install --frozen-lockfile` and `pnpm --filter @iconforge/web start`. Open the local address printed by Angular. The current walking skeleton creates a project and icons, adds rectangles, selects and moves a shape, undoes and redoes edits, saves each command to IndexedDB, and exports the active icon through the deterministic SVG profile compiler. The project list is local to this browser profile; export an SVG for a shareable artifact.
+
+Run `pnpm --filter @iconforge/web build` before `pnpm exec playwright test tests/web/m1.pw.ts --project=chromium`. The production build keeps the initial JavaScript shell below the documented 500 KB budget.
+
 ## Phase 1 SVG CLI preview
 
 With Node 24 and pnpm 11, run `pnpm install --frozen-lockfile` and `pnpm --filter @iconforge/cli build`. Then compile a `.iconproj` with a saved SVG export profile:

@@ -19,6 +19,7 @@ export default [
           { sourceTag: 'layer:compiler-core', onlyDependOnLibsWithTags: ['layer:model', 'layer:export-svg', 'layer:compiler-core'] },
           { sourceTag: 'layer:editor-core', onlyDependOnLibsWithTags: ['layer:model', 'layer:commands', 'layer:application', 'layer:editor-core'] },
           { sourceTag: 'layer:cli', onlyDependOnLibsWithTags: ['layer:model', 'layer:compiler-core', 'layer:persistence', 'layer:cli'] },
+          { sourceTag: 'layer:web', onlyDependOnLibsWithTags: ['layer:model', 'layer:commands', 'layer:application', 'layer:editor-core', 'layer:geometry', 'layer:persistence', 'layer:compiler-core', 'layer:web'] },
           { sourceTag: 'layer:geometry', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry'] },
           { sourceTag: 'layer:geometry-paper', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry', 'layer:geometry-paper'] },
           { sourceTag: 'layer:outline', onlyDependOnLibsWithTags: ['layer:model', 'layer:outline-wasm', 'layer:outline'] },

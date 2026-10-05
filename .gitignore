@@ -14,6 +14,7 @@ target
 **/mutants.out*/
 node_modules/
 .nx/
+.angular/
 dist/
 .pnpm-store/
 test-results/

@@ -4,5 +4,8 @@ packages:
 onlyBuiltDependencies:
   - nx
 allowBuilds:
+  '@parcel/watcher': false
   esbuild: true
+  lmdb: false
+  msgpackr-extract: false
   nx: true

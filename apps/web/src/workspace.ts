@@ -4,7 +4,7 @@ import { compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
 import { DexieProjectRepository, ProjectWriteLock, requestPersistentStorage } from '@iconforge/persistence';
-import type { IconV1, ProjectV1, SceneNodeV1 } from '@iconforge/project-model';
+import { quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
 
 const POINTER = 'iconforge:last-project';
 
@@ -39,9 +39,9 @@ export class BrowserWorkspace {
   get preview() { return this.drag?.preview; }
   get needsRecovery(): boolean { return this.recovery !== null; }
   get guides() { return this.icon ? gridGuides(this.icon.viewBox, [1, 1]) : null; }
-  get styleableSelection(): boolean {
+  get selectedNode(): SceneNodeV1 | null {
     const selectedIds = this.selection.snapshot.nodeIds;
-    if (selectedIds.length !== 1) return false;
+    if (selectedIds.length !== 1) return null;
     const find = (nodes: SceneNodeV1[]): SceneNodeV1 | null => {
       for (const node of nodes) {
         if (node.id === selectedIds[0]) return node;
@@ -52,7 +52,21 @@ export class BrowserWorkspace {
       }
       return null;
     };
-    const node = find(this.icon?.nodes ?? []);
+    return find(this.icon?.nodes ?? []);
+  }
+  get position(): [number, number] | null {
+    const node = this.selectedNode;
+    return node ? [node.transform?.[4] ?? 0, node.transform?.[5] ?? 0] : null;
+  }
+  get canUngroupSelection(): boolean {
+    const node = this.selectedNode;
+    if (!node || node.type !== 'group' || !node.visible || node.locked
+      || node.transform !== undefined || node.opacity !== undefined
+      || node.role !== undefined || node.name !== undefined) return false;
+    return !this.icon?.variants.some(variant => variant.overrides.some(override => override.nodeId === node.id));
+  }
+  get styleableSelection(): boolean {
+    const node = this.selectedNode;
     return Boolean(node && !node.locked && (node.type === 'rect' || node.type === 'ellipse'
       || node.type === 'path' || node.type === 'polyline'));
   }
@@ -306,6 +320,20 @@ export class BrowserWorkspace {
     if (!project || !icon || !nodeIds.length || !this.writable) return;
     const gesture = new TransformGesture(this.dispatcher, { ...this.base(project.id), iconId: icon.id, nodeIds });
     gesture.update([1, 0, 0, 1, dx, dy]);
+    await this.commitGesture(gesture, project.id);
+  }
+
+  async setPosition(x: number, y: number): Promise<void> {
+    const node = this.selectedNode;
+    const position = this.position;
+    const project = this.project;
+    const icon = this.icon;
+    if (!node || !position || !project || !icon || node.locked) throw new TypeError('Select an unlocked layer');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new TypeError('Position must be finite');
+    const matrix = quantizeMatrix([1, 0, 0, 1, x - position[0], y - position[1]]);
+    const gesture = new TransformGesture(this.dispatcher, { ...this.base(project.id),
+      iconId: icon.id, nodeIds: [node.id] });
+    gesture.update(matrix);
     await this.commitGesture(gesture, project.id);
   }
 

@@ -58,6 +58,12 @@ import type { BrowserWorkspace } from './workspace.js';
         <aside class="inspector" aria-label="Selection inspector">
           <h2>Selection</h2>
           <p>{{ selected() ? 'Shape selected' : 'Select a shape on the canvas' }}</p>
+          <div class="position-fields">
+            <label>X position <input #positionX type="number" step="0.001" [value]="xPosition()" [disabled]="!canEdit() || !canPosition()"></label>
+            <label>Y position <input #positionY type="number" step="0.001" [value]="yPosition()" [disabled]="!canEdit() || !canPosition()"></label>
+            <button type="button" (click)="runPosition(positionX.value, positionY.value)"
+              [disabled]="!canEdit() || !canPosition()">Apply position</button>
+          </div>
           <button type="button" (click)="runAppearance('filled')" [disabled]="!canEdit() || !canStyle()">Fill shape</button>
           <button type="button" (click)="runAppearance('outline')" [disabled]="!canEdit() || !canStyle()">Outline shape</button>
           <p class="hint">24 × 24 icon grid · drag snaps to whole units</p>
@@ -84,6 +90,9 @@ export class App implements OnInit, OnDestroy {
   readonly canGroup = signal(false);
   readonly canUngroup = signal(false);
   readonly canStyle = signal(false);
+  readonly canPosition = signal(false);
+  readonly xPosition = signal(0);
+  readonly yPosition = signal(0);
   readonly readOnly = signal(false);
   readonly needsRecovery = signal(false);
   readonly showGrid = signal(true);
@@ -127,8 +136,12 @@ export class App implements OnInit, OnDestroy {
       label: node.name ?? (node.type === 'rect' ? 'Rectangle' : node.type[0]!.toUpperCase() + node.type.slice(1)),
       selected: selectedIds.includes(node.id) })) ?? []);
     this.canGroup.set(selectedIds.length > 1 && selectedIds.every(id => icon?.nodes.some(node => node.id === id)));
-    this.canUngroup.set(selectedIds.length === 1 && Boolean(icon?.nodes.some(node => node.id === selectedIds[0] && node.type === 'group')));
+    this.canUngroup.set(this.workspace.canUngroupSelection);
     this.canStyle.set(this.workspace.styleableSelection);
+    const position = this.workspace.position;
+    this.canPosition.set(Boolean(position && !this.workspace.selectedNode?.locked));
+    this.xPosition.set(position?.[0] ?? 0);
+    this.yPosition.set(position?.[1] ?? 0);
     this.hasIcon.set(Boolean(icon));
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
     this.needsRecovery.set(this.workspace.needsRecovery);
@@ -209,6 +222,10 @@ export class App implements OnInit, OnDestroy {
   runGroup(): void { void this.run(() => this.workspace.groupSelected()); }
   runUngroup(): void { void this.run(() => this.workspace.ungroupSelected()); }
   runAppearance(mode: 'filled' | 'outline'): void { void this.run(() => this.workspace.setSelectedAppearance(mode)); }
+  runPosition(x: string, y: string): void {
+    if (!x.trim() || !y.trim()) { this.error.set('Enter both position values'); return; }
+    void this.run(() => this.workspace.setPosition(Number(x), Number(y)));
+  }
   toggleGrid(): void { this.showGrid.update(value => !value); this.refresh(); }
   runMoveRight(): void { void this.run(() => this.workspace.moveRight()); }
   runUndo(): void { void this.run(() => this.workspace.undo()); }

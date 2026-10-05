@@ -237,3 +237,19 @@ test('M1 keyboard layer controls move a shape through journalled commands', asyn
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
 });
+
+test('M1 numeric inspector applies a precise reversible position', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('spinbutton', { name: 'X position' }).fill('3.5');
+  await page.getByRole('spinbutton', { name: 'Y position' }).fill('-2.25');
+  await page.getByRole('button', { name: 'Apply position' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 3.5 -2.25)');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).not.toHaveAttribute('transform');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 3.5 -2.25)');
+});

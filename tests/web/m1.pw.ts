@@ -422,6 +422,63 @@ test('M1 composite browser icon exports byte-identically through the CLI', async
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test('M1 three-icon project keeps edits and browser CLI parity across reload', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('button', { name: 'Move right' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add ellipse' }).click();
+  await page.getByRole('button', { name: 'Ellipse layer' }).click();
+  await page.getByRole('button', { name: 'Outline shape' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Line layer' }).click();
+  await page.getByRole('button', { name: 'Move right' }).click();
+  await page.getByRole('button', { name: 'icon-1' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('button', { name: 'icon-3' }).click();
+  await expect(page.locator('svg line[data-node-id]')).not.toHaveAttribute('transform');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
+  await page.reload();
+  const browserSvgs = new Map<string, Buffer>();
+  for (const name of ['icon-1', 'icon-2', 'icon-3']) {
+    await page.getByRole('button', { name }).click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export SVG' }).click();
+    browserSvgs.set(`${name}.svg`, await readFile((await (await downloadPromise).path())!));
+  }
+  const saved = await page.evaluate(async () => {
+    const id = localStorage.getItem('iconforge:last-project')!;
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const get = db.transaction('projects', 'readonly').objectStore('projects').get(id);
+    const row = await new Promise<unknown>((resolve, reject) => {
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    db.close();
+    return row;
+  }) as SavedProject;
+  const project = ProjectDispatcher.replay(saved.snapshot, saved.journal).project!;
+  const dir = await mkdtemp(join(tmpdir(), 'iconforge-m1-multi-'));
+  try {
+    const archivePath = join(dir, 'project.iconproj');
+    const out = join(dir, 'out');
+    await writeFile(archivePath, await encodeProjectArchive(project));
+    execFileSync(process.execPath, ['apps/cli/dist/iconforge.mjs', 'compile', archivePath,
+      '--profile', 'web-svg', '--out', out], { cwd: process.cwd() });
+    for (const [name, browserSvg] of browserSvgs) expect(await readFile(join(out, name))).toEqual(browserSvg);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test('M1 editor passes automated WCAG 2.2 AA checks', async ({ page }) => {
   await page.addInitScript({ path: axePath });
   await page.goto(baseUrl);

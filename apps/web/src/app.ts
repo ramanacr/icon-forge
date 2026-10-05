@@ -10,14 +10,15 @@ import type { BrowserWorkspace } from './workspace.js';
         <span class="project-name">{{ projectName() }}</span>
         <span class="status" role="status">{{ status() }}</span>
         @if (readOnly()) {
-          <button type="button" (click)="runTakeOver()" [disabled]="busy()">Take over editing</button>
+          <button type="button" (click)="runTakeOver()" [disabled]="busy() || previewOnly()">Take over editing</button>
         }
         @if (needsRecovery()) {
-          <button type="button" (click)="runRecover()" [disabled]="busy() || readOnly()">Recover valid edits</button>
+          <button type="button" (click)="runRecover()" [disabled]="busy() || readOnly() || previewOnly()">Recover valid edits</button>
         }
-        <button type="button" (click)="runCreate()" [disabled]="busy()">Create project</button>
-        <button type="button" (click)="runExport()" [disabled]="!hasIcon()">Export SVG</button>
+        <button type="button" (click)="runCreate()" [disabled]="busy() || previewOnly()">Create project</button>
+        <button type="button" (click)="runExport()" [disabled]="!hasIcon() || previewOnly()">Export SVG</button>
       </header>
+      @if (previewOnly()) { <p class="mobile-preview" role="status">Mobile preview only</p> }
       <div class="layout">
         <aside class="sidebar" aria-label="Project assets">
           <h2>Icons</h2>
@@ -52,7 +53,7 @@ import type { BrowserWorkspace } from './workspace.js';
             <div #canvas class="canvas" (click)="onCanvasClick($event)"
               (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)"
               (pointerup)="onPointerUp($event)" (pointercancel)="onPointerCancel($event)"
-              aria-label="Icon canvas"></div>
+              role="group" aria-label="Icon canvas"></div>
           </div>
         </section>
         <aside class="inspector" aria-label="Selection inspector">
@@ -84,6 +85,11 @@ export class App implements OnInit, OnDestroy {
   @ViewChild('canvas') canvas?: ElementRef<HTMLElement>;
   private workspace!: BrowserWorkspace;
   private renderIconSvg!: typeof import('@iconforge/editor-core')['renderIconSvg'];
+  private readonly phoneMedia = window.matchMedia('(max-width: 600px) and (pointer: coarse)');
+  private readonly onPhoneMediaChange = (): void => {
+    this.previewOnly.set(this.phoneMedia.matches);
+    if (this.workspace) this.refresh();
+  };
   private dragFrame: { pointerId: number; startX: number; startY: number; scaleX: number; scaleY: number } | null = null;
   readonly busy = signal(true);
   readonly status = signal('Loading project…');
@@ -104,6 +110,7 @@ export class App implements OnInit, OnDestroy {
   readonly currentFillColor = signal('#000000');
   readonly currentStrokeWidth = signal(1.75);
   readonly canEditStroke = signal(false);
+  readonly previewOnly = signal(this.phoneMedia.matches);
   readonly readOnly = signal(false);
   readonly needsRecovery = signal(false);
   readonly showGrid = signal(true);
@@ -122,6 +129,7 @@ export class App implements OnInit, OnDestroy {
       this.renderIconSvg = renderIconSvg;
       await this.workspace.openLast();
       window.addEventListener('focus', this.onFocus);
+      this.phoneMedia.addEventListener('change', this.onPhoneMediaChange);
       this.busy.set(false);
       this.refresh();
     }
@@ -130,6 +138,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener('focus', this.onFocus);
+    this.phoneMedia.removeEventListener('change', this.onPhoneMediaChange);
     if (this.workspace) void this.workspace.close();
   }
 
@@ -167,7 +176,8 @@ export class App implements OnInit, OnDestroy {
     this.hasIcon.set(Boolean(icon));
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
     this.needsRecovery.set(this.workspace.needsRecovery);
-    this.canEdit.set(Boolean(project) && this.workspace.writable && !this.workspace.needsRecovery && !this.busy());
+    this.canEdit.set(Boolean(project) && this.workspace.writable && !this.workspace.needsRecovery
+      && !this.busy() && !this.previewOnly());
     this.status.set(this.workspace.saveStatus);
     this.error.set(this.workspace.error);
     const host = this.canvas?.nativeElement;
@@ -222,7 +232,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private async run(action: () => Promise<void>): Promise<void> {
-    if (this.busy()) return;
+    if (this.busy() || this.previewOnly()) return;
     this.busy.set(true);
     this.canEdit.set(false);
     this.status.set('Saving…');

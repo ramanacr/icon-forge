@@ -9,6 +9,7 @@ import { compileSvgProfile } from '@iconforge/compiler-core';
 import { encodeProjectArchive, type SavedProject } from '@iconforge/persistence';
 
 const root = resolve('dist/web/browser');
+const axePath = resolve('node_modules/axe-core/axe.min.js');
 let server: Server;
 let baseUrl: string;
 
@@ -340,4 +341,42 @@ test('M1 composite browser icon exports byte-identically through the CLI', async
       '--profile', 'web-svg', '--out', out], { cwd: process.cwd() });
     expect(await readFile(join(out, 'icon-1.svg'))).toEqual(browserSvg);
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('M1 editor passes automated WCAG 2.2 AA checks', async ({ page }) => {
+  await page.addInitScript({ path: axePath });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const violations = await page.evaluate(async () => {
+    const axe = (window as unknown as { axe: { run(context: Document, options: unknown): Promise<{
+      violations: { id: string; nodes: { target: string[] }[] }[] }>; } }).axe;
+    const results = await axe.run(document, { runOnly: { type: 'tag',
+      values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } });
+    return results.violations.map(violation => ({ id: violation.id,
+      targets: violation.nodes.map(node => node.target.join(' ')) }));
+  });
+  expect(violations).toEqual([]);
+});
+
+test('M1 phone preview controls meet the 44 pixel target minimum', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 900, height: 844 }, hasTouch: true });
+  try {
+    const page = await context.newPage();
+    await page.goto(baseUrl);
+    await page.getByRole('button', { name: 'Create project' }).click();
+    await page.getByRole('button', { name: 'Add icon' }).click();
+    await page.getByRole('button', { name: 'Add rectangle' }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByText('Mobile preview only')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add rectangle' })).toBeDisabled();
+    await expect(page.locator('svg rect[data-node-id]')).toHaveCount(1);
+    const controls = page.locator('button:visible');
+    for (let index = 0; index < await controls.count(); index++) {
+      const rect = await controls.nth(index).boundingBox();
+      expect(rect?.height).toBeGreaterThanOrEqual(44);
+      expect(rect?.width).toBeGreaterThanOrEqual(44);
+    }
+  } finally { await context.close(); }
 });

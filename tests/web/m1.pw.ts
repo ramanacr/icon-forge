@@ -109,6 +109,62 @@ test('M1 primitive tools and snapped pointer drag commit one reversible edit', a
   await expect(ellipse).toHaveAttribute('transform', 'matrix(1 0 0 1 4 3)');
 });
 
+test('M1 drag feedback keeps a 225-shape scene stable', async ({ page }, testInfo) => {
+  const dispatcher = new ProjectDispatcher();
+  const id = '0198e09b-a810-7000-8000-00000000a001';
+  const iconId = '0198e09b-a810-7000-8000-00000000a002';
+  const base = { commandVersion: '1.0' as const, projectId: id,
+    issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' as const } };
+  dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-00000000a003',
+    type: 'project.create', payload: { id, name: 'Drag scene' } });
+  const nodes = Array.from({ length: 225 }, (_, index) => ({
+    id: `0198e09b-a810-7000-8000-${(0xa100 + index).toString(16).padStart(12, '0')}`,
+    type: 'rect' as const, visible: true, locked: false,
+    x: (index % 15) * 1.5, y: Math.floor(index / 15) * 1.5,
+    width: 1, height: 1, rx: 0, ry: 0, fill: { kind: 'token' as const, token: 'currentColor' },
+  }));
+  dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-00000000a004',
+    type: 'icon.add', payload: { icon: { id: iconId, name: 'grid', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], variants: [], provenanceIds: [],
+      accessibility: { kind: 'decorative' }, nodes } } });
+  await page.goto(baseUrl);
+  await page.evaluate(({ id, project }) => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('iconforge-web-v1', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('projects', { keyPath: 'id' });
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction('projects', 'readwrite');
+      transaction.objectStore('projects').put({ id, revision: project.revision, snapshot: project, journal: [] });
+      transaction.oncomplete = () => { localStorage.setItem('iconforge:last-project', id); db.close(); resolve(); };
+      transaction.onerror = () => reject(transaction.error);
+    };
+  }), { id, project: dispatcher.project! });
+  await page.reload();
+  const first = page.locator('svg [data-node-id]').first();
+  await expect(page.locator('svg [data-node-id]')).toHaveCount(225);
+  const bounds = await first.boundingBox();
+  const svgBounds = await page.locator('.canvas svg').boundingBox();
+  expect(bounds && svgBounds).toBeTruthy();
+  expect(bounds!.y).toBeLessThan(page.viewportSize()!.height);
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  await page.mouse.down();
+  await page.evaluate(() => { (window as typeof window & { dragSvg?: SVGSVGElement }).dragSvg = document.querySelector('.canvas svg')!; });
+  await page.mouse.move(bounds!.x + bounds!.width / 2 + svgBounds!.width * 2.2 / 24,
+    bounds!.y + bounds!.height / 2 + svgBounds!.height * 1.2 / 24, { steps: 20 });
+  const feedback = await page.evaluate(() => ({
+    stable: document.querySelector('.canvas svg') === (window as typeof window & { dragSvg?: SVGSVGElement }).dragSvg,
+    samples: performance.getEntriesByName('iconforge.transform-feedback', 'measure').map(entry => entry.duration),
+  }));
+  expect(feedback.stable).toBe(true);
+  expect(feedback.samples.length).toBeGreaterThanOrEqual(10);
+  const p95 = feedback.samples.sort((a, b) => a - b)[Math.ceil(feedback.samples.length * 0.95) - 1]!;
+  if (testInfo.project.name === 'chromium') expect(p95).toBeLessThanOrEqual(16.67 * 1.1);
+  await expect(first).toHaveAttribute('transform', 'matrix(1 0 0 1 2 1)');
+  await page.mouse.up();
+  await expect(first).toHaveAttribute('transform', 'matrix(1 0 0 1 2 1)');
+});
+
 test('M1 second tab can take over a read-only project', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

@@ -37,14 +37,14 @@ button { font: inherit; color: inherit; background: var(--surface); border: 1px 
 button:hover:not(:disabled) { border-color: var(--selection-border); background: var(--surface-hover); }
 button:disabled { opacity: .48; cursor: default; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.shell { height: 100dvh; min-height: 600px; display: flex; flex-direction: column; }
 .topbar { height: 64px; display: flex; gap: var(--space-4); align-items: center; padding: 0 22px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); }
 .brand { font-size: 21px; letter-spacing: -.04em; color: var(--accent); }
 .project-name { font-weight: 600; }
 .status { margin-left: auto; font-size: 13px; color: var(--text-muted); }
-.layout { display: grid; grid-template-columns: 220px minmax(300px, 1fr) 220px; flex: 1; }
+.layout { display: grid; grid-template-columns: 220px minmax(300px, 1fr) 220px; flex: 1; min-height: 0; }
 .sidebar, .inspector { padding: var(--space-5); background: var(--surface); }
-.sidebar { border-right: 1px solid var(--border-subtle); }
+.sidebar { border-right: 1px solid var(--border-subtle); overflow-y: auto; }
 .inspector { border-left: 1px solid var(--border-subtle); }
 h2 { margin: 0 0 18px; font-size: 15px; }
 .sidebar > button { width: 100%; text-align: left; margin-bottom: var(--space-2); }

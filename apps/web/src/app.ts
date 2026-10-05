@@ -90,7 +90,8 @@ export class App implements OnInit, OnDestroy {
     this.previewOnly.set(this.phoneMedia.matches);
     if (this.workspace) this.refresh();
   };
-  private dragFrame: { pointerId: number; startX: number; startY: number; scaleX: number; scaleY: number } | null = null;
+  private dragFrame: { pointerId: number; startX: number; startY: number; scaleX: number; scaleY: number;
+    targets: { element: SVGElement; matrix: number[] }[] } | null = null;
   readonly busy = signal(true);
   readonly status = signal('Loading project…');
   readonly error = signal('');
@@ -315,19 +316,34 @@ export class App implements OnInit, OnDestroy {
     if (!bounds.width || !bounds.height) return;
     event.preventDefault();
     this.workspace.beginDrag(nodeId);
-    this.dragFrame = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
-      scaleX: icon.viewBox[2] / bounds.width, scaleY: icon.viewBox[3] / bounds.height };
     this.canvas!.nativeElement.setPointerCapture(event.pointerId);
     this.refresh();
+    const targets = this.workspace.selection.snapshot.nodeIds.flatMap(id => {
+      const element = this.canvas?.nativeElement.querySelector(`[data-node-id="${id}"]`);
+      if (!(element instanceof SVGElement)) return [];
+      const transform = element.getAttribute('transform');
+      const matrix = transform ? transform.slice(7, -1).split(/\s+/).map(Number) : [1, 0, 0, 1, 0, 0];
+      return [{ element, matrix }];
+    });
+    this.dragFrame = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
+      scaleX: icon.viewBox[2] / bounds.width, scaleY: icon.viewBox[3] / bounds.height, targets };
+    performance.clearMeasures('iconforge.transform-feedback');
   }
 
   onPointerMove(event: PointerEvent): void {
     const frame = this.dragFrame;
     if (!frame || frame.pointerId !== event.pointerId) return;
+    const start = performance.now();
     const dx = (event.clientX - frame.startX) * frame.scaleX;
     const dy = (event.clientY - frame.startY) * frame.scaleY;
     this.workspace.updateDrag(dx, dy, 6 * Math.max(frame.scaleX, frame.scaleY));
-    this.refresh();
+    const preview = this.workspace.preview;
+    if (preview) for (const { element, matrix } of frame.targets) {
+      element.setAttribute('transform', `matrix(${matrix[0]} ${matrix[1]} ${matrix[2]} ${matrix[3]} ${
+        Math.round((matrix[4]! + preview.matrix[4]) * 1000) / 1000} ${
+        Math.round((matrix[5]! + preview.matrix[5]) * 1000) / 1000})`);
+    }
+    performance.measure('iconforge.transform-feedback', { start, end: performance.now() });
   }
 
   onPointerUp(event: PointerEvent): void {

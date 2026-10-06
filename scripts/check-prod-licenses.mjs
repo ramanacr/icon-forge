@@ -3,9 +3,11 @@ import { readFileSync } from 'node:fs';
 
 const allowed = new Set(['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause',
   'Apache-2.0', '0BSD', 'CC0-1.0']);
+const isWindows = process.platform === 'win32';
 const source = process.argv[2]
   ? readFileSync(process.argv[2], 'utf8')
-  : execFileSync('pnpm', ['licenses', 'list', '--prod', '--json'], { encoding: 'utf8' });
+  : execFileSync(isWindows ? 'pnpm.cmd' : 'pnpm', ['licenses', 'list', '--prod', '--json'],
+    { encoding: 'utf8', shell: isWindows });
 const report = JSON.parse(source);
 if (!report || typeof report !== 'object' || Array.isArray(report)) throw new Error('Invalid licence report');
 

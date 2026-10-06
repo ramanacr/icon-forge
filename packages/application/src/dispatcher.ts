@@ -4,8 +4,16 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { applyPatches } from './patches.js';
 
-type CommandResult = HandlerResult['result'];
-interface Transaction { patches: StructuralPatch[]; inversePatches: StructuralPatch[] }
+export type CommandResult = HandlerResult['result'];
+export interface Transaction { patches: StructuralPatch[]; inversePatches: StructuralPatch[] }
+export interface DispatcherCheckpoint {
+  revision: number;
+  projectHash: string;
+  undo: Transaction[];
+  redo: Transaction[];
+  results: [string, CommandResult][];
+  checksum: string;
+}
 export interface JournalEntry {
   command: CommandEnvelopeV1;
   patches: StructuralPatch[];
@@ -14,8 +22,12 @@ export interface JournalEntry {
 }
 export interface RecoveryDiagnostic { severity: 'warning'; code: 'journal.corrupt-tail'; message: string }
 
+function hashCanonical(value: unknown): string {
+  return bytesToHex(sha256(new TextEncoder().encode(canonicalJson(value))));
+}
+
 function checksum(entry: Omit<JournalEntry, 'checksum'>): string {
-  return bytesToHex(sha256(new TextEncoder().encode(canonicalJson(entry))));
+  return hashCanonical(entry);
 }
 
 /** In-memory application boundary; repository adapters persist snapshots and journal. */
@@ -28,14 +40,40 @@ export class ProjectDispatcher {
   private readonly redoStack: Transaction[] = [];
   readonly recoveryDiagnostics: RecoveryDiagnostic[] = [];
 
-  constructor(snapshot: ProjectV1 | null = null) {
+  constructor(snapshot: ProjectV1 | null = null, checkpoint?: DispatcherCheckpoint) {
     this.current = snapshot === null ? null : assertProject(structuredClone(snapshot));
     this.currentRevision = snapshot?.revision ?? 0;
+    if (checkpoint) {
+      const { checksum: storedChecksum, ...payload } = checkpoint;
+      if (!snapshot || checkpoint.revision !== snapshot.revision
+        || checkpoint.projectHash !== hashCanonical(snapshot)
+        || !Array.isArray(checkpoint.undo) || !Array.isArray(checkpoint.redo)
+        || !Array.isArray(checkpoint.results) || hashCanonical(payload) !== storedChecksum) {
+        throw new TypeError('checkpoint.invalid');
+      }
+      const keys = new Set<string>();
+      for (const [id, result] of checkpoint.results) {
+        if (keys.has(id) || result.commandId !== id) throw new TypeError('checkpoint.invalid');
+        keys.add(id);
+        this.results.set(id, structuredClone(result));
+      }
+      this.undoStack.push(...structuredClone(checkpoint.undo));
+      this.redoStack.push(...structuredClone(checkpoint.redo));
+    }
   }
 
   get project(): ProjectV1 | null { return this.current === null ? null : structuredClone(this.current); }
   get journal(): readonly JournalEntry[] { return structuredClone(this.entries); }
+  get journalLength(): number { return this.entries.length; }
   get revision(): number { return this.currentRevision; }
+
+  checkpoint(): DispatcherCheckpoint {
+    if (!this.current) throw new TypeError('checkpoint.no-project');
+    const payload = { revision: this.currentRevision, projectHash: hashCanonical(this.current),
+      undo: structuredClone(this.undoStack), redo: structuredClone(this.redoStack),
+      results: structuredClone([...this.results]) };
+    return { ...payload, checksum: hashCanonical(payload) };
+  }
 
   dispatch(command: CommandEnvelopeV1): CommandResult {
     assertCommandEnvelope(command);
@@ -92,8 +130,9 @@ export class ProjectDispatcher {
     this.results.set(command.commandId, structuredClone(result));
   }
 
-  static replay(snapshot: ProjectV1 | null, journal: readonly JournalEntry[]): ProjectDispatcher {
-    const dispatcher = new ProjectDispatcher(snapshot);
+  static replay(snapshot: ProjectV1 | null, journal: readonly JournalEntry[],
+    checkpoint?: DispatcherCheckpoint): ProjectDispatcher {
+    const dispatcher = new ProjectDispatcher(snapshot, checkpoint);
     for (const [index, entry] of journal.entries()) {
       try {
         const { checksum: storedChecksum, ...payload } = entry;
@@ -105,7 +144,7 @@ export class ProjectDispatcher {
           throw new TypeError('Journal patch mismatch');
         }
       } catch {
-        const recovered = ProjectDispatcher.replay(snapshot, journal.slice(0, index));
+        const recovered = ProjectDispatcher.replay(snapshot, journal.slice(0, index), checkpoint);
         recovered.recoveryDiagnostics.push({ severity: 'warning', code: 'journal.corrupt-tail', message: `Journal truncated at entry ${index}` });
         return recovered;
       }

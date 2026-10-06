@@ -1,6 +1,6 @@
 import { Dexie, type Table } from 'dexie';
 import { assertProject, type ProjectV1 } from '@iconforge/project-model';
-import type { JournalEntry } from '@iconforge/application';
+import { ProjectDispatcher, type DispatcherCheckpoint, type JournalEntry } from '@iconforge/application';
 import type { IProjectRepository, SavedProject } from './contracts.js';
 import { asProjectStorageError } from './storage-error.js';
 
@@ -43,14 +43,17 @@ export class DexieProjectRepository implements IProjectRepository {
     } catch (error) { throw asProjectStorageError(error); }
   }
 
-  async compact(id: string, expectedRevision: number, snapshot: ProjectV1): Promise<void> {
+  async compact(id: string, expectedRevision: number, snapshot: ProjectV1,
+    checkpoint?: DispatcherCheckpoint): Promise<void> {
     assertProject(snapshot);
     if (snapshot.id !== id || snapshot.revision !== expectedRevision) throw new TypeError('snapshot.invalid');
+    if (checkpoint) new ProjectDispatcher(snapshot, checkpoint);
     try {
       await this.database.transaction('rw', this.database.projects, async () => {
         const row = await this.database.projects.get(id);
         if (!row || row.revision !== expectedRevision) throw new TypeError('revision.conflict');
-        await this.database.projects.put({ id, revision: expectedRevision, snapshot: structuredClone(snapshot), journal: [] });
+        await this.database.projects.put({ id, revision: expectedRevision,
+          snapshot: structuredClone(snapshot), journal: [], ...(checkpoint ? { checkpoint: structuredClone(checkpoint) } : {}) });
       });
     } catch (error) { throw asProjectStorageError(error); }
   }

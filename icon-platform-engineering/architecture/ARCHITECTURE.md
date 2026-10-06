@@ -60,6 +60,7 @@ Workers receive immutable snapshots (structured clone) and return results; they 
 
 ## Persistence and durability (ADR-020, ADR-021)
 - IndexedDB (Dexie) stores: latest snapshot per project + bounded command journal (compacted into a new snapshot every 200 commands or 30 s idle) + preserved originals.
+- Compaction stores a checksummed dispatcher history checkpoint alongside the snapshot, preserving undo/redo and command idempotency across reopen. Existing rows without a checkpoint still replay normally; the checkpoint does not change `ProjectV1`.
 - **Single writer:** opening a project acquires a Web Lock `iconforge:project:{id}` (exclusive). A second tab opens read-only and can request takeover; the holder flushes and releases. `BroadcastChannel` announces new revisions to read-only viewers.
 - **Durability:** request `navigator.storage.persist()` on first project creation; surface status. `.iconproj` file save is first-class: File System Access API (Chromium) gives true "Save" to a user file handle; elsewhere "Save" downloads. The UI tracks "changes not saved to a file" and reminds on a cadence, because IndexedDB alone can be evicted (Safari's 7-day rule for non-installed sites, quota pressure everywhere).
 - Crash recovery: on open, replay journal after snapshot; journal entries are checksummed; a corrupt tail is truncated and reported.

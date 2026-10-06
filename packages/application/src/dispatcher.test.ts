@@ -311,6 +311,22 @@ describe('project dispatcher', () => {
     expect(canonicalJson(ProjectDispatcher.replay(null, dispatcher.journal).project)).toBe(canonicalJson(dispatcher.project));
   });
 
+  it('restores undo, redo and command idempotency from a compacted checkpoint', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    dispatcher.dispatch(rename);
+    const checkpoint = dispatcher.checkpoint();
+    const reopened = ProjectDispatcher.replay(dispatcher.project, [], checkpoint);
+    expect(reopened.dispatch(rename)).toEqual(dispatcher.dispatch(rename));
+    expect(reopened.revision).toBe(2);
+    reopened.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000004',
+      type: 'history.undo', payload: {} });
+    expect(reopened.project?.name).toBe('Medical');
+    expect(ProjectDispatcher.replay(dispatcher.project, reopened.journal, checkpoint).project).toEqual(reopened.project);
+    expect(() => ProjectDispatcher.replay(dispatcher.project, [], { ...checkpoint, checksum: '0'.repeat(64) }))
+      .toThrow('checkpoint.invalid');
+  });
+
   it('can undo creation and redo it without reusing a revision', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

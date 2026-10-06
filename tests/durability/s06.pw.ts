@@ -20,12 +20,13 @@ test.beforeAll(async () => {
     entryPoints: {
       application: resolve('packages/application/src/index.ts'),
       persistence: resolve('packages/persistence/src/index.ts'),
+      workspace: resolve('apps/web/src/workspace.ts'),
     },
     outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
   });
   server = createServer(async (request, response) => {
     const name = request.url?.slice(1);
-    if (name !== 'application.js' && name !== 'persistence.js') {
+    if (name !== 'application.js' && name !== 'persistence.js' && name !== 'workspace.js') {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>');
       return;
     }
@@ -35,6 +36,33 @@ test.beforeAll(async () => {
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('No test server address');
   baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+test('S-06 browser workspace compacts at 200 commands and keeps undo', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const { BrowserWorkspace } = await import(new URL('/workspace.js', location.origin).href);
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const workspace = new BrowserWorkspace();
+    await workspace.create();
+    await workspace.addIcon();
+    for (let index = 0; index < 197; index++) await workspace.addRectangle();
+    const id = workspace.project!.id;
+    const repository = new DexieProjectRepository('iconforge-web-v1');
+    const saved = await repository.load(id);
+    await workspace.close();
+    const reopened = new BrowserWorkspace();
+    await reopened.openLast();
+    await reopened.undo();
+    const afterUndo = reopened.icon?.nodes.length;
+    await reopened.close();
+    repository.close();
+    return { revision: saved?.revision, journalLength: saved?.journal.length,
+      checkpoint: Boolean(saved?.checkpoint), snapshotNodes: saved?.snapshot?.icons[0]?.nodes.length, afterUndo };
+  });
+  expect(result).toEqual({ revision: 200, journalLength: 0,
+    checkpoint: true, snapshotNodes: 197, afterUndo: 196 });
 });
 
 test.afterAll(async () => {
@@ -60,13 +88,23 @@ test('S-06 IndexedDB append, reopen, stale writer and compaction', async ({ page
     try { await repository.append(id, 0, 2, dispatcher.journal[1]); } catch { staleRejected = true; }
     const afterRejected = await repository.load(id);
     await repository.append(id, 1, 2, dispatcher.journal[1]);
-    await repository.compact(id, 2, dispatcher.project);
+    let damagedCheckpointRejected = false;
+    try { await repository.compact(id, 2, dispatcher.project,
+      { ...dispatcher.checkpoint(), checksum: '0'.repeat(64) }); }
+    catch { damagedCheckpointRejected = true; }
+    const beforeCompaction = await repository.load(id);
+    await repository.compact(id, 2, dispatcher.project, dispatcher.checkpoint());
     const compacted = await repository.load(id);
+    const restored = ProjectDispatcher.replay(compacted.snapshot, compacted.journal, compacted.checkpoint);
+    restored.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000004', type: 'history.undo', payload: {} });
     return { firstName: reopened.project?.name, staleRejected, revisionAfterRejected: afterRejected?.revision,
-      compactedRevision: compacted?.revision, compactedName: compacted?.snapshot?.name, journalLength: compacted?.journal.length };
+      damagedCheckpointRejected, journalBeforeCompaction: beforeCompaction?.journal.length,
+      compactedRevision: compacted?.revision, compactedName: compacted?.snapshot?.name,
+      journalLength: compacted?.journal.length, undoName: restored.project?.name };
   });
   expect(result).toEqual({ firstName: 'Medical', staleRejected: true, revisionAfterRejected: 1,
-    compactedRevision: 2, compactedName: 'Clinical', journalLength: 0 });
+    damagedCheckpointRejected: true, journalBeforeCompaction: 2,
+    compactedRevision: 2, compactedName: 'Clinical', journalLength: 0, undoName: 'Medical' });
   await page.reload();
   const reopenedAfterReload = await page.evaluate(async () => {
     const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);

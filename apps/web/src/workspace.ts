@@ -26,6 +26,8 @@ export class BrowserWorkspace {
   private lock: ProjectWriteLock | null = null;
   private unsubscribeMode: (() => void) | null = null;
   private pendingSave: Promise<void> | null = null;
+  private compaction: Promise<void> | null = null;
+  private idleCompaction: ReturnType<typeof setTimeout> | null = null;
   private drag: TransformGesture | null = null;
   private recovery: { projectId: string; storedRevision: number; validLength: number } | null = null;
   readonly selection = new SelectionModel();
@@ -89,7 +91,10 @@ export class BrowserWorkspace {
   private async openLock(projectId: string): Promise<void> {
     this.unsubscribeMode?.();
     await this.lock?.close();
-    this.lock = await ProjectWriteLock.open(projectId, async () => { await this.pendingSave; });
+    this.lock = await ProjectWriteLock.open(projectId, async () => {
+      await this.pendingSave;
+      await this.compaction;
+    });
     this.unsubscribeMode = this.lock.onModeChange(mode => {
       if (!this.recovery) this.saveStatus = mode === 'writer' ? 'Saved in browser only' : 'Read only in this tab';
       this.onChanged?.();
@@ -115,7 +120,7 @@ export class BrowserWorkspace {
   }
 
   private loadRow(row: NonNullable<Awaited<ReturnType<DexieProjectRepository['load']>>>): void {
-    this.dispatcher = ProjectDispatcher.replay(row.snapshot, row.journal);
+    this.dispatcher = ProjectDispatcher.replay(row.snapshot, row.journal, row.checkpoint);
     this.currentIconId = this.project?.icons.find(icon => icon.id === this.currentIconId)?.id
       ?? this.project?.icons[0]?.id ?? null;
     if (this.project) this.selection.reconcile(this.project);
@@ -129,6 +134,37 @@ export class BrowserWorkspace {
     this.recovery = null;
     this.error = '';
     this.saveStatus = this.writable ? 'Saved in browser only' : 'Read only in this tab';
+    if (this.writable && this.dispatcher.journalLength) void this.scheduleCompaction(row.id);
+  }
+
+  private async scheduleCompaction(projectId: string): Promise<void> {
+    if (this.idleCompaction) clearTimeout(this.idleCompaction);
+    this.idleCompaction = null;
+    if (this.dispatcher.journalLength === 0) return;
+    if (this.dispatcher.journalLength >= 200) { await this.compactJournal(projectId); return; }
+    this.idleCompaction = setTimeout(() => {
+      this.idleCompaction = null;
+      void this.compactJournal(projectId);
+    }, 30_000);
+  }
+
+  private async compactJournal(projectId: string): Promise<void> {
+    if (this.compaction) { await this.compaction; return; }
+    const snapshot = this.dispatcher.project;
+    if (!snapshot || snapshot.id !== projectId || !this.writable || this.recovery
+      || this.dispatcher.journalLength === 0) return;
+    const checkpoint = this.dispatcher.checkpoint();
+    const work = (async (): Promise<void> => {
+      try {
+        await this.repository.compact(projectId, snapshot.revision, snapshot, checkpoint);
+        if (this.dispatcher.revision === snapshot.revision && this.project?.id === projectId) {
+          this.dispatcher = ProjectDispatcher.replay(snapshot, [], checkpoint);
+        }
+      } catch { /* The committed journal remains authoritative; retry after the next edit. */ }
+    })();
+    this.compaction = work;
+    try { await work; }
+    finally { if (this.compaction === work) this.compaction = null; }
   }
 
   async refreshReadonly(): Promise<void> {
@@ -158,8 +194,11 @@ export class BrowserWorkspace {
 
   private async persist(command: CommandEnvelopeV1): Promise<void> {
     if (!this.writable || this.recovery) throw new TypeError('Project is read only until recovery is complete');
+    if (this.idleCompaction) clearTimeout(this.idleCompaction);
+    this.idleCompaction = null;
     const before = this.dispatcher.revision;
-    this.dispatcher.dispatch(command);
+    try { this.dispatcher.dispatch(command); }
+    catch (error) { await this.scheduleCompaction(command.projectId); throw error; }
     const entry = this.dispatcher.journal.at(-1)!;
     const write = this.repository.append(command.projectId, before, this.dispatcher.revision, entry);
     this.pendingSave = write;
@@ -171,13 +210,15 @@ export class BrowserWorkspace {
       if (this.project) this.selection.reconcile(this.project);
     } catch (error) {
       const row = await this.repository.load(command.projectId);
-      this.dispatcher = row ? ProjectDispatcher.replay(row.snapshot, row.journal) : new ProjectDispatcher();
+      this.dispatcher = row ? ProjectDispatcher.replay(row.snapshot, row.journal, row.checkpoint) : new ProjectDispatcher();
       this.error = error instanceof Error ? error.message : String(error);
       this.saveStatus = 'Save failed';
+      await this.scheduleCompaction(command.projectId);
       throw error;
     } finally {
       if (this.pendingSave === write) this.pendingSave = null;
     }
+    await this.scheduleCompaction(command.projectId);
   }
 
   async create(): Promise<void> {
@@ -341,8 +382,10 @@ export class BrowserWorkspace {
   cancelDrag(): void { this.drag?.cancel(); this.drag = null; }
 
   private async commitGesture(gesture: TransformGesture, projectId: string): Promise<void> {
+    if (this.idleCompaction) clearTimeout(this.idleCompaction);
+    this.idleCompaction = null;
     const before = this.dispatcher.revision;
-    if (!gesture.commit()) return;
+    if (!gesture.commit()) { await this.scheduleCompaction(projectId); return; }
     const entry = this.dispatcher.journal.at(-1)!;
     const write = this.repository.append(projectId, before, this.dispatcher.revision, entry);
     this.pendingSave = write;
@@ -353,11 +396,13 @@ export class BrowserWorkspace {
       this.error = '';
     } catch (error) {
       const row = await this.repository.load(projectId);
-      this.dispatcher = row ? ProjectDispatcher.replay(row.snapshot, row.journal) : new ProjectDispatcher();
+      this.dispatcher = row ? ProjectDispatcher.replay(row.snapshot, row.journal, row.checkpoint) : new ProjectDispatcher();
+      await this.scheduleCompaction(projectId);
       throw error;
     } finally {
       if (this.pendingSave === write) this.pendingSave = null;
     }
+    await this.scheduleCompaction(projectId);
   }
 
   async finishDrag(): Promise<void> {
@@ -424,7 +469,9 @@ export class BrowserWorkspace {
   }
 
   async close(): Promise<void> {
+    if (this.idleCompaction) clearTimeout(this.idleCompaction);
     await this.pendingSave;
+    await this.compaction;
     this.unsubscribeMode?.();
     await this.lock?.close();
     this.repository.close();

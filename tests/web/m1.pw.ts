@@ -123,6 +123,35 @@ test('M1 warns on best-effort storage and downloads a project backup', async ({ 
   await expect(page.getByText('Browser storage may be cleared')).toBeVisible();
 });
 
+test('S-06 idle compaction keeps undo available after reload', async ({ page }) => {
+  await page.clock.install();
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.locator('svg rect[data-node-id]').click(); // An identity gesture must keep idle compaction scheduled.
+  await page.clock.fastForward(31_000);
+  await expect.poll(() => page.evaluate(async () => {
+    const id = localStorage.getItem('iconforge:last-project')!;
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const get = db.transaction('projects', 'readonly').objectStore('projects').get(id);
+    const row = await new Promise<{ journal: unknown[]; checkpoint?: unknown }>((resolve, reject) => {
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    db.close();
+    return { journalLength: row.journal.length, checkpoint: Boolean(row.checkpoint) };
+  })).toEqual({ journalLength: 0, checkpoint: true });
+  await page.reload();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(0);
+});
+
 test('M1 primitive tools and snapped pointer drag commit one reversible edit', async ({ page }) => {
   test.setTimeout(15_000);
   await page.goto(baseUrl);

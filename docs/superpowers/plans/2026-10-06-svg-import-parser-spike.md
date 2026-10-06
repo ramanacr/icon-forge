@@ -39,7 +39,7 @@
 - [x] Run `pnpm exec vitest run packages/import-svg/src/xml-reader.test.ts` and confirm the new cases fail.
 - [x] Implement `readSvgXml` with `saxes` events and counters that abort on limit breach; accept only a single `svg` root. Reject XML namespaces/attributes outside the SVG and xlink namespaces.
 - [x] Run the focused tests, typecheck, the production licence gate and boundary lint; record the dependency licences in the change.
-- [ ] Commit and push the parser boundary.
+- [x] Commit and push the parser boundary.
 
 ### Task 2: Safe AST and local `use` expansion
 
@@ -47,10 +47,10 @@
 
 **Interfaces:** Produce `parseSvgAst(source: string): SvgElement`, using Task 1's reader. The returned tree has expanded local `use` instances and no disallowed elements, attributes or URLs. It is still an import AST, not a project document.
 
-- [ ] Write failing tests for safe primitives/groups, local `use`/`symbol`, cycle/depth/fan-out rejection, external and data URLs, event attributes, scripts, `foreignObject`, image, animation, mask/filter, unsafe styles, extreme coordinates and malformed numbers.
-- [ ] Run focused tests and confirm failures.
-- [ ] Implement allowlist checks and bounded `use` expansion, preserving source order and explicit diagnostics for unsupported constructs. Reject unsupported `clipPath` conversion at this stage rather than silently flattening it.
-- [ ] Run focused tests, typecheck, lint and the malicious fixture corpus.
+- [x] Write failing tests for safe primitives/groups, local `use`/`symbol`, cycle/depth/fan-out rejection, external and data URLs, event attributes, scripts, `foreignObject`, image, animation, mask/filter, unsafe styles, extreme coordinates and malformed numbers.
+- [x] Run focused tests and confirm failures.
+- [x] Implement allowlist checks and bounded `use` expansion, preserving source order and explicit diagnostics for unsupported constructs. Reject unsupported `clipPath` conversion at this stage rather than silently flattening it.
+- [x] Run focused tests, typecheck, lint and the malicious fixture corpus.
 - [ ] Commit and push the safe AST boundary.
 
 ### Task 3: Terminable worker and browser spike

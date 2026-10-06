@@ -3,7 +3,8 @@ import type { CommandEnvelopeV1 } from '@iconforge/commands';
 import { compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
-import { DexieProjectRepository, ProjectWriteLock, requestPersistentStorage } from '@iconforge/persistence';
+import { DexieProjectRepository, ProjectWriteLock, downloadProjectFile, readStorageDurability,
+  requestPersistentStorage, type StorageDurability } from '@iconforge/persistence';
 import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
 
 const POINTER = 'iconforge:last-project';
@@ -31,6 +32,7 @@ export class BrowserWorkspace {
   currentIconId: string | null = null;
   saveStatus = '';
   error = '';
+  storageDurability: StorageDurability | null = null;
   onChanged: (() => void) | null = null;
 
   get project(): ProjectV1 | null { return this.dispatcher.project; }
@@ -101,6 +103,15 @@ export class BrowserWorkspace {
     if (!row) { localStorage.removeItem(POINTER); return; }
     await this.openLock(id);
     this.loadRow(row);
+    void this.refreshStorageDurability(id, false);
+  }
+
+  private async refreshStorageDurability(projectId: string, request: boolean): Promise<void> {
+    const status = request ? await requestPersistentStorage() : await readStorageDurability();
+    if (this.project?.id === projectId) {
+      this.storageDurability = status;
+      this.onChanged?.();
+    }
   }
 
   private loadRow(row: NonNullable<Awaited<ReturnType<DexieProjectRepository['load']>>>): void {
@@ -176,12 +187,13 @@ export class BrowserWorkspace {
     this.recovery = null;
     this.selection.clear();
     this.currentIconId = null;
+    this.storageDurability = null;
     await this.persist({ ...this.base(id), type: 'project.create', payload: { id, name: 'Untitled project' } });
     localStorage.setItem(POINTER, id);
-    void requestPersistentStorage();
     await this.persist({ ...this.base(id), type: 'exportProfile.upsert',
       payload: { profile: { id: uuidV7(), name: 'web-svg', target: 'svg',
         options: { precision: 3, sizeAttrs: true, paintMode: 'currentColor', metadata: false } } } });
+    void this.refreshStorageDurability(id, true);
   }
 
   async addIcon(): Promise<void> {
@@ -403,6 +415,12 @@ export class BrowserWorkspace {
     anchor.download = `${icon.name}.svg`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
+
+  async downloadProject(): Promise<void> {
+    const project = this.project;
+    if (!project) throw new TypeError('No project to download');
+    await downloadProjectFile(project);
   }
 
   async close(): Promise<void> {

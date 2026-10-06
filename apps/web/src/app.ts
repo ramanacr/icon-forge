@@ -10,6 +10,7 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
         <strong class="brand">IconForge</strong>
         <span class="project-name">{{ projectName() }}</span>
         <span class="status" role="status">{{ status() }}</span>
+        @if (storageWarning()) { <span class="storage-warning" role="status">Browser storage may be cleared</span> }
         @if (readOnly()) {
           <button type="button" (click)="runTakeOver()" [disabled]="busy() || previewOnly()">Take over editing</button>
         }
@@ -18,6 +19,7 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
         }
         <button type="button" (click)="runCreate()" [disabled]="busy() || previewOnly()">Create project</button>
         <button type="button" (click)="runExport()" [disabled]="!hasIcon() || previewOnly()">Export SVG</button>
+        <button type="button" (click)="runDownloadProject()" [disabled]="!hasProject() || busy() || previewOnly()">Download project</button>
       </header>
       @if (previewOnly()) { <p class="mobile-preview" role="status">Mobile preview only</p> }
       <div class="layout">
@@ -103,6 +105,8 @@ export class App implements OnInit, OnDestroy {
   readonly activeIconId = signal<string | null>(null);
   readonly selected = signal(false);
   readonly hasIcon = signal(false);
+  readonly hasProject = signal(false);
+  readonly storageWarning = signal(false);
   readonly canEdit = signal(false);
   readonly canGroup = signal(false);
   readonly canUngroup = signal(false);
@@ -178,6 +182,9 @@ export class App implements OnInit, OnDestroy {
     this.currentStrokeWidth.set(this.workspace.strokeWidth ?? project?.designSystem.stroke.width ?? 1.75);
     this.canEditStroke.set(this.workspace.strokeWidth !== null && !this.workspace.selectedNode?.locked);
     this.hasIcon.set(Boolean(icon));
+    this.hasProject.set(Boolean(project));
+    this.storageWarning.set(Boolean(project && this.workspace.storageDurability
+      && this.workspace.storageDurability !== 'persistent'));
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
     this.needsRecovery.set(this.workspace.needsRecovery);
     this.canEdit.set(Boolean(project) && this.workspace.writable && !this.workspace.needsRecovery
@@ -273,6 +280,9 @@ export class App implements OnInit, OnDestroy {
   runUndo(): void { void this.run(() => this.workspace.undo()); }
   runRedo(): void { void this.run(() => this.workspace.redo()); }
   runExport(): void { try { this.workspace.exportSvg(); } catch (error) { this.error.set(this.message(error)); } }
+  runDownloadProject(): void {
+    void this.workspace.downloadProject().catch(error => this.error.set(this.message(error)));
+  }
 
   chooseIcon(id: string): void { this.workspace.currentIconId = id; this.workspace.selection.clear(); this.refresh(); }
 

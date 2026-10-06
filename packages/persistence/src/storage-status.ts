@@ -5,6 +5,15 @@ export interface PersistenceCapability {
   persist(): Promise<boolean>;
 }
 
+/** Read durability on reopen without prompting for permission again. */
+export async function readStorageDurability(
+  storage: PersistenceCapability | undefined = globalThis.navigator?.storage,
+): Promise<StorageDurability> {
+  if (!storage || typeof storage.persisted !== 'function') return 'unsupported';
+  try { return await storage.persisted() ? 'persistent' : 'best-effort'; }
+  catch { return 'best-effort'; }
+}
+
 /** Called on first project creation so the UI can explain the durability of its browser copy. */
 export async function requestPersistentStorage(
   storage: PersistenceCapability | undefined = globalThis.navigator?.storage,

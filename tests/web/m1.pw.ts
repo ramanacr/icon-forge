@@ -6,7 +6,7 @@ import { extname, join, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { ProjectDispatcher } from '@iconforge/application';
 import { compileSvgProfile } from '@iconforge/compiler-core';
-import { encodeProjectArchive, type SavedProject } from '@iconforge/persistence';
+import { decodeProjectArchive, encodeProjectArchive, type SavedProject } from '@iconforge/persistence';
 
 const root = resolve('dist/web/browser');
 const axePath = resolve('node_modules/axe-core/axe.min.js');
@@ -100,6 +100,27 @@ test('M1 reports module worker startup failure without opening storage', async (
   await expect(page.getByRole('alert')).toContainText('module Web Workers');
   await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
   expect(await page.evaluate(() => localStorage.getItem('iconforge:last-project'))).toBeNull();
+});
+
+test('M1 warns on best-effort storage and downloads a project backup', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'storage', { configurable: true, value: {
+      persisted: async () => false, persist: async () => false,
+    } });
+  });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await expect(page.getByText('Browser storage may be cleared')).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Untitled project.iconproj');
+  const archive = await decodeProjectArchive(await readFile((await download.path())!));
+  expect(archive.project.icons[0]?.nodes).toHaveLength(1);
+  await page.reload();
+  await expect(page.getByText('Browser storage may be cleared')).toBeVisible();
 });
 
 test('M1 primitive tools and snapped pointer drag commit one reversible edit', async ({ page }) => {

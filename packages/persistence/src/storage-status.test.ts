@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { requestPersistentStorage } from './storage-status.js';
+import { readStorageDurability, requestPersistentStorage } from './storage-status.js';
 
 describe('persistent browser storage', () => {
   it('requests persistence when the browser has not granted it', async () => {
@@ -27,5 +27,12 @@ describe('persistent browser storage', () => {
 
   it('reports unsupported browsers', async () => {
     expect(await requestPersistentStorage(undefined)).toBe('unsupported');
+  });
+
+  it('checks durability on reopen without requesting permission', async () => {
+    expect(await readStorageDurability({ persisted: async () => false,
+      persist: async () => { throw new Error('unexpected request'); } })).toBe('best-effort');
+    expect(await readStorageDurability({ persisted: async () => true,
+      persist: async () => { throw new Error('unexpected request'); } })).toBe('persistent');
   });
 });

@@ -74,5 +74,16 @@ export class DexieProjectRepository implements IProjectRepository {
     } catch (error) { throw asProjectStorageError(error); }
   }
 
+  async insertSnapshot(snapshot: ProjectV1): Promise<void> {
+    assertProject(snapshot);
+    try {
+      await this.database.transaction('rw', this.database.projects, async () => {
+        if (await this.database.projects.get(snapshot.id)) throw new TypeError('snapshot.exists');
+        await this.database.projects.add({ id: snapshot.id, revision: snapshot.revision,
+          snapshot: structuredClone(snapshot), journal: [] });
+      });
+    } catch (error) { throw asProjectStorageError(error); }
+  }
+
   close(): void { this.database.close(); }
 }

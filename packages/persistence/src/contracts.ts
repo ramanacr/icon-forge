@@ -14,4 +14,5 @@ export interface IProjectRepository {
   append(id: string, expectedRevision: number, nextRevision: number, entry: JournalEntry): Promise<void>;
   compact(id: string, expectedRevision: number, snapshot: ProjectV1, checkpoint?: DispatcherCheckpoint): Promise<void>;
   truncateJournal(id: string, expectedRevision: number, validLength: number): Promise<void>;
+  insertSnapshot(snapshot: ProjectV1): Promise<void>;
 }

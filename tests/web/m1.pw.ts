@@ -291,6 +291,100 @@ test('M1 damaged journal tail offers explicit recovery of valid edits', async ({
   await expect(page.getByText('Saved in browser only')).toBeVisible();
 });
 
+test('M1 damaged checkpoint opens valid post-snapshot edits and recovers a separate copy', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  const sourceId = await page.evaluate(() => localStorage.getItem('iconforge:last-project')!);
+  const initial = await page.evaluate(async id => {
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const row = await new Promise<SavedProject>((resolve, reject) => {
+      const get = db.transaction('projects').objectStore('projects').get(id);
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    db.close();
+    return row;
+  }, sourceId);
+  const dispatcher = ProjectDispatcher.replay(initial.snapshot, initial.journal);
+  await page.evaluate(async ({ id, snapshot, checkpoint }) => {
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = db.transaction('projects', 'readwrite');
+    transaction.objectStore('projects').put({ id, revision: snapshot.revision, snapshot, journal: [], checkpoint });
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  }, { id: sourceId, snapshot: dispatcher.project!, checkpoint: dispatcher.checkpoint() });
+  await page.reload();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.evaluate(async id => {
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = db.transaction('projects', 'readwrite');
+    const store = transaction.objectStore('projects');
+    const row = await new Promise<SavedProject>((resolve, reject) => {
+      const get = store.get(id);
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    row.checkpoint!.checksum = '0'.repeat(64);
+    store.put(row);
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  }, sourceId);
+  await page.reload();
+  await expect(page.getByText('Recovery needed')).toBeVisible();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Add rectangle' })).toBeDisabled();
+  const rawDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download recovery data' }).click();
+  const raw = JSON.parse(await readFile((await (await rawDownload).path())!, 'utf8')) as SavedProject;
+  expect(raw.id).toBe(sourceId);
+  expect(raw.checkpoint?.checksum).toBe('0'.repeat(64));
+  expect(raw.journal).toHaveLength(1);
+  await page.getByRole('button', { name: 'Recover as copy' }).click();
+  await expect(page.getByText('Recovered as a copy')).toBeVisible();
+  const recoveredId = await page.evaluate(() => localStorage.getItem('iconforge:last-project')!);
+  expect(recoveredId).not.toBe(sourceId);
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(2);
+  await page.reload();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveCount(2);
+  const original = await page.evaluate(async id => {
+    const request = indexedDB.open('iconforge-web-v1');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const row = await new Promise<SavedProject>((resolve, reject) => {
+      const get = db.transaction('projects').objectStore('projects').get(id);
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    db.close();
+    return row;
+  }, sourceId);
+  expect(original.checkpoint?.checksum).toBe('0'.repeat(64));
+  expect(original.journal).toHaveLength(1);
+});
+
 test('M1 grid and safe-area guides are editor-only overlays', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

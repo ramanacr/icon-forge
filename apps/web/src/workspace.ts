@@ -29,7 +29,7 @@ export class BrowserWorkspace {
   private compaction: Promise<void> | null = null;
   private idleCompaction: ReturnType<typeof setTimeout> | null = null;
   private drag: TransformGesture | null = null;
-  private recovery: { projectId: string; storedRevision: number; validLength: number } | null = null;
+  private recovery: { kind: 'journal' | 'checkpoint'; projectId: string; storedRevision: number; validLength: number } | null = null;
   readonly selection = new SelectionModel();
   currentIconId: string | null = null;
   saveStatus = '';
@@ -42,6 +42,7 @@ export class BrowserWorkspace {
   get icon(): IconV1 | null { return this.project?.icons.find(icon => icon.id === this.currentIconId) ?? null; }
   get preview() { return this.drag?.preview; }
   get needsRecovery(): boolean { return this.recovery !== null; }
+  get checkpointRecovery(): boolean { return this.recovery?.kind === 'checkpoint'; }
   get guides() { return this.icon ? gridGuides(this.icon.viewBox, [1, 1]) : null; }
   get selectedNode(): SceneNodeV1 | null {
     const selectedIds = this.selection.snapshot.nodeIds;
@@ -120,12 +121,28 @@ export class BrowserWorkspace {
   }
 
   private loadRow(row: NonNullable<Awaited<ReturnType<DexieProjectRepository['load']>>>): void {
-    this.dispatcher = ProjectDispatcher.replay(row.snapshot, row.journal, row.checkpoint);
+    try {
+      this.dispatcher = ProjectDispatcher.replay(row.snapshot, row.journal, row.checkpoint);
+    } catch (error) {
+      if (!(error instanceof TypeError) || error.message !== 'checkpoint.invalid') throw error;
+      const salvaged = ProjectDispatcher.salvage(row.snapshot, row.journal);
+      this.dispatcher = new ProjectDispatcher(salvaged.project);
+      this.recovery = { kind: 'checkpoint', projectId: row.id, storedRevision: row.revision,
+        validLength: salvaged.validLength };
+      this.currentIconId = this.project?.icons.find(icon => icon.id === this.currentIconId)?.id
+        ?? this.project?.icons[0]?.id ?? null;
+      if (this.project) this.selection.reconcile(this.project);
+      this.error = salvaged.corruptTail
+        ? 'Saved history and journal tail are damaged. Valid edits are shown read only. Download recovery data, then recover as copy. The original stays stored; undo history starts fresh.'
+        : 'Saved history is damaged. All journal edits are shown read only. Download recovery data, then recover as copy. The original stays stored; undo history starts fresh.';
+      this.saveStatus = 'Recovery needed';
+      return;
+    }
     this.currentIconId = this.project?.icons.find(icon => icon.id === this.currentIconId)?.id
       ?? this.project?.icons[0]?.id ?? null;
     if (this.project) this.selection.reconcile(this.project);
     if (this.dispatcher.recoveryDiagnostics.length) {
-      this.recovery = { projectId: row.id, storedRevision: row.revision,
+      this.recovery = { kind: 'journal', projectId: row.id, storedRevision: row.revision,
         validLength: this.dispatcher.revision - (row.snapshot?.revision ?? 0) };
       this.error = 'A damaged journal tail was found. Recover valid edits to continue.';
       this.saveStatus = 'Recovery needed';
@@ -185,11 +202,43 @@ export class BrowserWorkspace {
   async recover(): Promise<void> {
     const damaged = this.recovery;
     if (!damaged || !this.writable) throw new TypeError('Recovery requires the editing lock');
+    if (damaged.kind === 'checkpoint') {
+      const source = this.project;
+      if (!source) throw new TypeError('No valid project to recover');
+      const latest = await this.repository.load(damaged.projectId);
+      if (!latest || latest.revision !== damaged.storedRevision) throw new TypeError('revision.conflict');
+      const copy = { ...source, id: uuidV7() };
+      await this.repository.insertSnapshot(copy);
+      await this.openLock(copy.id);
+      localStorage.setItem(POINTER, copy.id);
+      this.loadRow((await this.repository.load(copy.id))!);
+      this.saveStatus = 'Recovered as a copy';
+      return;
+    }
     await this.repository.truncateJournal(damaged.projectId, damaged.storedRevision, damaged.validLength);
     this.recovery = null;
     this.error = '';
     this.saveStatus = 'Recovered valid edits';
     this.lock!.publishRevision(this.dispatcher.revision);
+  }
+
+  async downloadRecoveryData(): Promise<void> {
+    const damaged = this.recovery;
+    if (!damaged) throw new TypeError('No recovery data is available');
+    const row = await this.repository.load(damaged.projectId);
+    if (!row) throw new TypeError('Recovery data is missing');
+    const blob = new Blob([JSON.stringify(row)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${row.id}-recovery.json`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
   }
 
   private async persist(command: CommandEnvelopeV1): Promise<void> {

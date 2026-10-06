@@ -151,4 +151,35 @@ export class ProjectDispatcher {
     }
     return dispatcher;
   }
+
+  /** Reconstruct visible state from checked patches when the history checkpoint is unusable. */
+  static salvage(snapshot: ProjectV1 | null, journal: readonly JournalEntry[]):
+    { project: ProjectV1 | null; validLength: number; corruptTail: boolean } {
+    let project = snapshot === null ? null : assertProject(structuredClone(snapshot));
+    let revision = snapshot?.revision ?? 0;
+    const projectId = snapshot?.id ?? journal[0]?.command.projectId;
+    const seen = new Set<string>();
+    for (const [index, entry] of journal.entries()) {
+      try {
+        const { checksum: storedChecksum, ...payload } = entry;
+        if (checksum(payload) !== storedChecksum) throw new TypeError('Checksum mismatch');
+        assertCommandEnvelope(entry.command);
+        if (entry.command.projectId !== projectId || entry.command.dryRun || seen.has(entry.command.commandId)
+          || (entry.command.expectedRevision !== undefined && entry.command.expectedRevision !== revision)) {
+          throw new TypeError('Journal command mismatch');
+        }
+        const changed = applyPatches(project, entry.patches);
+        const next = changed === null ? null : assertProject({ ...changed, revision: revision + 1 });
+        const reversed = applyPatches(next, entry.inversePatches);
+        const prior = reversed === null ? null : { ...reversed, revision };
+        if (canonicalJson(prior) !== canonicalJson(project)) throw new TypeError('Journal inverse mismatch');
+        project = next;
+        revision++;
+        seen.add(entry.command.commandId);
+      } catch {
+        return { project, validLength: index, corruptTail: true };
+      }
+    }
+    return { project, validLength: journal.length, corruptTail: false };
+  }
 }

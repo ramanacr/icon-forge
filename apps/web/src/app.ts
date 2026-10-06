@@ -15,7 +15,8 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
           <button type="button" (click)="runTakeOver()" [disabled]="busy() || previewOnly()">Take over editing</button>
         }
         @if (needsRecovery()) {
-          <button type="button" (click)="runRecover()" [disabled]="busy() || readOnly() || previewOnly()">Recover valid edits</button>
+          <button type="button" (click)="runRecover()" [disabled]="busy() || readOnly() || previewOnly()">{{ checkpointRecovery() ? 'Recover as copy' : 'Recover valid edits' }}</button>
+          <button type="button" (click)="runDownloadRecoveryData()" [disabled]="busy() || previewOnly()">Download recovery data</button>
         }
         <button type="button" (click)="runCreate()" [disabled]="busy() || previewOnly()">Create project</button>
         <button type="button" (click)="runExport()" [disabled]="!hasIcon() || previewOnly()">Export SVG</button>
@@ -120,6 +121,7 @@ export class App implements OnInit, OnDestroy {
   readonly previewOnly = signal(this.phoneMedia.matches);
   readonly readOnly = signal(false);
   readonly needsRecovery = signal(false);
+  readonly checkpointRecovery = signal(false);
   readonly showGrid = signal(true);
   private readonly onFocus = (): void => {
     if (!this.workspace) return;
@@ -187,6 +189,7 @@ export class App implements OnInit, OnDestroy {
       && this.workspace.storageDurability !== 'persistent'));
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
     this.needsRecovery.set(this.workspace.needsRecovery);
+    this.checkpointRecovery.set(this.workspace.checkpointRecovery);
     this.canEdit.set(Boolean(project) && this.workspace.writable && !this.workspace.needsRecovery
       && !this.busy() && !this.previewOnly());
     this.status.set(this.workspace.saveStatus);
@@ -282,6 +285,9 @@ export class App implements OnInit, OnDestroy {
   runExport(): void { try { this.workspace.exportSvg(); } catch (error) { this.error.set(this.message(error)); } }
   runDownloadProject(): void {
     void this.workspace.downloadProject().catch(error => this.error.set(this.message(error)));
+  }
+  runDownloadRecoveryData(): void {
+    void this.workspace.downloadRecoveryData().catch(error => this.error.set(this.message(error)));
   }
 
   chooseIcon(id: string): void { this.workspace.currentIconId = id; this.workspace.selection.clear(); this.refresh(); }

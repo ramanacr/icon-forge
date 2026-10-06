@@ -327,6 +327,27 @@ describe('project dispatcher', () => {
       .toThrow('checkpoint.invalid');
   });
 
+  it('salvages checked journal patches after a damaged checkpoint, including undo', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    dispatcher.dispatch(rename);
+    const snapshot = dispatcher.project!;
+    const checkpoint = dispatcher.checkpoint();
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000004',
+      type: 'project.rename', payload: { name: 'Updated' }, expectedRevision: 2 });
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000005',
+      type: 'history.undo', payload: {}, expectedRevision: 3 });
+    const journal = dispatcher.journal.slice(2);
+    expect(() => ProjectDispatcher.replay(snapshot, journal, { ...checkpoint, checksum: '0'.repeat(64) }))
+      .toThrow('checkpoint.invalid');
+    const salvaged = ProjectDispatcher.salvage(snapshot, journal);
+    expect(salvaged).toEqual({ project: dispatcher.project, validLength: 2, corruptTail: false });
+    const corrupt = [...journal, { ...journal[1]!, checksum: '0'.repeat(64) }];
+    expect(ProjectDispatcher.salvage(snapshot, corrupt)).toEqual({ project: dispatcher.project,
+      validLength: 2, corruptTail: true });
+    expect(journal).toHaveLength(2);
+  });
+
   it('can undo creation and redo it without reusing a revision', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

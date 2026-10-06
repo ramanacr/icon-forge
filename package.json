@@ -10,6 +10,8 @@
     "schema:generate": "node packages/project-model/generate-schema.mjs && node packages/commands/generate-schema.mjs",
     "schema:check": "node packages/project-model/generate-schema.mjs --check && node packages/commands/generate-schema.mjs --check",
     "budget:web": "node scripts/check-web-budgets.mjs",
+    "licenses:prod": "node scripts/check-prod-licenses.mjs",
+    "sbom:prod": "pnpm sbom --sbom-format cyclonedx --prod --out iconforge.cdx.json",
     "test": "vitest run",
     "test:parity": "playwright test",
     "typecheck": "tsc --noEmit",

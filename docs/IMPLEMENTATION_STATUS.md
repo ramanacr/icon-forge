@@ -21,6 +21,7 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 - Selected layers can now be deleted together through a toolbar button or with Delete/Backspace on a focused layer. The browser persists one reversible `node.remove` command; a Chromium workflow checks multi-selection removal, undo, redo, reload and keyboard deletion.
 - A three-icon Chromium workflow now checks edits across icon switching, undo/redo after switching, journal replay on reload, and byte-identical SVG output from the browser and built Node CLI for each icon. Seventeen Chromium web E2E cases pass.
 - CI now checks the production web build's compressed initial JavaScript (500 KiB), initial CSS (60 KiB), and current lazy editor JavaScript (350 KiB) against the documented payload limits. The local build measures 43.32, 1.48, and 95.94 KiB gzip respectively; oversized shell and lazy fixtures were rejected by the checker. Budgets for adapters that are not in the web build remain to be wired as they are integrated.
+- The pinned pnpm CLI now enforces the production dependency licence allowlist in CI and emits a CycloneDX 1.7 production SBOM as a downloadable CI artifact. All 20 currently reported production packages pass; a disallowed GPL fixture fails the gate. Development-only transitive licences outside the stated allowlist remain under [B-07](BLOCKERS.md), so this is not a full-tree policy pass.
 
 Environment-dependent blockers are tracked in [BLOCKERS.md](BLOCKERS.md).
 

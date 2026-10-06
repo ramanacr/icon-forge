@@ -17,6 +17,12 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm licenses:prod
+      - run: pnpm sbom:prod
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-sbom
+          path: iconforge.cdx.json
       - run: pnpm schema:check
       - run: pnpm typecheck
       - run: pnpm lint:boundaries

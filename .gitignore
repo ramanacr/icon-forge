@@ -19,6 +19,7 @@ dist/
 .pnpm-store/
 test-results/
 playwright-report/
+iconforge.cdx.json
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

@@ -58,6 +58,6 @@ export async function saveProjectFile(project: ProjectV1, options: FileSaveOptio
 }
 
 /** Explicit backup action always downloads, including on browsers with a native picker. */
-export async function downloadProjectFile(project: ProjectV1): Promise<void> {
-  await saveProjectFile(project, { download: browserDownload });
+export async function downloadProjectFile(project: ProjectV1, attachments: Record<string, Uint8Array> = {}): Promise<void> {
+  await saveProjectFile(project, { download: browserDownload, attachments });
 }

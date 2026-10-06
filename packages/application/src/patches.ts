@@ -83,6 +83,22 @@ export function applyPatches(project: ProjectV1 | null, patches: readonly Struct
         throw new TypeError('patch.path.unsupported');
       }
       current = { ...current, icons };
+    } else if (patch.path[0] === 'provenance' && patch.path.length === 2) {
+      if (current === null || !/^(0|[1-9]\d*)$/.test(patch.path[1]!)) throw new TypeError('patch.conflict');
+      const index = Number(patch.path[1]);
+      const provenance = structuredClone(current.provenance);
+      if (patch.op === 'insert') {
+        if (index > provenance.length) throw new TypeError('patch.conflict');
+        provenance.splice(index, 0, structuredClone(patch.value as ProjectV1['provenance'][number]));
+      } else if (patch.op === 'remove') {
+        if (index >= provenance.length || canonicalJson(provenance[index]) !== canonicalJson(patch.value)) {
+          throw new TypeError('patch.conflict');
+        }
+        provenance.splice(index, 1);
+      } else {
+        throw new TypeError('patch.op.unsupported');
+      }
+      current = { ...current, provenance };
     } else if (patch.path[0] === 'tokens' && patch.path.length === 2) {
       if (current === null || !/^(0|[1-9]\d*)$/.test(patch.path[1]!)) throw new TypeError('patch.conflict');
       const index = Number(patch.path[1]);

@@ -6,10 +6,12 @@ import { asProjectStorageError } from './storage-error.js';
 
 class ProjectDatabase extends Dexie {
   projects!: Table<SavedProject, string>;
+  originals!: Table<{ key: string; projectId: string; path: string; bytes: Uint8Array }, string>;
 
   constructor(name: string) {
     super(name);
     this.version(1).stores({ projects: 'id' });
+    this.version(2).stores({ projects: 'id', originals: 'key, projectId' });
   }
 }
 
@@ -27,11 +29,35 @@ export class DexieProjectRepository implements IProjectRepository {
   }
 
   async append(id: string, expectedRevision: number, nextRevision: number, entry: JournalEntry): Promise<void> {
+    if (entry.command.type === 'icon.importSvg') throw new TypeError('journal.append.original-required');
+    await this.appendEntry(id, expectedRevision, nextRevision, entry);
+  }
+
+  async appendImport(id: string, expectedRevision: number, nextRevision: number,
+    entry: JournalEntry, originalSvg: Uint8Array): Promise<void> {
+    if (entry.command.type !== 'icon.importSvg' || !(originalSvg instanceof Uint8Array)
+      || originalSvg.length > 2 * 1024 * 1024) throw new TypeError('journal.append.invalid-original');
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(originalSvg))),
+      byte => byte.toString(16).padStart(2, '0')).join('');
+    if (entry.command.payload.provenance.originalSha256 !== hash) {
+      throw new TypeError('journal.append.original-hash-mismatch');
+    }
+    await this.appendEntry(id, expectedRevision, nextRevision, entry,
+      { key: `${id}/originals/${hash}.svg`, projectId: id, path: `originals/${hash}.svg`, bytes: new Uint8Array(originalSvg) });
+  }
+
+  async loadOriginals(id: string): Promise<Record<string, Uint8Array>> {
+    const rows = await this.database.originals.where('projectId').equals(id).toArray();
+    return Object.fromEntries(rows.map(row => [row.path, new Uint8Array(row.bytes)]));
+  }
+
+  private async appendEntry(id: string, expectedRevision: number, nextRevision: number,
+    entry: JournalEntry, original?: { key: string; projectId: string; path: string; bytes: Uint8Array }): Promise<void> {
     if (nextRevision !== expectedRevision + 1 || entry.command.projectId !== id || entry.command.dryRun) {
       throw new TypeError('journal.append.invalid');
     }
     try {
-      await this.database.transaction('rw', this.database.projects, async () => {
+      await this.database.transaction('rw', this.database.projects, this.database.originals, async () => {
         const row = await this.database.projects.get(id);
         const revision = row?.revision ?? 0;
         if (revision !== expectedRevision) throw new TypeError('revision.conflict');
@@ -39,6 +65,7 @@ export class DexieProjectRepository implements IProjectRepository {
           ? { ...row, revision: nextRevision, journal: [...row.journal, structuredClone(entry)] }
           : { id, revision: nextRevision, snapshot: null, journal: [structuredClone(entry)] };
         await this.database.projects.put(next);
+        if (original) await this.database.originals.put(original);
       });
     } catch (error) { throw asProjectStorageError(error); }
   }

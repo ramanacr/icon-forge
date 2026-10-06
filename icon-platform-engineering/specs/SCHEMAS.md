@@ -211,7 +211,7 @@ Handler contract: `(project: ProjectV1, cmd: CommandEnvelope) → { project, pat
 | `project.updateDesignSystem` | `{ patch: Partial<DesignSystemV1> }` | Does not rewrite icons; use `set.applyStyle`. |
 | `token.upsert` / `token.remove` | `{ token }` / `{ name }` | Remove fails if referenced (`token.in-use`). |
 | `icon.add` | `{ icon: IconV1 }` | Created from blank, primitive or library. |
-| `icon.importSvg` | `{ iconId, nodeIdSeed, source: string, provenance }` | Parsing happens in the import worker before the command; the command receives the canonicalized result + diagnostics. `nodeIdSeed` makes ID assignment deterministic. |
+| `icon.importSvg` | `{ icon: IconV1, provenance: ProvenanceRecordV1, diagnostics: ImportDiagnosticV1[] }` | The import worker validates source, assigns stable IDs and converts it to a canonical icon before dispatch. The icon references exactly this provenance record, whose `originalSha256` is the lowercase SHA-256 of the original SVG bytes. `ImportDiagnosticV1` is `{ code: string, severity: "info"\|"warning", message: string }`. The command handler inserts the icon and provenance in one reversible transaction and returns the diagnostics. The original bytes are stored at `originals/<sha256>.svg` in the same durable IndexedDB transaction as the journal entry and included in project backups. Raw source and ID seeds do not enter the command journal. |
 | `icon.remove` / `icon.rename` / `icon.duplicate` | `{ iconId }` / `{ iconId, name }` / `{ iconId, newIconId, idMap }` | |
 | `icon.updateMetadata` | `{ iconId, patch }` | Tags, aliases, accessibility, font mapping. |
 | `node.add` / `node.remove` | `{ iconId, parentId?, index, node }` / `{ iconId, nodeIds }` | |

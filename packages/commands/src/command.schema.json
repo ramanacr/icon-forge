@@ -585,6 +585,92 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "icon.importSvg"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "icon": {
+                  "$ref": "#/$defs/IconV1"
+                },
+                "provenance": {
+                  "$ref": "#/$defs/ProvenanceRecordV1"
+                },
+                "diagnostics": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ImportDiagnosticV1"
+                  }
+                }
+              },
+              "required": [
+                "icon",
+                "provenance",
+                "diagnostics"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "icon.rename"
             },
             "payload": {
@@ -3236,6 +3322,64 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ProvenanceRecordV1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "source": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "attribution": {
+          "type": "string"
+        },
+        "originalSha256": {
+          "type": "string"
+        },
+        "importedAt": {
+          "type": "string"
+        },
+        "modified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "modified"
+      ],
+      "additionalProperties": false
+    },
+    "ImportDiagnosticV1": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warning"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": false
     },
     "IconMetadataPatch": {
       "type": "object",

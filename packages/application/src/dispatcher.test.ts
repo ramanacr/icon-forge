@@ -12,6 +12,31 @@ const create = { ...base, commandId: firstId, type: 'project.create' as const, p
 const rename = { ...base, commandId: secondId, type: 'project.rename' as const, payload: { name: 'Clinical' }, expectedRevision: 1 };
 
 describe('project dispatcher', () => {
+  it('imports a canonical icon and provenance as one reversible replayable command', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const provenance = { id: '0198e09b-a810-7000-8000-0000000000b1',
+      originalSha256: 'a'.repeat(64), modified: false };
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-0000000000b2', name: 'imported',
+      aliases: [], tags: [], viewBox: [0, 0, 24, 24], nodes: [], variants: [],
+      accessibility: { kind: 'decorative' }, provenanceIds: [provenance.id] };
+    const importCommand = { ...base, commandId: '0198e09b-a810-7000-8000-0000000000b3',
+      type: 'icon.importSvg' as const, payload: { icon, provenance,
+        diagnostics: [{ code: 'svg.unsupported-attribute', severity: 'warning' as const, message: 'Ignored metadata' }] } };
+    expect(dispatcher.dispatch(importCommand).diagnostics).toEqual(importCommand.payload.diagnostics);
+    expect(dispatcher.project?.provenance).toEqual([provenance]);
+    expect(dispatcher.project?.icons).toEqual([icon]);
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000b4', type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.provenance).toEqual([]);
+    expect(dispatcher.project?.icons).toEqual([]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-0000000000b5', type: 'history.redo', payload: {} });
+    expect(dispatcher.project?.provenance).toEqual([provenance]);
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+    expect(() => dispatcher.dispatch({ ...importCommand, commandId: '0198e09b-a810-7000-8000-0000000000b6',
+      payload: { ...importCommand.payload, icon: { ...icon, provenanceIds: [] } } }))
+      .toThrow('icon.importSvg.invalid-payload');
+  });
   it('undoes and replays sibling grouping and ungrouping as single transactions', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

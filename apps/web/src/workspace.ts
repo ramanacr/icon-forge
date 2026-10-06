@@ -514,7 +514,7 @@ export class BrowserWorkspace {
   async downloadProject(): Promise<void> {
     const project = this.project;
     if (!project) throw new TypeError('No project to download');
-    await downloadProjectFile(project);
+    await downloadProjectFile(project, await this.repository.loadOriginals(project.id));
   }
 
   async close(): Promise<void> {

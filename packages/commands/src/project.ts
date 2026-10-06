@@ -1,4 +1,4 @@
-import { assertProject, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type StrokeV1,
+import { assertProject, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type ProvenanceRecordV1, type StrokeV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 import { findNodePath, nodeArrayAt, removalOrder } from './scene-path.js';
@@ -21,6 +21,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'token.upsert'; payload: { token: ColorTokenV1 } }
   | { type: 'token.remove'; payload: { name: string } }
   | { type: 'icon.add'; payload: { icon: IconV1 } }
+  | { type: 'icon.importSvg'; payload: { icon: IconV1; provenance: ProvenanceRecordV1; diagnostics: ImportDiagnosticV1[] } }
   | { type: 'icon.rename'; payload: { iconId: UUID; name: string } }
   | { type: 'icon.updateMetadata'; payload: { iconId: UUID; patch: IconMetadataPatch } }
   | { type: 'icon.remove'; payload: { iconId: UUID } }
@@ -41,6 +42,12 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
+
+export interface ImportDiagnosticV1 {
+  code: string;
+  severity: 'info' | 'warning';
+  message: string;
+}
 
 /** Explicit node field operations; callers cannot merge arbitrary scene data. */
 export type NodeUpdateOp =
@@ -73,7 +80,7 @@ export interface HandlerResult {
     revision: number;
     changedIds: UUID[];
     patchSummary: { added: number; updated: number; removed: number; iconsAffected: UUID[] };
-    diagnostics: [];
+    diagnostics: ImportDiagnosticV1[];
   };
 }
 
@@ -134,6 +141,26 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
   if (project === null || command.projectId !== project.id) throw new TypeError('project.not-found');
   if (command.expectedRevision !== undefined && command.expectedRevision !== project.revision) {
     throw new TypeError('revision.conflict');
+  }
+  if (command.type === 'icon.importSvg') {
+    const { icon, provenance, diagnostics } = command.payload;
+    if (icon.provenanceIds.length !== 1 || icon.provenanceIds[0] !== provenance.id
+      || !provenance.originalSha256 || !/^[0-9a-f]{64}$/.test(provenance.originalSha256)
+      || project.icons.some(existing => existing.id === icon.id)
+      || project.provenance.some(existing => existing.id === provenance.id)) {
+      throw new TypeError('icon.importSvg.invalid-payload');
+    }
+    const icons = [...project.icons, structuredClone(icon)];
+    const records = [...project.provenance, structuredClone(provenance)];
+    const next = assertProject({ ...project, icons, provenance: records, revision: project.revision + 1 });
+    const iconPath = ['icons', String(project.icons.length)];
+    const provenancePath = ['provenance', String(project.provenance.length)];
+    return { project: next,
+      patches: [{ op: 'insert', path: provenancePath, value: provenance }, { op: 'insert', path: iconPath, value: icon }],
+      inversePatches: [{ op: 'remove', path: iconPath, value: icon }, { op: 'remove', path: provenancePath, value: provenance }],
+      result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
+        changedIds: [icon.id, provenance.id], patchSummary: { added: 2, updated: 0, removed: 0, iconsAffected: [icon.id] },
+        diagnostics: structuredClone(diagnostics) } };
   }
   if (command.type === 'project.rename') {
     validName(command.payload.name);

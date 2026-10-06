@@ -116,6 +116,76 @@ test('S-06 IndexedDB append, reopen, stale writer and compaction', async ({ page
   expect(reopenedAfterReload).toEqual({ revision: 2, name: 'Clinical' });
 });
 
+test('S-06 SVG original and import journal commit atomically', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const { ProjectDispatcher } = await import(new URL('/application.js', location.origin).href);
+    const { DexieProjectRepository, encodeProjectArchive, decodeProjectArchive } =
+      await import(new URL('/persistence.js', location.origin).href);
+    const id = '0198e09b-a810-7000-8000-000000000201';
+    const base = { commandVersion: '1.0', projectId: id, issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' } };
+    const dispatcher = new ProjectDispatcher();
+    const repository = new DexieProjectRepository('iconforge-s06-import');
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000202',
+      type: 'project.create', payload: { id, name: 'Imported' } });
+    await repository.append(id, 0, 1, dispatcher.journal[0]);
+    const original = new TextEncoder().encode('<svg viewBox="0 0 24 24"/>');
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', original)),
+      byte => byte.toString(16).padStart(2, '0')).join('');
+    const provenance = { id: '0198e09b-a810-7000-8000-000000000203', originalSha256: hash, modified: false };
+    const icon = { id: '0198e09b-a810-7000-8000-000000000204', name: 'imported', aliases: [], tags: [],
+      viewBox: [0, 0, 24, 24], nodes: [], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [provenance.id] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000205',
+      type: 'icon.importSvg', payload: { icon, provenance, diagnostics: [] } });
+    let hashRejected = false;
+    try { await repository.appendImport(id, 1, 2, dispatcher.journal[1], new TextEncoder().encode('<svg/>')); }
+    catch { hashRejected = true; }
+    const before = await repository.load(id);
+    const originalsBefore = await repository.loadOriginals(id);
+    await repository.appendImport(id, 1, 2, dispatcher.journal[1], original);
+    const attachments = await repository.loadOriginals(id);
+    const saved = await repository.load(id);
+    const reopened = ProjectDispatcher.replay(saved.snapshot, saved.journal);
+    const archive = await decodeProjectArchive(await encodeProjectArchive(reopened.project, attachments));
+    let staleRejected = false;
+    try { await repository.appendImport(id, 1, 2, dispatcher.journal[1], original); }
+    catch { staleRejected = true; }
+    repository.close();
+    return { hashRejected, beforeRevision: before?.revision, originalCountBefore: Object.keys(originalsBefore).length,
+      revision: saved?.revision, iconCount: reopened.project?.icons.length,
+      attachmentMatches: new TextDecoder().decode(archive.attachments[`originals/${hash}.svg`]) ===
+        new TextDecoder().decode(original), staleRejected };
+  });
+  expect(result).toEqual({ hashRejected: true, beforeRevision: 1, originalCountBefore: 0,
+    revision: 2, iconCount: 1, attachmentMatches: true, staleRejected: true });
+});
+
+test('S-06 IndexedDB v1 rows survive the originals-table upgrade', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const databaseName = 'iconforge-s06-upgrade';
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(databaseName, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('projects', { keyPath: 'id' });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction('projects', 'readwrite');
+        transaction.objectStore('projects').put({ id: 'prior', revision: 0, snapshot: null, journal: [] });
+        transaction.oncomplete = () => { database.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error);
+      };
+    });
+    const { DexieProjectRepository } = await import(new URL('/persistence.js', location.origin).href);
+    const repository = new DexieProjectRepository(databaseName);
+    const row = await repository.load('prior');
+    const originals = await repository.loadOriginals('prior');
+    repository.close();
+    return { revision: row?.revision, originals: Object.keys(originals).length };
+  });
+  expect(result).toEqual({ revision: 0, originals: 0 });
+});
+
 test('S-06 second tab is read-only until explicit takeover', async ({ browser }) => {
   const context = await browser.newContext();
   const first = await context.newPage();

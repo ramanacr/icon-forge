@@ -90,6 +90,24 @@ test('S-07 browser wrapper terminates a worker that never replies', async ({ pag
   expect(result).toEqual({ error: 'import.timeout', terminated: 1 });
 });
 
+test('S-07 browser wrapper rejects oversized source before creating a worker', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const url = '/browser.js';
+    const { parseSvgInWorker } = await import(url) as { parseSvgInWorker(source: string): Promise<unknown> };
+    const RealWorker = window.Worker;
+    let created = 0;
+    window.Worker = class { constructor() { created++; } } as unknown as typeof Worker;
+    try {
+      let error = '';
+      try { await parseSvgInWorker('x'.repeat(2 * 1024 * 1024 + 1)); }
+      catch (reason) { error = (reason as Error).message; }
+      return { error, created };
+    } finally { window.Worker = RealWorker; }
+  });
+  expect(result).toEqual({ error: 'import.source-limit', created: 0 });
+});
+
 test('S-07 parses near-limit 2 MB SVG sources within 300 ms in the worker', async ({ page }) => {
   await page.goto(baseUrl);
   const results = await page.evaluate(async () => {

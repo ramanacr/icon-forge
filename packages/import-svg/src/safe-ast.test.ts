@@ -58,6 +58,7 @@ describe('safe SVG import AST', () => {
     '<svg><rect x="NaN"/></svg>',
     '<svg><rect width="1e999"/></svg>',
     '<svg><path d="M0 nope"/></svg>',
+    '<svg><path d="M0,,0"/></svg>',
     '<svg><polyline points="1,2,3"/></svg>',
     '<svg viewBox="0,,0 24 24"/>',
     '<svg><g transform="translate(2)garbage"/></svg>',

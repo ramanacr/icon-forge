@@ -12,11 +12,27 @@ const numberPattern = /[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?/g;
 const commandPattern = /^[MLHVCSQTAZmlhvcsqtaz,\s]*$/;
 
 function checkNumbers(value: string, kind: 'single' | 'list' | 'path', maxCoordinate: number): void {
+  if (kind === 'path') {
+    if (/,\s*,/.test(value) || /,\s*$/.test(value)) throw new TypeError('import.number-invalid');
+    numberPattern.lastIndex = 0;
+    let end = 0;
+    let found = false;
+    for (let match = numberPattern.exec(value); match !== null; match = numberPattern.exec(value)) {
+      const gap = value.slice(end, match.index);
+      if (!commandPattern.test(gap)) throw new TypeError('import.number-invalid');
+      const number = Number(match[0]);
+      if (!Number.isFinite(number) || Math.abs(number) > maxCoordinate) throw new TypeError('import.coordinate-limit');
+      end = numberPattern.lastIndex;
+      found = true;
+    }
+    const tail = value.slice(end);
+    if (!found || !commandPattern.test(tail)) throw new TypeError('import.number-invalid');
+    return;
+  }
   const numbers = [...value.matchAll(numberPattern)];
   const remaining = value.replace(numberPattern, '');
   if ((kind === 'single' && (numbers.length !== 1 || remaining.trim()))
-    || (kind === 'list' && (!numbers.length || !/^[,\s]*$/.test(remaining)))
-    || (kind === 'path' && (!numbers.length || !commandPattern.test(remaining)))) {
+    || (kind === 'list' && (!numbers.length || !/^[,\s]*$/.test(remaining)))) {
     throw new TypeError('import.number-invalid');
   }
   if (kind === 'list') {

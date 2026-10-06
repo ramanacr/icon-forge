@@ -5,6 +5,8 @@ type WorkerReply = { ok: true; ast: SvgElement } | { ok: false; error: string };
 /** One parse per module worker, with a hard upper timeout and cleanup on every result. */
 export function parseSvgInWorker(source: string,
   options: { timeoutMs?: number; limits?: Partial<ImportLimits> } = {}): Promise<SvgElement> {
+  if (typeof source !== 'string') return Promise.reject(new TypeError('import.source-invalid'));
+  if (source.length > 2 * 1024 * 1024) return Promise.reject(new TypeError('import.source-limit'));
   const requestedTimeout = options.timeoutMs ?? 2_000;
   if (!Number.isFinite(requestedTimeout) || requestedTimeout <= 0) {
     return Promise.reject(new TypeError('import.timeout-invalid'));

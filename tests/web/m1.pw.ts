@@ -82,6 +82,26 @@ test('M1 browser workflow creates, edits, undoes, exports, and reloads an icon',
   expect(errors).toEqual([]);
 });
 
+test('M1 explains a missing required browser capability before enabling edits', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true });
+  });
+  await page.goto(baseUrl);
+  await expect(page.getByRole('alert')).toContainText('Web Locks');
+  await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
+  expect(await page.evaluate(() => localStorage.getItem('iconforge:last-project'))).toBeNull();
+});
+
+test('M1 reports module worker startup failure without opening storage', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'Worker', { value: class { constructor() { throw new Error('blocked'); } }, configurable: true });
+  });
+  await page.goto(baseUrl);
+  await expect(page.getByRole('alert')).toContainText('module Web Workers');
+  await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
+  expect(await page.evaluate(() => localStorage.getItem('iconforge:last-project'))).toBeNull();
+});
+
 test('M1 primitive tools and snapped pointer drag commit one reversible edit', async ({ page }) => {
   test.setTimeout(15_000);
   await page.goto(baseUrl);

@@ -14,6 +14,7 @@
           "options": {
             "browser": "apps/web/src/main.ts",
             "tsConfig": "apps/web/tsconfig.app.json",
+            "assets": [{ "glob": "**/*", "input": "apps/web/public", "output": "/" }],
             "styles": ["apps/web/src/styles.css"],
             "optimization": { "styles": { "inlineCritical": false } },
             "outputPath": "dist/web"

@@ -1,5 +1,6 @@
 import { Component, ElementRef, ViewChild, signal, type OnInit, type OnDestroy } from '@angular/core';
 import type { BrowserWorkspace } from './workspace.js';
+import { assertBrowserCapabilities } from './browser-capabilities.js';
 
 @Component({
   selector: 'iconforge-root',
@@ -123,6 +124,7 @@ export class App implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     try {
+      await assertBrowserCapabilities();
       const [{ BrowserWorkspace }, { renderIconSvg }] = await Promise.all([
         import('./workspace.js'), import('@iconforge/editor-core'),
       ]);

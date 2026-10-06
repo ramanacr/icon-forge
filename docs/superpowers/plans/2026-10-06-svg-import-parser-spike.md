@@ -31,14 +31,14 @@
 
 ### Task 1: Bounded XML reader
 
-**Files:** Create `packages/import-svg/package.json`, `packages/import-svg/project.json`, `packages/import-svg/src/xml-reader.ts`, `packages/import-svg/src/xml-reader.test.ts`; modify `pnpm-lock.yaml`.
+**Files:** Create `packages/import-svg/package.json`, `packages/import-svg/project.json`, `packages/import-svg/src/index.ts`, `packages/import-svg/src/xml-reader.ts`, `packages/import-svg/src/xml-reader.test.ts`; modify `pnpm-lock.yaml`.
 
 **Interfaces:** Produce `readSvgXml(source: string): SvgElement` and `SvgElement { name: string; attributes: Record<string, string>; children: SvgElement[] }`. Reject with stable `import.*` error codes. This is parser output only, not a canonical icon.
 
-- [ ] Write failing tests for valid shapes; XML declaration; DOCTYPE, entity and non-XML processing instruction rejection; malformed XML; source bytes, element count, nesting and path length limits.
-- [ ] Run `pnpm exec vitest run packages/import-svg/src/xml-reader.test.ts` and confirm the new cases fail.
-- [ ] Implement `readSvgXml` with `saxes` events and counters that abort on limit breach; accept only a single `svg` root. Reject XML namespaces/attributes outside the SVG and xlink namespaces.
-- [ ] Run the focused tests, typecheck, the production licence gate and boundary lint; record the dependency licences in the change.
+- [x] Write failing tests for valid shapes; XML declaration; DOCTYPE, entity and non-XML processing instruction rejection; malformed XML; source bytes, element count, nesting and path length limits.
+- [x] Run `pnpm exec vitest run packages/import-svg/src/xml-reader.test.ts` and confirm the new cases fail.
+- [x] Implement `readSvgXml` with `saxes` events and counters that abort on limit breach; accept only a single `svg` root. Reject XML namespaces/attributes outside the SVG and xlink namespaces.
+- [x] Run the focused tests, typecheck, the production licence gate and boundary lint; record the dependency licences in the change.
 - [ ] Commit and push the parser boundary.
 
 ### Task 2: Safe AST and local `use` expansion

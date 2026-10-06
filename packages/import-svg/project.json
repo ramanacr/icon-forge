@@ -1,0 +1,4 @@
+{
+  "name": "import-svg",
+  "tags": ["scope:core", "type:adapter", "layer:import-svg"]
+}

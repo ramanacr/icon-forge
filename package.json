@@ -9,6 +9,7 @@
   "scripts": {
     "schema:generate": "node packages/project-model/generate-schema.mjs && node packages/commands/generate-schema.mjs",
     "schema:check": "node packages/project-model/generate-schema.mjs --check && node packages/commands/generate-schema.mjs --check",
+    "budget:web": "node scripts/check-web-budgets.mjs",
     "test": "vitest run",
     "test:parity": "playwright test",
     "typecheck": "tsc --noEmit",

@@ -39,6 +39,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm --filter @iconforge/cli build
       - run: pnpm --filter @iconforge/web build
+      - run: pnpm budget:web
       - run: pnpm exec playwright test --grep-invert 'Phase 0 validation, command history and SVG throughput budgets|225-shape scene stable'
       - run: pnpm exec playwright test tests/performance/phase0.pw.ts --workers=1
       - run: pnpm exec playwright test tests/web/m1.pw.ts --grep '225-shape scene stable' --workers=1

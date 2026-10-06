@@ -46,12 +46,20 @@ describe('safe SVG import AST', () => {
     expect(() => parseSvgAst(repeated)).toThrow('import.use-limit');
   });
 
+  it('applies tighter use and coordinate limits', () => {
+    const source = '<svg><defs><rect id="a" width="4"/></defs><use href="#a"/></svg>';
+    expect(() => parseSvgAst(source, { expandedNodes: 1 })).toThrow('import.use-limit');
+    expect(() => parseSvgAst('<svg><rect x="5"/></svg>', { coordinates: 4 })).toThrow('import.coordinate-limit');
+    expect(() => parseSvgAst('<svg/>', { useDepth: 9 })).toThrow('import.limit-invalid');
+  });
+
   it.each([
     '<svg viewBox="0 0 1000001 24"/>',
     '<svg><rect x="NaN"/></svg>',
     '<svg><rect width="1e999"/></svg>',
     '<svg><path d="M0 nope"/></svg>',
     '<svg><polyline points="1,2,3"/></svg>',
+    '<svg viewBox="0,,0 24 24"/>',
     '<svg><g transform="translate(2)garbage"/></svg>',
     '<svg><g transform="matrix(1 0 0)"/></svg>',
     '<svg><g transform="translate(1e999)"/></svg>',

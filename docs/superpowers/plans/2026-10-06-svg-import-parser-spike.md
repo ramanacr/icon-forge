@@ -51,7 +51,7 @@
 - [x] Run focused tests and confirm failures.
 - [x] Implement allowlist checks and bounded `use` expansion, preserving source order and explicit diagnostics for unsupported constructs. Reject unsupported `clipPath` conversion at this stage rather than silently flattening it.
 - [x] Run focused tests, typecheck, lint and the malicious fixture corpus.
-- [ ] Commit and push the safe AST boundary.
+- [x] Commit and push the safe AST boundary.
 
 ### Task 3: Terminable worker and browser spike
 
@@ -59,8 +59,12 @@
 
 **Interfaces:** Produce `parseSvgInWorker(source: string, options?: { timeoutMs?: number }): Promise<SvgElement>`; the worker posts a success/error result and is always terminated. The public timeout never exceeds 2,000 ms.
 
-- [ ] Write browser tests for worker-only execution under CSP, malicious corpus rejection, worker timeout/termination, and a generated 2 MB accepted SVG completing within 300 ms.
-- [ ] Run the Chromium test to see the expected failure.
-- [ ] Implement the module worker and browser wrapper with one-shot settlement and termination on every path.
-- [ ] Run unit, typecheck, lint, browser fixture and bundle checks. Record measured size/time and deferred Firefox/WebKit verification without claiming the S-07 gate passed there.
-- [ ] Commit and push the worker spike and evidence.
+- [x] Write browser tests for worker-only execution under CSP, malicious corpus rejection, worker timeout/termination, and a generated 2 MB accepted SVG completing within 300 ms.
+- [x] Run the Chromium test to see the expected failure.
+- [x] Implement the module worker and browser wrapper with one-shot settlement and termination on every path.
+- [x] Run unit, typecheck, lint, browser fixture and bundle checks. Record measured size/time and deferred Firefox/WebKit verification without claiming the S-07 gate passed there.
+- [x] Commit and push the worker spike and evidence.
+
+Ruling: The normative import limits must be configurable downward; the first plan draft omitted the configuration API. `ImportLimits` now covers each bound, the browser worker receives lower limits, and values above the documented maxima reject with `import.limit-invalid`. The package root exports only the worker wrapper and data types so application code does not accidentally parse hostile XML on the main thread.
+
+Ruling: Run the 2 MB parse timing fixture alone in CI. A concurrent local unit suite raised the path-heavy timing from 198–224 ms to 394 ms due to CPU contention; the 300 ms threshold stays unchanged. Cost if wrong: this does not measure throughput while the device is saturated by unrelated work.

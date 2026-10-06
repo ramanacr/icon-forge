@@ -29,4 +29,10 @@ describe('bounded SVG XML reader', () => {
     expect(() => readSvgXml(`<svg>${'<g/>'.repeat(5_000)}</svg>`)).toThrow('import.element-limit');
     expect(() => readSvgXml(`<svg><path d="${'0'.repeat(200_001)}"/></svg>`)).toThrow('import.path-limit');
   });
+
+  it('permits tighter limits but rejects limits above the security defaults', () => {
+    expect(() => readSvgXml('<svg><rect/></svg>', { elements: 1 })).toThrow('import.element-limit');
+    expect(() => readSvgXml('<svg/>', { elements: 5_001 })).toThrow('import.limit-invalid');
+    expect(() => readSvgXml('<svg/>', { toString: 1 } as never)).toThrow('import.limit-invalid');
+  });
 });

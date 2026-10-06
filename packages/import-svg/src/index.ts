@@ -1,2 +1,2 @@
-export * from './xml-reader.js';
-export * from './safe-ast.js';
+export type { SvgElement, ImportLimits } from './xml-reader.js';
+export * from './browser.js';

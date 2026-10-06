@@ -2,6 +2,12 @@
 
 Phase 0 is in progress. At the user's direction, Phase 1 independent work has started before the formal S-01 through S-06 gate closes. The v4 engineering package remains the design authority; the Phase 1 exit is not yet met.
 
+## Phase 2 import spike
+
+- S-07 now has a data-only `saxes` XML reader and an allowlisted AST adapter behind a one-shot module worker. It rejects DOCTYPE/entity declarations, unsupported processing instructions, dangerous elements/attributes/URLs, malformed or extreme numbers, and local `use` cycles, missing targets, excessive depth and fan-out. Source, element, path-data, coordinate and nesting limits can be tightened but not raised. Unsupported clip paths are rejected until explicit Boolean conversion exists. No imported markup is inserted into the DOM or committed to a project.
+- Chromium verifies parsing under CSP, malicious-input diagnostics and worker termination on timeout. Isolated near-2 MB fixtures took about 99–123 ms for comment-heavy source and 198–250 ms for path-heavy source across five runs, below the 300 ms S-07 target. A simultaneous unit run raised the path-heavy measurement to 394 ms, so CI runs this timing fixture alone. The minified parser worker is about 10.2 KB gzip and its browser wrapper is about 0.4 KB gzip. `saxes@6.0.0` is ISC and its `xmlchars@2.2.0` dependency is MIT; the production licence gate passes.
+- Canonical scene conversion, original preservation, provenance, explicit clip flattening, import UI and the remaining Phase 2 acceptance corpus are not implemented. Firefox/WebKit verification stays deferred in this workspace.
+
 ## Phase 1 kickoff
 
 - A pure SVG profile compiler now creates sorted per-icon SVG artifacts and a deterministic hash manifest from a validated project and saved SVG export profile. The Node CLI reads `.iconproj`, compiles into a new output directory, and supports `--check` against existing output. Unit tests compare CLI output to the pure compiler, and Chromium checks artifact and manifest byte parity with Node.

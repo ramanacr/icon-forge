@@ -1,4 +1,4 @@
-import { readSvgXml, type SvgElement } from './xml-reader.js';
+import { readSvgXml, resolveImportLimits, type ImportLimits, type SvgElement } from './xml-reader.js';
 
 const elements = new Set(['svg', 'g', 'defs', 'symbol', 'use', 'rect', 'circle', 'ellipse',
   'line', 'polyline', 'polygon', 'path']);
@@ -11,7 +11,7 @@ const singleNumbers = new Set(['width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y
 const numberPattern = /[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?/g;
 const commandPattern = /^[MLHVCSQTAZmlhvcsqtaz,\s]*$/;
 
-function checkNumbers(value: string, kind: 'single' | 'list' | 'path'): void {
+function checkNumbers(value: string, kind: 'single' | 'list' | 'path', maxCoordinate: number): void {
   const numbers = [...value.matchAll(numberPattern)];
   const remaining = value.replace(numberPattern, '');
   if ((kind === 'single' && (numbers.length !== 1 || remaining.trim()))
@@ -19,13 +19,25 @@ function checkNumbers(value: string, kind: 'single' | 'list' | 'path'): void {
     || (kind === 'path' && (!numbers.length || !commandPattern.test(remaining)))) {
     throw new TypeError('import.number-invalid');
   }
+  if (kind === 'list') {
+    let end = 0;
+    for (const [index, match] of numbers.entries()) {
+      const gap = value.slice(end, match.index);
+      if (index === 0 ? !/^\s*$/.test(gap)
+        : gap === '' ? !/^[+-]/.test(match[0]) : !/^(?:\s+|\s*,\s*)$/.test(gap)) {
+        throw new TypeError('import.number-invalid');
+      }
+      end = match.index! + match[0].length;
+    }
+    if (!/^\s*$/.test(value.slice(end))) throw new TypeError('import.number-invalid');
+  }
   for (const match of numbers) {
     const number = Number(match[0]);
-    if (!Number.isFinite(number) || Math.abs(number) > 1e6) throw new TypeError('import.coordinate-limit');
+    if (!Number.isFinite(number) || Math.abs(number) > maxCoordinate) throw new TypeError('import.coordinate-limit');
   }
 }
 
-function checkTransform(value: string): void {
+function checkTransform(value: string, maxCoordinate: number): void {
   const counts: Record<string, readonly number[]> = {
     matrix: [6], translate: [1, 2], scale: [1, 2], rotate: [1, 3], skewX: [1], skewY: [1],
   };
@@ -35,7 +47,7 @@ function checkTransform(value: string): void {
   for (const match of value.matchAll(operation)) {
     if (!/^[,\s]*$/.test(value.slice(end, match.index))) throw new TypeError('import.transform-invalid');
     const args = match[2]!;
-    checkNumbers(args, 'list');
+    checkNumbers(args, 'list', maxCoordinate);
     if (!counts[match[1]!]?.includes([...args.matchAll(numberPattern)].length)) {
       throw new TypeError('import.transform-invalid');
     }
@@ -45,7 +57,7 @@ function checkTransform(value: string): void {
   if (!found || !/^[,\s]*$/.test(value.slice(end))) throw new TypeError('import.transform-invalid');
 }
 
-function validate(node: SvgElement, ids: Map<string, SvgElement>): void {
+function validate(node: SvgElement, ids: Map<string, SvgElement>, limits: ImportLimits): void {
   if (!elements.has(node.name)) throw new TypeError('import.element-unsupported');
   for (const [name, value] of Object.entries(node.attributes)) {
     if (name.toLowerCase().startsWith('on') || !attributes.has(name)) throw new TypeError('import.attribute-unsupported');
@@ -53,14 +65,14 @@ function validate(node: SvgElement, ids: Map<string, SvgElement>): void {
     if (name === 'href' || name === 'xlink:href') {
       if (node.name !== 'use' || !/^#[^\s#]+$/.test(value)) throw new TypeError('import.reference-invalid');
     }
-    if (singleNumbers.has(name)) checkNumbers(value, 'single');
+    if (singleNumbers.has(name)) checkNumbers(value, 'single', limits.coordinates);
     if (name === 'viewBox' || name === 'points' || name === 'stroke-dasharray') {
-      checkNumbers(value, 'list');
+      checkNumbers(value, 'list', limits.coordinates);
       if (name === 'viewBox' && [...value.matchAll(numberPattern)].length !== 4) throw new TypeError('import.number-invalid');
       if (name === 'points' && [...value.matchAll(numberPattern)].length % 2) throw new TypeError('import.number-invalid');
     }
-    if (name === 'd') checkNumbers(value, 'path');
-    if (name === 'transform') checkTransform(value);
+    if (name === 'd') checkNumbers(value, 'path', limits.coordinates);
+    if (name === 'transform') checkTransform(value, limits.coordinates);
   }
   const id = node.attributes.id;
   if (id !== undefined) {
@@ -73,29 +85,30 @@ function validate(node: SvgElement, ids: Map<string, SvgElement>): void {
       && node.attributes.href !== node.attributes['xlink:href'])) throw new TypeError('import.reference-invalid');
     if (node.children.length) throw new TypeError('import.use-children');
   }
-  for (const child of node.children) validate(child, ids);
+  for (const child of node.children) validate(child, ids, limits);
 }
 
 /** Data-only import AST. `use-instance` retains placement attributes for later canonical conversion. */
-export function parseSvgAst(source: string): SvgElement {
-  const root = readSvgXml(source);
+export function parseSvgAst(source: string, requestedLimits: Partial<ImportLimits> = {}): SvgElement {
+  const limits = resolveImportLimits(requestedLimits);
+  const root = readSvgXml(source, limits);
   const ids = new Map<string, SvgElement>();
-  validate(root, ids);
+  validate(root, ids, limits);
   let expandedCount = 0;
   const expand = (node: SvgElement, chain: readonly string[], depth: number): SvgElement => {
     if (node.name === 'use') {
       const href = node.attributes.href ?? node.attributes['xlink:href']!;
       const id = href.slice(1);
       if (chain.includes(id)) throw new TypeError('import.use-cycle');
-      if (depth >= 8) throw new TypeError('import.use-depth');
+      if (depth >= limits.useDepth) throw new TypeError('import.use-depth');
       const target = ids.get(id);
       if (!target) throw new TypeError('import.use-missing');
       const { href: _href, 'xlink:href': _xlinkHref, ...placement } = node.attributes;
-      if (++expandedCount > 2_000) throw new TypeError('import.use-limit');
+      if (++expandedCount > limits.expandedNodes) throw new TypeError('import.use-limit');
       return { name: 'use-instance', attributes: placement,
         children: [expand(target, [...chain, id], depth + 1)] };
     }
-    if (chain.length && ++expandedCount > 2_000) throw new TypeError('import.use-limit');
+    if (chain.length && ++expandedCount > limits.expandedNodes) throw new TypeError('import.use-limit');
     return { name: node.name, attributes: { ...node.attributes },
       children: node.name === 'defs' && chain.length === 0
         ? structuredClone(node.children) : node.children.map(child => expand(child, chain, depth)) };

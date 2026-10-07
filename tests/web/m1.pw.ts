@@ -480,6 +480,45 @@ test('M2 grid presets set the project, new icon geometry and starter artboard', 
   await expect(page.getByText('32 × 32 icon grid')).toBeVisible();
 });
 
+test('M2 browser flow creates five icons and exports SVG, sprite and project file', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
+  });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('textbox', { name: 'Project name' }).fill('Navigation');
+  await page.getByRole('button', { name: 'Apply project name' }).click();
+  await page.getByRole('button', { name: 'Pick starter' }).click();
+  for (const name of ['Home', 'Search', 'Plus', 'Check', 'Arrow right']) {
+    await page.locator('.starter-list').getByRole('button', { name }).click();
+    await expect(page.locator('.asset')).toHaveCount(['Home', 'Search', 'Plus', 'Check', 'Arrow right'].indexOf(name) + 1);
+  }
+
+  await page.locator('.asset').filter({ hasText: 'home' }).click();
+  let downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const svgDownload = await downloadPromise;
+  expect(svgDownload.suggestedFilename()).toBe('home.svg');
+  expect(await readFile((await svgDownload.path())!, 'utf8')).toContain('<svg');
+
+  downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download sprite' }).click();
+  const spriteDownload = await downloadPromise;
+  const sprite = new TextDecoder().decode(unzipSync(await readFile((await spriteDownload.path())!))['sprite.svg']);
+  for (const name of ['home', 'search', 'plus', 'check', 'arrow-right']) {
+    expect(sprite).toContain(`id="if-${name}"`);
+  }
+
+  downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save project' }).click();
+  const projectDownload = await downloadPromise;
+  expect(projectDownload.suggestedFilename()).toBe('Navigation.iconproj');
+  const saved = await decodeProjectArchive(await readFile((await projectDownload.path())!));
+  expect(saved.project.icons).toHaveLength(5);
+  expect(saved.project.provenance).toHaveLength(5);
+  await expect(page.locator('.status')).toHaveText('Saved to file');
+});
+
 test('M2 set style changes are undoable without rewriting icon geometry', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

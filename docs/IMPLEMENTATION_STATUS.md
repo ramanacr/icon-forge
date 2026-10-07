@@ -5,7 +5,7 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 ## Phase 3 beginner product kickoff
 
 - A pure sprite profile compiler emits sorted `<symbol>` entries for every icon and variant from canonical SVG output. It rejects invalid or colliding derived IDs and emits deterministic `sprite.svg`, `usage.html` and a hashed manifest. The Node CLI compiles and checks sprite profiles as well as standalone SVG profiles. Node and Chromium produce byte-identical sprite artifacts and manifest for the parity fixture. New browser projects get a sprite profile; the editor downloads its files in a deterministic ZIP. Chromium checks its entries against the pure compiler.
-- The browser now has a searchable set overview with canonical SVG previews and 24-icon pages. Opening a card returns to the editor without changing the project document. Chromium checks preview loading, filtering, pagination beyond 24 icons, project byte-equivalence across the view switch, and automated WCAG 2.2 AA checks in both views. Starter assets, multi-size/theme preview, consistency warnings and the M2 usability gate remain open.
+- The browser now has a searchable set overview with canonical SVG previews and 24-icon pages. Opening a card returns to the editor without changing the project document. The inspector previews the active icon at 16, 20, 24 and 32 px on light and dark surfaces, resolving `currentColor` and theme tokens for each. Chromium checks image loading, filtering, pagination beyond 24 icons, project byte-equivalence across view and preview switches, and automated WCAG 2.2 AA checks. Starter assets, consistency warnings and the M2 usability gate remain open.
 
 ## Phase 2 import spike
 

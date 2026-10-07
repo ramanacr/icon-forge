@@ -319,6 +319,35 @@ test('M2 set overview previews and filters icons without changing the project', 
   await expect(overview.getByRole('button', { name: 'Next icons' })).toBeDisabled();
 });
 
+test('M2 previews the active icon at four sizes in light and dark without edits', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('button', { name: 'Add icon' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  let downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const before = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;
+
+  await page.getByRole('button', { name: 'Preview sizes' }).click();
+  const previews = page.getByRole('region', { name: 'Icon size and theme preview' });
+  await expect(previews.getByRole('img')).toHaveCount(8);
+  for (const size of [16, 20, 24, 32]) {
+    for (const theme of ['Light', 'Dark']) {
+      const image = previews.getByRole('img', { name: `${theme} ${size} px preview` });
+      await expect(image).toBeVisible();
+      expect(await image.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      expect(await image.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(size);
+    }
+  }
+  const darkSource = await previews.getByRole('img', { name: 'Dark 24 px preview' }).getAttribute('src');
+  expect(decodeURIComponent(darkSource!.split(',')[1]!)).toContain('color="#ffffff"');
+  downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const after = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;
+  expect(after).toEqual(before);
+});
+
 test('S-06 idle compaction keeps undo available after reload', async ({ page }) => {
   await page.clock.install();
   await page.goto(baseUrl);
@@ -855,6 +884,9 @@ test('M1 editor passes automated WCAG 2.2 AA checks', async ({ page }) => {
   });
   expect(await audit()).toEqual([]);
   await page.getByRole('button', { name: 'Set overview' }).click();
+  expect(await audit()).toEqual([]);
+  await page.getByRole('button', { name: 'Return to editor' }).click();
+  await page.getByRole('button', { name: 'Preview sizes' }).click();
   expect(await audit()).toEqual([]);
 });
 

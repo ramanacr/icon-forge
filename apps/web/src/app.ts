@@ -111,9 +111,22 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
             <button type="button" (click)="runFillColor(fillColor.value)" [disabled]="!canEdit() || !canStyle()">Apply fill color</button>
             <label>Stroke width <input #strokeWidth type="number" step="0.001" min="0.001"
               [value]="currentStrokeWidth()" [disabled]="!canEdit() || !canEditStroke()"></label>
-            <button type="button" (click)="runStrokeWidth(strokeWidth.value)"
+          <button type="button" (click)="runStrokeWidth(strokeWidth.value)"
               [disabled]="!canEdit() || !canEditStroke()">Apply stroke width</button>
           </div>
+          <button type="button" (click)="toggleSizePreview()" [disabled]="!hasIcon()">{{ showSizePreview() ? 'Hide size preview' : 'Preview sizes' }}</button>
+          <section class="size-preview" aria-label="Icon size and theme preview" [hidden]="!showSizePreview()">
+            <h3>Sizes and themes</h3>
+            <div class="size-preview-grid">
+              @for (sample of previewSamples(); track sample.theme + sample.size) {
+                <div class="size-preview-tile" [class.dark]="sample.theme === 'Dark'">
+                  <img [src]="sample.source" [alt]="sample.theme + ' ' + sample.size + ' px preview'"
+                    [style.width.px]="sample.size" [style.height.px]="sample.size">
+                  <span>{{ sample.theme }} · {{ sample.size }} px</span>
+                </div>
+              }
+            </div>
+          </section>
           <p class="hint">24 × 24 icon grid · drag snaps to whole units</p>
         </aside>
       </div>
@@ -159,6 +172,8 @@ export class App implements OnInit, OnDestroy {
   readonly needsRecovery = signal(false);
   readonly checkpointRecovery = signal(false);
   readonly showGrid = signal(true);
+  readonly showSizePreview = signal(false);
+  readonly previewSamples = signal<{ theme: 'Light' | 'Dark'; size: number; source: string }[]>([]);
   readonly showOverview = signal(false);
   readonly overviewQuery = signal('');
   readonly overviewItems = signal<{ id: string; name: string; preview: string }[]>([]);
@@ -239,6 +254,7 @@ export class App implements OnInit, OnDestroy {
     this.status.set(this.workspace.saveStatus);
     this.error.set(this.workspace.error);
     this.refreshOverview(project);
+    this.refreshSizePreview(project, icon);
     const host = this.canvas?.nativeElement;
     if (host) {
       host.replaceChildren();
@@ -253,6 +269,19 @@ export class App implements OnInit, OnDestroy {
         host.append(svg);
       }
     }
+  }
+
+  private refreshSizePreview(project: NonNullable<BrowserWorkspace['project']> | null,
+    icon: NonNullable<BrowserWorkspace['icon']> | null): void {
+    if (!project || !icon || !this.showSizePreview()) { this.previewSamples.set([]); return; }
+    const samples: { theme: 'Light' | 'Dark'; size: number; source: string }[] = [];
+    for (const theme of ['Light', 'Dark'] as const) {
+      const svg = this.renderIconSvg(document, project, icon, { theme: theme.toLowerCase() as 'light' | 'dark' });
+      svg.setAttribute('color', theme === 'Light' ? '#17233d' : '#ffffff');
+      const source = `data:image/svg+xml,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+      for (const size of [16, 20, 24, 32]) samples.push({ theme, size, source });
+    }
+    this.previewSamples.set(samples);
   }
 
   private refreshOverview(project: NonNullable<BrowserWorkspace['project']> | null): void {
@@ -325,6 +354,7 @@ export class App implements OnInit, OnDestroy {
 
   private resetOverview(): void {
     this.showOverview.set(false);
+    this.showSizePreview.set(false);
     this.overviewQuery.set('');
     this.overviewPage = 0;
   }
@@ -388,6 +418,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   toggleOverview(): void { this.showOverview.update(value => !value); this.refresh(); }
+
+  toggleSizePreview(): void { this.showSizePreview.update(value => !value); this.refresh(); }
 
   setOverviewQuery(event: Event): void {
     const input = event.target;

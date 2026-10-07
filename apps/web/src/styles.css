@@ -46,7 +46,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
 .layout { display: grid; grid-template-columns: 220px minmax(300px, 1fr) 220px; flex: 1; min-height: 0; }
 .sidebar, .inspector { padding: var(--space-5); background: var(--surface); }
 .sidebar { border-right: 1px solid var(--border-subtle); overflow-y: auto; }
-.inspector { border-left: 1px solid var(--border-subtle); }
+.inspector { border-left: 1px solid var(--border-subtle); overflow-y: auto; }
 h2 { margin: 0 0 18px; font-size: 15px; }
 .sidebar > button { width: 100%; text-align: left; margin-bottom: var(--space-2); }
 .import-file { display: block; margin: var(--space-2) 0 var(--space-4); font-size: 13px; }
@@ -74,6 +74,14 @@ h2 { margin: 0 0 18px; font-size: 15px; }
 .overview-card { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); min-width: 0; overflow-wrap: anywhere; }
 .overview-card img { display: block; width: 72px; height: 72px; object-fit: contain; }
 .overview-pages { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+.size-preview[hidden] { display: none; }
+.size-preview h3 { font-size: 13px; margin: var(--space-3) 0; }
+.size-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.size-preview-tile { display: flex; min-height: 90px; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2); padding: var(--space-2); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-control);
+  color: var(--text); font-size: 11px; text-align: center; }
+.size-preview-tile.dark { background: var(--text); color: var(--surface); }
+.size-preview-tile img { display: block; object-fit: contain; }
 .canvas { width: min(65vh, 70vw, 520px); aspect-ratio: 1; display: grid; place-items: center; background: var(--surface); box-shadow: var(--elevation-canvas); color: var(--canvas-ink); }
 .canvas svg { width: 80%; height: 80%; overflow: visible; touch-action: none; }
 .canvas [data-node-id] { cursor: pointer; }

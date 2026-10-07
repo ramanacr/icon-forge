@@ -350,6 +350,21 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(project.id), type: 'icon.rename', payload: { iconId: icon.id, name } });
   }
 
+  async setIconAccessibility(kind: IconV1['accessibility']['kind'], requestedLabel: string): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    if (!project || !icon) throw new TypeError('Select an icon first');
+    if (kind !== 'decorative' && kind !== 'informative') throw new TypeError('Unknown icon accessibility kind');
+    const label = requestedLabel.trim();
+    if (kind === 'informative' && (!label || label.length > 120)) {
+      throw new TypeError('Informative icons need a label of 1–120 characters');
+    }
+    const accessibility = kind === 'decorative' ? { kind } : { kind, label };
+    if (JSON.stringify(icon.accessibility) === JSON.stringify(accessibility)) return;
+    await this.persist({ ...this.base(project.id), type: 'icon.updateMetadata',
+      payload: { iconId: icon.id, patch: { accessibility } } });
+  }
+
   async updateSetStyle(style: ProjectV1['designSystem']['style'], width: number, cornerRadius: number): Promise<void> {
     const project = this.project;
     if (!project) throw new TypeError('Create a project first');

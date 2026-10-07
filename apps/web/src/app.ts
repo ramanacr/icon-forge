@@ -145,6 +145,18 @@ import type { IconGridPreset } from '@iconforge/commands';
           </label>
           <button type="button" (click)="runRenameIcon(iconName.value)" [disabled]="!canEdit() || !hasIcon()">Apply icon name</button>
           <p class="hint">Names become SVG filenames and sprite IDs.</p>
+          <div class="icon-accessibility-fields">
+            <label>Icon use
+              <select #iconUse [value]="accessibilityKind()" (change)="setAccessibilityKind($event)"
+                [disabled]="!canEdit() || !hasIcon()">
+                <option value="decorative">Decorative</option><option value="informative">Informative</option>
+              </select>
+            </label>
+            <label>Accessible name <input #accessibleName type="text" maxlength="120"
+              [value]="accessibilityLabel()" [disabled]="!canEdit() || !hasIcon() || accessibilityKind() === 'decorative'"></label>
+            <button type="button" (click)="runIconAccessibility(iconUse.value, accessibleName.value)"
+              [disabled]="!canEdit() || !hasIcon()">Apply icon use</button>
+          </div>
           <h2>Selection</h2>
           <p>{{ selected() ? 'Shape selected' : 'Select a shape on the canvas' }}</p>
           <div class="position-fields">
@@ -202,6 +214,8 @@ export class App implements OnInit, OnDestroy {
   readonly layers = signal<{ id: string; label: string; selected: boolean }[]>([]);
   readonly activeIconId = signal<string | null>(null);
   readonly activeIconName = signal('');
+  readonly accessibilityKind = signal<'decorative' | 'informative'>('decorative');
+  readonly accessibilityLabel = signal('');
   readonly selected = signal(false);
   readonly hasIcon = signal(false);
   readonly hasProject = signal(false);
@@ -285,6 +299,8 @@ export class App implements OnInit, OnDestroy {
     this.icons.set(project?.icons.map(item => ({ id: item.id, name: item.name })) ?? []);
     this.activeIconId.set(icon?.id ?? null);
     this.activeIconName.set(icon?.name ?? '');
+    this.accessibilityKind.set(icon?.accessibility.kind ?? 'decorative');
+    this.accessibilityLabel.set(icon?.accessibility.label ?? icon?.name ?? '');
     const selectedIds = this.workspace.selection.snapshot.nodeIds;
     this.selected.set(selectedIds.length > 0);
     const layerBases = icon?.nodes.map(node => ({ id: node.id,
@@ -467,6 +483,15 @@ export class App implements OnInit, OnDestroy {
   runAddStarter(name: StarterIconName): void { void this.run(() => this.workspace.addStarterIcon(name)); }
   toggleStarters(): void { this.showStarters.update(value => !value); }
   runRenameIcon(name: string): void { void this.run(() => this.workspace.renameIcon(name)); }
+  setAccessibilityKind(event: Event): void {
+    const input = event.target;
+    if (input instanceof HTMLSelectElement && (input.value === 'decorative' || input.value === 'informative')) {
+      this.accessibilityKind.set(input.value);
+    }
+  }
+  runIconAccessibility(kind: string, label: string): void {
+    void this.run(() => this.workspace.setIconAccessibility(kind as 'decorative' | 'informative', label));
+  }
   runUpdateSetStyle(style: string, width: string, roundness: string): void {
     if (!width.trim() || !roundness.trim()) { this.error.set('Enter stroke width and roundness'); return; }
     void this.run(() => this.workspace.updateSetStyle(

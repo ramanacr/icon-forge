@@ -620,6 +620,35 @@ test('M2 semantic icon names are journalled and drive sprite IDs', async ({ page
   expect(sprite).toContain('id="if-medical-plus"');
 });
 
+test('M2 informative icon label is exported, journalled and reversible', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('combobox', { name: 'Icon use' }).selectOption('informative');
+  await page.getByRole('textbox', { name: 'Accessible name' }).fill('Navigation home');
+  await page.getByRole('button', { name: 'Apply icon use' }).click();
+  await expect(page.locator('.canvas svg title')).toHaveText('Navigation home');
+  let downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const informativeSvg = await readFile((await (await downloadPromise).path())!, 'utf8');
+  expect(informativeSvg).toContain('role="img"><title>Navigation home</title>');
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('.canvas svg')).toHaveAttribute('aria-hidden', 'true');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('.canvas svg title')).toHaveText('Navigation home');
+  await page.reload();
+  await expect(page.getByRole('textbox', { name: 'Accessible name' })).toHaveValue('Navigation home');
+  await page.getByRole('combobox', { name: 'Icon use' }).selectOption('decorative');
+  await page.getByRole('button', { name: 'Apply icon use' }).click();
+  downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const decorativeSvg = await readFile((await (await downloadPromise).path())!, 'utf8');
+  expect(decorativeSvg).toContain('aria-hidden="true"');
+  expect(decorativeSvg).not.toContain('<title>');
+});
+
 test('S-06 idle compaction keeps undo available after reload', async ({ page }) => {
   await page.clock.install();
   await page.goto(baseUrl);

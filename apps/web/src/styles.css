@@ -105,6 +105,9 @@ h2 { margin: 0 0 18px; font-size: 15px; }
 .hint { color: var(--text-muted); font-size: 13px; }
 .inspector button { display: block; width: 100%; margin-bottom: 8px; }
 .icon-name-field { display: block; font-size: 13px; margin-bottom: var(--space-2); }
+.icon-accessibility-fields { display: grid; gap: var(--space-2); margin: var(--space-4) 0; }
+.icon-accessibility-fields label { font-size: 13px; }
+.icon-accessibility-fields input, .icon-accessibility-fields select { width: 100%; margin-top: var(--space-1); padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-control); font: inherit; }
 .icon-name-field input { display: block; width: 100%; margin-top: var(--space-1); padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-control); font: inherit; }
 .position-fields { margin: 18px 0; }
 .position-fields label { display: block; font-size: 13px; margin-bottom: 8px; }

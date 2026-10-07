@@ -4,7 +4,7 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 
 ## Phase 3 beginner product kickoff
 
-- A pure sprite profile compiler emits sorted `<symbol>` entries for every icon and variant from canonical SVG output. It rejects invalid or colliding derived IDs and emits deterministic `sprite.svg`, `usage.html` and a hashed manifest. The Node CLI now compiles and checks sprite profiles as well as standalone SVG profiles. Node and Chromium produce byte-identical sprite artifacts and manifest for the parity fixture. Browser sprite download, set overview, starter assets, preview and the M2 usability gate remain open.
+- A pure sprite profile compiler emits sorted `<symbol>` entries for every icon and variant from canonical SVG output. It rejects invalid or colliding derived IDs and emits deterministic `sprite.svg`, `usage.html` and a hashed manifest. The Node CLI compiles and checks sprite profiles as well as standalone SVG profiles. Node and Chromium produce byte-identical sprite artifacts and manifest for the parity fixture. New browser projects get a sprite profile; the editor downloads its files in a deterministic ZIP. Chromium checks its entries against the pure compiler. Set overview, starter assets, preview and the M2 usability gate remain open.
 
 ## Phase 2 import spike
 

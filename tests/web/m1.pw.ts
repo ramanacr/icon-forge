@@ -4,8 +4,9 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { unzipSync } from 'fflate';
 import { ProjectDispatcher } from '@iconforge/application';
-import { compileSvgProfile } from '@iconforge/compiler-core';
+import { compileSpriteProfile, compileSvgProfile } from '@iconforge/compiler-core';
 import { decodeProjectArchive, encodeProjectArchive, type SavedProject } from '@iconforge/persistence';
 
 const root = resolve('dist/web/browser');
@@ -251,6 +252,25 @@ test('M1 restores a downloaded project with its original SVG and rejects damaged
     mimeType: 'application/zip', buffer: Buffer.from(freshBytes) });
   await expect(page.getByRole('status').filter({ hasText: 'Restored from project file' })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('iconforge:last-project'))).toBe(freshId);
+});
+
+test('M2 browser downloads a sprite archive matching the pure compiler', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('button', { name: 'Add icon' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const projectDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const project = (await decodeProjectArchive(await readFile((await (await projectDownload).path())!))).project;
+  const expected = compileSpriteProfile(project, 'web-sprite');
+  const spriteDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download sprite' }).click();
+  const archive = unzipSync(await readFile((await (await spriteDownload).path())!));
+  expect(Object.keys(archive).sort()).toEqual(['manifest.json', 'sprite.svg', 'usage.html']);
+  expect(archive['sprite.svg']).toEqual(expected.artifacts['sprite.svg']);
+  expect(archive['usage.html']).toEqual(expected.artifacts['usage.html']);
+  expect(archive['manifest.json']).toEqual(expected.manifestBytes);
 });
 
 test('S-06 idle compaction keeps undo available after reload', async ({ page }) => {

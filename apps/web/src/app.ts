@@ -23,6 +23,7 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
           <input type="file" accept=".iconproj,application/zip" (change)="runOpenProject($event)" [disabled]="busy() || previewOnly()">
         </label>
         <button type="button" (click)="runExport()" [disabled]="!hasIcon() || previewOnly()">Export SVG</button>
+        <button type="button" (click)="runDownloadSprite()" [disabled]="!canExportSprite() || busy() || previewOnly()">Download sprite</button>
         <button type="button" (click)="runDownloadProject()" [disabled]="!hasProject() || busy() || previewOnly()">Download project</button>
       </header>
       @if (previewOnly()) { <p class="mobile-preview" role="status">Mobile preview only</p> }
@@ -119,6 +120,7 @@ export class App implements OnInit, OnDestroy {
   readonly selected = signal(false);
   readonly hasIcon = signal(false);
   readonly hasProject = signal(false);
+  readonly canExportSprite = signal(false);
   readonly storageWarning = signal(false);
   readonly canEdit = signal(false);
   readonly canGroup = signal(false);
@@ -197,6 +199,7 @@ export class App implements OnInit, OnDestroy {
     this.canEditStroke.set(this.workspace.strokeWidth !== null && !this.workspace.selectedNode?.locked);
     this.hasIcon.set(Boolean(icon));
     this.hasProject.set(Boolean(project));
+    this.canExportSprite.set(this.workspace.canExportSprite);
     this.storageWarning.set(Boolean(project && this.workspace.storageDurability
       && this.workspace.storageDurability !== 'persistent'));
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
@@ -317,6 +320,9 @@ export class App implements OnInit, OnDestroy {
   runExport(): void { try { this.workspace.exportSvg(); } catch (error) { this.error.set(this.message(error)); } }
   runDownloadProject(): void {
     void this.workspace.downloadProject().catch(error => this.error.set(this.message(error)));
+  }
+  runDownloadSprite(): void {
+    void this.workspace.downloadSprite().catch(error => this.error.set(this.message(error)));
   }
   runDownloadRecoveryData(): void {
     void this.workspace.downloadRecoveryData().catch(error => this.error.set(this.message(error)));

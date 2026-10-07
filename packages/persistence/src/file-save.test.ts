@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectDispatcher } from '@iconforge/application';
+import { unzipSync } from 'fflate';
 import { decodeProjectArchive } from './project-archive.js';
-import { saveProjectFile } from './file-save.js';
+import { encodeBuildArchive, saveProjectFile } from './file-save.js';
 
 const id = '0198e09b-a810-7000-8000-000000000001';
 const dispatcher = new ProjectDispatcher();
@@ -38,5 +39,15 @@ describe('project file save', () => {
       write: async () => { throw new Error('disk full'); }, close: async () => {},
     }) };
     await expect(saveProjectFile(project, { handle })).rejects.toThrow('disk full');
+  });
+
+  it('packs build artifacts deterministically and rejects unsafe paths', () => {
+    const artifacts = { 'usage.html': new TextEncoder().encode('<html/>'),
+      'sprite.svg': new TextEncoder().encode('<svg/>') };
+    const manifest = new TextEncoder().encode('{}');
+    const first = encodeBuildArchive(artifacts, manifest);
+    expect(encodeBuildArchive(artifacts, manifest)).toEqual(first);
+    expect(unzipSync(first)).toEqual({ ...artifacts, 'manifest.json': manifest });
+    expect(() => encodeBuildArchive({ '../escape': manifest }, manifest)).toThrow('build-archive.path');
   });
 });

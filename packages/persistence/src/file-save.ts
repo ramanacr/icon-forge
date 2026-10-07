@@ -1,4 +1,5 @@
 import type { ProjectV1 } from '@iconforge/project-model';
+import { zipSync, type Zippable } from 'fflate';
 import { encodeProjectArchive } from './project-archive.js';
 
 export interface WritableProjectHandle {
@@ -60,4 +61,22 @@ export async function saveProjectFile(project: ProjectV1, options: FileSaveOptio
 /** Explicit backup action always downloads, including on browsers with a native picker. */
 export async function downloadProjectFile(project: ProjectV1, attachments: Record<string, Uint8Array> = {}): Promise<void> {
   await saveProjectFile(project, { download: browserDownload, attachments });
+}
+
+/** Package trusted compiler artifacts and their manifest with stable entry metadata. */
+export function encodeBuildArchive(artifacts: Record<string, Uint8Array>, manifest: Uint8Array): Uint8Array {
+  const files: Zippable = {};
+  for (const path of Object.keys(artifacts).sort()) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(path)
+      || path.split('/').some(part => part === '.' || part === '..' || !part)) throw new TypeError('build-archive.path');
+    files[path] = artifacts[path]!;
+  }
+  if (files['manifest.json']) throw new TypeError('build-archive.path');
+  files['manifest.json'] = manifest;
+  return zipSync(files, { mtime: new Date('1980-01-01T00:00:00Z'), level: 9 });
+}
+
+export async function downloadBuildArchive(filename: string, artifacts: Record<string, Uint8Array>,
+  manifest: Uint8Array): Promise<void> {
+  await browserDownload(filename, encodeBuildArchive(artifacts, manifest));
 }

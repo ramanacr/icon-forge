@@ -44,6 +44,9 @@ importers:
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
       nx:
         specifier: 23.2.1
         version: 23.2.1

@@ -1,10 +1,10 @@
 import { ProjectDispatcher } from '@iconforge/application';
 import type { CommandEnvelopeV1, ImportDiagnosticV1 } from '@iconforge/commands';
-import { compileSvgProfile } from '@iconforge/compiler-core';
+import { compileSpriteProfile, compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
 import { prepareSvgImportInWorker } from '@iconforge/import-svg';
-import { DexieProjectRepository, ProjectWriteLock, downloadProjectFile, openProjectArchive, readStorageDurability,
+import { DexieProjectRepository, ProjectWriteLock, downloadBuildArchive, downloadProjectFile, openProjectArchive, readStorageDurability,
   requestPersistentStorage, type StorageDurability } from '@iconforge/persistence';
 import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
 
@@ -41,6 +41,7 @@ export class BrowserWorkspace {
   get project(): ProjectV1 | null { return this.dispatcher.project; }
   get writable(): boolean { return this.lock?.mode === 'writer'; }
   get icon(): IconV1 | null { return this.project?.icons.find(icon => icon.id === this.currentIconId) ?? null; }
+  get canExportSprite(): boolean { return Boolean(this.project?.exportProfiles.some(profile => profile.name === 'web-sprite' && profile.target === 'sprite')); }
   get preview() { return this.drag?.preview; }
   get needsRecovery(): boolean { return this.recovery !== null; }
   get checkpointRecovery(): boolean { return this.recovery?.kind === 'checkpoint'; }
@@ -287,6 +288,9 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(id), type: 'exportProfile.upsert',
       payload: { profile: { id: uuidV7(), name: 'web-svg', target: 'svg',
         options: { precision: 3, sizeAttrs: true, paintMode: 'currentColor', metadata: false } } } });
+    await this.persist({ ...this.base(id), type: 'exportProfile.upsert',
+      payload: { profile: { id: uuidV7(), name: 'web-sprite', target: 'sprite',
+        options: { idPrefix: 'if-', precision: 3 } } } });
     void this.refreshStorageDurability(id, true);
   }
 
@@ -544,6 +548,14 @@ export class BrowserWorkspace {
     const project = this.project;
     if (!project) throw new TypeError('No project to download');
     await downloadProjectFile(project, await this.repository.loadOriginals(project.id));
+  }
+
+  async downloadSprite(): Promise<void> {
+    const project = this.project;
+    if (!project) throw new TypeError('No project to export');
+    const build = compileSpriteProfile(project, 'web-sprite');
+    const filename = `${project.name.replace(/[^A-Za-z0-9 _.-]/g, '_').slice(0, 110) || 'project'}-sprite.zip`;
+    await downloadBuildArchive(filename, build.artifacts, build.manifestBytes);
   }
 
   async openProjectFile(bytes: Uint8Array): Promise<void> {

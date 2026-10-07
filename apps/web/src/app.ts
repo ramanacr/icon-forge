@@ -1,6 +1,7 @@
 import { Component, ElementRef, ViewChild, signal, type OnInit, type OnDestroy } from '@angular/core';
 import type { BrowserWorkspace } from './workspace.js';
 import { assertBrowserCapabilities } from './browser-capabilities.js';
+import { iconConsistencyWarnings, type IconConsistencyWarning } from './consistency.js';
 
 @Component({
   selector: 'iconforge-root',
@@ -79,6 +80,9 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
                 <button type="button" class="overview-card" [attr.aria-label]="'Open ' + item.name" (click)="chooseIcon(item.id)">
                   <img [src]="item.preview" [alt]="item.name + ' preview'" loading="lazy">
                   <span>{{ item.name }}</span>
+                  @for (warning of item.warnings; track warning.code) {
+                    <span class="overview-warning" [class.error]="warning.severity === 'error'">{{ warning.message }}</span>
+                  }
                 </button>
               }
             </div>
@@ -183,7 +187,7 @@ export class App implements OnInit, OnDestroy {
   readonly previewSamples = signal<{ theme: 'Light' | 'Dark'; size: number; source: string }[]>([]);
   readonly showOverview = signal(false);
   readonly overviewQuery = signal('');
-  readonly overviewItems = signal<{ id: string; name: string; preview: string }[]>([]);
+  readonly overviewItems = signal<{ id: string; name: string; preview: string; warnings: IconConsistencyWarning[] }[]>([]);
   readonly overviewSummary = signal('');
   readonly overviewHasPrevious = signal(false);
   readonly overviewHasNext = signal(false);
@@ -303,7 +307,7 @@ export class App implements OnInit, OnDestroy {
     this.overviewItems.set(filtered.slice(start, start + pageSize).map(icon => {
       const svg = this.renderIconSvg(document, project, icon);
       const preview = `data:image/svg+xml,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
-      return { id: icon.id, name: icon.name, preview };
+      return { id: icon.id, name: icon.name, preview, warnings: iconConsistencyWarnings(project, icon) };
     }));
     this.overviewSummary.set(filtered.length
       ? `Showing ${start + 1}–${Math.min(start + pageSize, filtered.length)} of ${filtered.length} icons`

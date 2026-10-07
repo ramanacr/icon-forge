@@ -319,6 +319,28 @@ test('M2 set overview previews and filters icons without changing the project', 
   await expect(overview.getByRole('button', { name: 'Next icons' })).toBeDisabled();
 });
 
+test('M2 set overview warns about stroke widths that differ from the set policy', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('button', { name: 'Outline shape' }).click();
+  await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('2.5');
+  await page.getByRole('button', { name: 'Apply stroke width' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('stroke-width', '2.5');
+
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  const overview = page.getByRole('region', { name: 'Set overview' });
+  await expect(overview.getByRole('button', { name: /Open icon-1/ }))
+    .toContainText('1 stroke width differs from set width 1.75');
+  await page.getByRole('button', { name: 'Return to editor' }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('stroke-width', '1.75');
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  await expect(overview.getByRole('button', { name: /Open icon-1/ })).not.toContainText('differs');
+});
+
 test('M2 previews the active icon at four sizes in light and dark without edits', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();
@@ -354,6 +376,7 @@ test('M2 semantic icon names are journalled and drive sprite IDs', async ({ page
   await expect(page.getByRole('button', { name: 'Add icon' })).toBeEnabled();
   await page.getByRole('button', { name: 'Add icon' }).click();
   await page.getByRole('button', { name: 'Add icon' }).click();
+  await expect(page.getByRole('textbox', { name: 'Icon name' })).toHaveValue('icon-2');
   await page.getByRole('textbox', { name: 'Icon name' }).fill('Medical Plus');
   await page.getByRole('button', { name: 'Apply icon name' }).click();
   await expect(page.getByRole('button', { name: 'medical-plus' })).toBeVisible();

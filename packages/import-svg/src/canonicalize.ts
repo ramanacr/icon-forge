@@ -50,6 +50,58 @@ function rawList(value: string): number[] {
   return [...value.matchAll(NUMBERS)].map(match => Number(match[0]));
 }
 
+function functionalPaint(value: string): string | undefined {
+  const match = /^(rgb|rgba|hsl|hsla)\((.*)\)$/i.exec(value);
+  if (!match) return undefined;
+  const functionName = match[1]!.toLowerCase();
+  const body = match[2]!.trim();
+  const comma = body.includes(',');
+  if (comma && body.includes('/')) return undefined;
+  const parts = comma ? body.split(',').map(part => part.trim())
+    : body.replace('/', ' / ').trim().split(/\s+/);
+  const alphaIndex = parts.indexOf('/');
+  const channels = comma ? parts.slice(0, 3) : alphaIndex < 0 ? parts : parts.slice(0, alphaIndex);
+  const alphaText = alphaIndex < 0 ? (comma ? parts[3] : undefined) : parts[alphaIndex + 1];
+  if (channels.length !== 3 || (comma && parts.length !== (functionName.endsWith('a') ? 4 : 3))
+    || (!comma && (alphaIndex < 0 ? parts.length !== 3 : alphaIndex !== 3 || parts.length !== 5))
+    || (functionName.endsWith('a') && alphaText === undefined)) return undefined;
+  const numeric = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+  const percentage = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)%$/;
+  const unit = (text: string, percentOnly = false): number | undefined => {
+    if (percentage.test(text)) return Number(text.slice(0, -1)) / 100;
+    if (!percentOnly && numeric.test(text)) return Number(text);
+    return undefined;
+  };
+  const alpha = alphaText === undefined ? 1 : unit(alphaText);
+  if (alpha === undefined || alpha < 0 || alpha > 1) return undefined;
+  let rgb: number[];
+  if (functionName.startsWith('rgb')) {
+    const percentChannels = channels.every(channel => percentage.test(channel));
+    if (!percentChannels && !channels.every(channel => numeric.test(channel))) return undefined;
+    rgb = channels.map(channel => Number(percentChannels ? channel.slice(0, -1) : channel));
+    if (rgb.some(channel => channel < 0 || channel > (percentChannels ? 100 : 255))) return undefined;
+    if (percentChannels) rgb = rgb.map(channel => channel * 255 / 100);
+  } else {
+    const hueText = channels[0]!.replace(/deg$/i, '');
+    if (!numeric.test(hueText)) return undefined;
+    const hue = Number(hueText);
+    if (!Number.isFinite(hue)) return undefined;
+    const saturation = unit(channels[1]!, true);
+    const lightness = unit(channels[2]!, true);
+    if (saturation === undefined || lightness === undefined || saturation < 0 || saturation > 1
+      || lightness < 0 || lightness > 1) return undefined;
+    const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+    const sector = ((hue % 360) + 360) % 360 / 60;
+    const secondary = chroma * (1 - Math.abs(sector % 2 - 1));
+    const primaries = sector < 1 ? [chroma, secondary, 0] : sector < 2 ? [secondary, chroma, 0]
+      : sector < 3 ? [0, chroma, secondary] : sector < 4 ? [0, secondary, chroma]
+        : sector < 5 ? [secondary, 0, chroma] : [chroma, 0, secondary];
+    rgb = primaries.map(channel => (channel + lightness - chroma / 2) * 255);
+  }
+  const bytes = [...rgb, ...(alphaText === undefined ? [] : [alpha * 255])];
+  return `#${bytes.map(channel => Math.round(channel).toString(16).padStart(2, '0')).join('')}`;
+}
+
 function paint(value: string): PaintV1 {
   if (value === 'none') return { kind: 'none' };
   if (value === 'currentColor') return { kind: 'token', token: 'currentColor' };
@@ -67,13 +119,8 @@ function paint(value: string): PaintV1 {
   if (/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(value)) {
     return { kind: 'color', value: value.toLowerCase() };
   }
-  const rgb = /^rgb\(\s*(\d{1,3})\s*(?:,\s*|\s+)(\d{1,3})\s*(?:,\s*|\s+)(\d{1,3})\s*\)$/i.exec(value);
-  if (rgb) {
-    const channels = rgb.slice(1).map(Number);
-    if (channels.every(channel => channel <= 255)) {
-      return { kind: 'color', value: `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}` };
-    }
-  }
+  const functional = functionalPaint(value);
+  if (functional) return { kind: 'color', value: functional };
   throw new TypeError('import.paint-unsupported');
 }
 

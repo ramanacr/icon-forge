@@ -156,13 +156,13 @@ test('Phase 2 imported primitives and arc paths retain their raster silhouette',
   expect(iou).toBeGreaterThanOrEqual(0.995);
 });
 
-test('Phase 2 browser normalizes safe inline styles, named paint and px viewport', async ({ page }) => {
+test('Phase 2 browser normalizes safe styles, named and functional paint, and px viewport', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();
   const input = page.getByLabel('Import SVG');
   await expect(input).toBeEnabled();
   await input.setInputFiles({ name: 'styled.svg', mimeType: 'image/svg+xml',
-    buffer: Buffer.from('<svg width="24px" height="24px"><rect width="8" height="8" style="fill: red; stroke: blue; stroke-width: 1"/></svg>') });
+    buffer: Buffer.from('<svg width="24px" height="24px"><rect width="8" height="8" style="fill: red; stroke: blue; stroke-width: 1"/><circle cx="12" cy="12" r="3" fill="hsl(120 100% 25% / 50%)"/></svg>') });
   await expect(page.getByRole('button', { name: 'styled' })).toBeVisible();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export SVG' }).click();
@@ -170,6 +170,7 @@ test('Phase 2 browser normalizes safe inline styles, named paint and px viewport
   expect(exported).toContain('viewBox="0 0 24 24"');
   expect(exported).toContain('fill="#ff0000"');
   expect(exported).toContain('stroke="#0000ff"');
+  expect(exported).toContain('#00800080');
 });
 
 test('M1 explains a missing required browser capability before enabling edits', async ({ page }) => {

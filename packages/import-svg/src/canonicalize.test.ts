@@ -37,7 +37,9 @@ describe('SVG canonicalization', () => {
 
   it.each([
     ['missing viewBox', '<svg><rect width="2" height="2"/></svg>', 'import.viewbox-invalid'],
-    ['unsupported paint', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="hsl(0 100% 50%)"/></svg>', 'import.paint-unsupported'],
+    ['unsupported paint', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="color(display-p3 1 0 0)"/></svg>', 'import.paint-unsupported'],
+    ['out-of-range color', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="rgb(120% 0% 0%)"/></svg>', 'import.paint-unsupported'],
+    ['invalid HSL saturation', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="hsl(60 150% 50%)"/></svg>', 'import.paint-unsupported'],
     ['prototype-like paint', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="constructor"/></svg>', 'import.paint-unsupported'],
     ['lossy fill opacity', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill-opacity="0.5"/></svg>', 'import.opacity-unsupported'],
     ['malformed path', '<svg viewBox="0 0 24 24"><path d="M0 0 L1"/></svg>', 'import.path-invalid'],
@@ -98,6 +100,21 @@ describe('SVG canonicalization', () => {
       { fill: { kind: 'color', value: '#ff0000' } },
       { fill: { kind: 'color', value: '#00ff0088' } },
       { fill: { kind: 'color', value: '#102030' } },
+    ]);
+  });
+
+  it('converts HSL, percentage RGB and CSS alpha values to canonical hex', () => {
+    const source = '<svg viewBox="0 0 24 24">'
+      + '<rect width="2" height="2" fill="hsl(120 100% 25%)"/>'
+      + '<rect width="2" height="2" fill="hsla(240, 100%, 50%, 0.5)"/>'
+      + '<rect width="2" height="2" fill="rgb(100% 50% 0% / 25%)"/>'
+      + '<rect width="2" height="2" fill="rgba(16, 32, 48, 0)"/></svg>';
+    const { icon } = canonicalizeSvgAst(parseSvgAst(source), options());
+    expect(icon.nodes).toMatchObject([
+      { fill: { kind: 'color', value: '#008000' } },
+      { fill: { kind: 'color', value: '#0000ff80' } },
+      { fill: { kind: 'color', value: '#ff800040' } },
+      { fill: { kind: 'color', value: '#10203000' } },
     ]);
   });
 

@@ -109,6 +109,22 @@ import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
           </div>
         </section>
         <aside class="inspector" aria-label="Selection inspector">
+          <h2>Set style</h2>
+          <div class="set-style-fields">
+            <label>Visual language
+              <select #setStyle [value]="setStyleValue()" [disabled]="!canEdit()">
+                <option value="outline">Outline</option><option value="filled">Filled</option>
+                <option value="duotone">Duotone</option><option value="custom">Custom</option>
+              </select>
+            </label>
+            <label>Set stroke width <input #setWidth type="number" min="0.001" max="24" step="0.001"
+              [value]="setStrokeWidth()" [disabled]="!canEdit()"></label>
+            <label>Roundness <input #setRoundness type="number" min="0" max="12" step="0.001"
+              [value]="setCornerRadius()" [disabled]="!canEdit()"></label>
+            <button type="button" (click)="runUpdateSetStyle(setStyle.value, setWidth.value, setRoundness.value)"
+              [disabled]="!canEdit()">Apply set style</button>
+          </div>
+          <p class="hint">Sets the design policy. Existing icons are not changed.</p>
           <h2>Icon</h2>
           <label class="icon-name-field">Icon name
             <input #iconName type="text" [value]="activeIconName()" [disabled]="!canEdit() || !hasIcon()">
@@ -186,6 +202,9 @@ export class App implements OnInit, OnDestroy {
   readonly yPosition = signal(0);
   readonly currentFillColor = signal('#000000');
   readonly currentStrokeWidth = signal(1.75);
+  readonly setStyleValue = signal('outline');
+  readonly setStrokeWidth = signal(1.75);
+  readonly setCornerRadius = signal(2);
   readonly canEditStroke = signal(false);
   readonly previewOnly = signal(this.phoneMedia.matches);
   readonly readOnly = signal(false);
@@ -263,6 +282,9 @@ export class App implements OnInit, OnDestroy {
     this.yPosition.set(position?.[1] ?? 0);
     this.currentFillColor.set(this.workspace.fillColor);
     this.currentStrokeWidth.set(this.workspace.strokeWidth ?? project?.designSystem.stroke.width ?? 1.75);
+    this.setStyleValue.set(project?.designSystem.style ?? 'outline');
+    this.setStrokeWidth.set(project?.designSystem.stroke.width ?? 1.75);
+    this.setCornerRadius.set(project?.designSystem.cornerRadius ?? 2);
     this.canEditStroke.set(this.workspace.strokeWidth !== null && !this.workspace.selectedNode?.locked);
     this.hasIcon.set(Boolean(icon));
     this.hasProject.set(Boolean(project));
@@ -399,6 +421,11 @@ export class App implements OnInit, OnDestroy {
   runAddStarter(name: StarterIconName): void { void this.run(() => this.workspace.addStarterIcon(name)); }
   toggleStarters(): void { this.showStarters.update(value => !value); }
   runRenameIcon(name: string): void { void this.run(() => this.workspace.renameIcon(name)); }
+  runUpdateSetStyle(style: string, width: string, roundness: string): void {
+    if (!width.trim() || !roundness.trim()) { this.error.set('Enter stroke width and roundness'); return; }
+    void this.run(() => this.workspace.updateSetStyle(
+      style as 'outline' | 'filled' | 'duotone' | 'custom', Number(width), Number(roundness)));
+  }
   runImportSvg(event: Event): void {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || !input.files?.length) return;

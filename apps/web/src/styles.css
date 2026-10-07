@@ -47,6 +47,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
 .sidebar, .inspector { padding: var(--space-5); background: var(--surface); }
 .sidebar { border-right: 1px solid var(--border-subtle); overflow-y: auto; }
 .inspector { border-left: 1px solid var(--border-subtle); overflow-y: auto; }
+.set-style-fields { display: grid; gap: var(--space-2); margin-bottom: var(--space-2); }
+.set-style-fields label { font-size: 13px; }
+.set-style-fields input, .set-style-fields select { width: 100%; margin-top: var(--space-1); padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-control); font: inherit; }
 h2 { margin: 0 0 18px; font-size: 15px; }
 .sidebar > button { width: 100%; text-align: left; margin-bottom: var(--space-2); }
 .starter-list { display: grid; gap: var(--space-2); margin: 0 0 var(--space-4); }

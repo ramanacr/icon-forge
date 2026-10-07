@@ -319,6 +319,23 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(project.id), type: 'icon.rename', payload: { iconId: icon.id, name } });
   }
 
+  async updateSetStyle(style: ProjectV1['designSystem']['style'], width: number, cornerRadius: number): Promise<void> {
+    const project = this.project;
+    if (!project) throw new TypeError('Create a project first');
+    if (!['outline', 'filled', 'duotone', 'custom'].includes(style)
+      || !Number.isFinite(width) || width <= 0 || width > 24
+      || !Number.isFinite(cornerRadius) || cornerRadius < 0 || cornerRadius > 12) {
+      throw new TypeError('Enter a valid style, stroke width and roundness');
+    }
+    const strokeWidth = quantize(width);
+    const roundness = quantize(cornerRadius);
+    if (project.designSystem.style === style && project.designSystem.stroke.width === strokeWidth
+      && project.designSystem.cornerRadius === roundness) return;
+    await this.persist({ ...this.base(project.id), type: 'project.updateDesignSystem', payload: { patch: {
+      style, stroke: { ...project.designSystem.stroke, width: strokeWidth }, cornerRadius: roundness,
+    } } });
+  }
+
   async importSvg(originalSvg: Uint8Array, requestedName: string,
     provenance: Pick<ProvenanceRecordV1, 'source' | 'author' | 'license' | 'attribution'> = {}): Promise<ImportDiagnosticV1[]> {
     const project = this.project;

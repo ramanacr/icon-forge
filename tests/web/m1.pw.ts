@@ -326,7 +326,7 @@ test('M2 set overview warns about stroke widths that differ from the set policy'
   await page.getByRole('button', { name: 'Add rectangle' }).click();
   await page.getByRole('button', { name: 'Rectangle layer' }).click();
   await page.getByRole('button', { name: 'Outline shape' }).click();
-  await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('2.5');
+  await page.getByRole('spinbutton', { name: 'Stroke width', exact: true }).fill('2.5');
   await page.getByRole('button', { name: 'Apply stroke width' }).click();
   await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('stroke-width', '2.5');
 
@@ -362,6 +362,35 @@ test('M2 starter library creates five editable icons with licensed source in bac
     expect(record.source).toMatch(/^IconForge starter library\//);
     expect(archive.attachments[`originals/${record.originalSha256}.svg`]).toBeDefined();
   }
+});
+
+test('M2 set style changes are undoable without rewriting icon geometry', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('button', { name: 'Outline shape' }).click();
+  await expect(page.locator('.canvas svg rect[data-node-id]')).toHaveAttribute('stroke-width', '1.75');
+  const beforeStroke = await page.locator('.canvas svg rect[data-node-id]').getAttribute('stroke-width');
+
+  await page.getByLabel('Visual language').selectOption('duotone');
+  await page.getByRole('spinbutton', { name: 'Set stroke width' }).fill('2.25');
+  await page.getByRole('spinbutton', { name: 'Roundness' }).fill('3');
+  await page.getByRole('button', { name: 'Apply set style' }).click();
+  await expect(page.locator('.canvas svg rect[data-node-id]')).toHaveAttribute('stroke-width', beforeStroke!);
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  await expect(page.getByRole('button', { name: 'Open icon-1' }))
+    .toContainText('1 stroke width differs from set width 2.25');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const saved = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;
+  expect(saved.designSystem.style).toBe('duotone');
+  expect(saved.designSystem.cornerRadius).toBe(3);
+  await page.getByRole('button', { name: 'Return to editor' }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByLabel('Visual language')).toHaveValue('outline');
+  await expect(page.getByRole('spinbutton', { name: 'Set stroke width' })).toHaveValue('1.75');
 });
 
 test('M2 previews the active icon at four sizes in light and dark without edits', async ({ page }) => {
@@ -813,7 +842,7 @@ test('M1 inspector color and stroke width changes survive export and reload', as
   const download = await downloadPromise;
   expect(await readFile(await download.path()!, 'utf8')).toContain('#cc3344');
   await page.getByRole('button', { name: 'Outline shape' }).click();
-  await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('2.5');
+  await page.getByRole('spinbutton', { name: 'Stroke width', exact: true }).fill('2.5');
   await page.getByRole('button', { name: 'Apply stroke width' }).click();
   await expect(rect).toHaveAttribute('stroke-width', '2.5');
   await page.getByRole('button', { name: 'Undo' }).click();

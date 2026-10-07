@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { ProjectV1 } from '@iconforge/project-model';
 import { encodeProjectArchive } from '@iconforge/persistence';
-import { compileSvgProfile } from '@iconforge/compiler-core';
+import { compileSpriteProfile, compileSvgProfile } from '@iconforge/compiler-core';
 import { runCli } from './main.js';
 
 const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
@@ -61,5 +61,27 @@ describe('CLI compile', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await runCli(['compile', input, '--profile', 'web-svg', '--out', join(root, 'dist')])).toBe(2);
     error.mockRestore();
+  });
+
+  it('compiles a sprite profile with the same bytes as the pure compiler', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'iconforge-sprite-cli-'));
+    directories.push(root);
+    const input = join(root, 'project.iconproj');
+    const out = join(root, 'dist');
+    const spriteProject: ProjectV1 = { ...project, exportProfiles: [{ id: id(4), name: 'web-sprite',
+      target: 'sprite', options: { idPrefix: 'if-', precision: 3 } }] };
+    await writeFile(input, await encodeProjectArchive(spriteProject));
+    const command = ['compile', input, '--profile', 'web-sprite', '--out', out];
+    expect(await runCli(command)).toBe(0);
+    const expected = compileSpriteProfile(spriteProject, 'web-sprite');
+    for (const [path, bytes] of Object.entries(expected.artifacts)) {
+      expect(await readFile(join(out, path))).toEqual(Buffer.from(bytes));
+    }
+    expect(await runCli([...command, '--check'])).toBe(0);
+    const built = join(root, 'iconforge.mjs');
+    execFileSync(process.execPath, ['apps/cli/build.mjs', built], { cwd: process.cwd() });
+    execFileSync(process.execPath, [built, 'compile', input, '--profile', 'web-sprite',
+      '--out', join(root, 'built-output')], { cwd: process.cwd() });
+    expect(await readFile(join(root, 'built-output', 'sprite.svg'))).toEqual(Buffer.from(expected.artifacts['sprite.svg']!));
   });
 });

@@ -2,7 +2,7 @@
 import { readFile, mkdir, mkdtemp, rename, rm, writeFile, lstat, stat } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileSvgProfile, type SvgProfileBuild } from '@iconforge/compiler-core';
+import { compileSpriteProfile, compileSvgProfile, type SvgProfileBuild } from '@iconforge/compiler-core';
 import { openProjectArchive } from '@iconforge/persistence';
 
 export interface CompileArgs { input: string; profile: string; out: string; check: boolean }
@@ -54,7 +54,8 @@ export async function compileCommand(args: CompileArgs): Promise<0 | 1> {
   try { opened = await openProjectArchive(bytes); }
   catch (error) { throw new TypeError(`cli.project.invalid: ${error instanceof Error ? error.message : String(error)}`); }
   if (opened.mode !== 'read-write') throw new TypeError('cli.project.read-only');
-  const build = compileSvgProfile(opened.project, args.profile);
+  const build = opened.project.exportProfiles.find(profile => profile.name === args.profile)?.target === 'sprite'
+    ? compileSpriteProfile(opened.project, args.profile) : compileSvgProfile(opened.project, args.profile);
   const out = resolve(args.out);
   if (args.check) {
     if (await verifyBuild(out, build)) return 0;

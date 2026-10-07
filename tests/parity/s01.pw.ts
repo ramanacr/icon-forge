@@ -172,6 +172,20 @@ test('Phase 1 SVG profile artifacts and manifest match Node and Chromium', async
   }, project);
   expect(browser.svg).toBe(new TextDecoder().decode(build.artifacts['box.svg']));
   expect(browser.manifest).toBe(new TextDecoder().decode(build.manifestBytes));
+  const spriteProject: ProjectV1 = { ...project, exportProfiles: [...project.exportProfiles, {
+    id: id(58), name: 'web-sprite', target: 'sprite', options: { idPrefix: 'if-', precision: 3 },
+  }] };
+  const nodeSprite = compiler.compileSpriteProfile(spriteProject, 'web-sprite');
+  const browserSprite = await page.evaluate(async project => {
+    const module = await import(new URL('/profileCompiler.js', location.origin).href);
+    const output = module.compileSpriteProfile(project, 'web-sprite');
+    return { sprite: new TextDecoder().decode(output.artifacts['sprite.svg']),
+      usage: new TextDecoder().decode(output.artifacts['usage.html']),
+      manifest: new TextDecoder().decode(output.manifestBytes) };
+  }, spriteProject);
+  expect(browserSprite).toEqual({ sprite: new TextDecoder().decode(nodeSprite.artifacts['sprite.svg']),
+    usage: new TextDecoder().decode(nodeSprite.artifacts['usage.html']),
+    manifest: new TextDecoder().decode(nodeSprite.manifestBytes) });
 });
 
 test('Phase 1 bounds and grid queries match Node and Chromium', async ({ page }) => {

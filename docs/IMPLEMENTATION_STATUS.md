@@ -2,6 +2,10 @@
 
 Phase 0 is in progress. At the user's direction, Phase 1 independent work has started before the formal S-01 through S-06 gate closes. The v4 engineering package remains the design authority; the Phase 1 exit is not yet met.
 
+## Phase 3 beginner product kickoff
+
+- A pure sprite profile compiler emits sorted `<symbol>` entries for every icon and variant from canonical SVG output. It rejects invalid or colliding derived IDs and emits deterministic `sprite.svg`, `usage.html` and a hashed manifest. The Node CLI now compiles and checks sprite profiles as well as standalone SVG profiles. Node and Chromium produce byte-identical sprite artifacts and manifest for the parity fixture. Browser sprite download, set overview, starter assets, preview and the M2 usability gate remain open.
+
 ## Phase 2 import spike
 
 - S-07 has a data-only `saxes` XML reader and an allowlisted AST adapter behind a one-shot module worker. It rejects DOCTYPE/entity declarations, unsupported processing instructions, dangerous elements/attributes/URLs, malformed or extreme numbers, and local `use` cycles, missing targets, excessive depth and fan-out. Source, element, path-data, coordinate and nesting limits can be tightened but not raised. Unsupported clip paths are rejected until explicit Boolean conversion exists. No imported markup is inserted into the DOM.

@@ -151,6 +151,18 @@ describe('SVG canonicalization', () => {
     ]);
   });
 
+  it('clears an inherited dash pattern with stroke-dasharray none', () => {
+    const source = '<svg viewBox="0 0 24 24" stroke="black" stroke-dasharray="2 1">'
+      + '<line x1="0" y1="0" x2="8" y2="0"/>'
+      + '<line x1="0" y1="2" x2="8" y2="2" stroke-dasharray="none"/>'
+      + '</svg>';
+    const { icon } = canonicalizeSvgAst(parseSvgAst(source), options());
+    expect(icon.nodes[0]).toMatchObject({ type: 'line', stroke: { dash: [2, 1] } });
+    expect(icon.nodes[1]).toMatchObject({ type: 'line' });
+    if (icon.nodes[1]?.type !== 'line') throw new Error('Expected line');
+    expect(icon.nodes[1].stroke.dash).toBeUndefined();
+  });
+
   it('inherits evenodd fill rule and preserves it for polygons and paths', () => {
     const source = '<svg viewBox="0 0 24 24"><g fill-rule="evenodd"><polygon points="0 0 4 0 4 4 0 4"/><path d="M0 0 L2 0 Z"/></g></svg>';
     const { icon } = canonicalizeSvgAst(parseSvgAst(source), options());

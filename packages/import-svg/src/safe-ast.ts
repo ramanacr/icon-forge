@@ -116,7 +116,7 @@ function validate(node: SvgElement, ids: Map<string, SvgElement>, limits: Import
         checkNumbers(value.slice(0, -2), 'single', limits.coordinates);
       } else checkNumbers(value, 'single', limits.coordinates);
     }
-    if (name === 'viewBox' || name === 'points' || name === 'stroke-dasharray') {
+    if (name === 'viewBox' || name === 'points' || name === 'stroke-dasharray' && value.trim() !== 'none') {
       checkNumbers(value, 'list', limits.coordinates);
       if (name === 'viewBox' && [...value.matchAll(numberPattern)].length !== 4) throw new TypeError('import.number-invalid');
       if (name === 'points' && [...value.matchAll(numberPattern)].length % 2) throw new TypeError('import.number-invalid');

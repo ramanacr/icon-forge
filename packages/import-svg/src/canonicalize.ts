@@ -149,7 +149,8 @@ function styled(parent: Style, attributes: Record<string, string>, diagonal: num
   const strokeWidth = length(attributes['stroke-width'], diagonal, parent.strokeWidth);
   const miterLimit = num(attributes['stroke-miterlimit'], parent.miterLimit);
   if (strokeWidth < 0 || miterLimit < 1) throw new TypeError('import.stroke-unsupported');
-  const dash = attributes['stroke-dasharray'] === undefined ? parent.dash : list(attributes['stroke-dasharray']);
+  const dash = attributes['stroke-dasharray'] === undefined ? parent.dash
+    : attributes['stroke-dasharray'].trim() === 'none' ? undefined : list(attributes['stroke-dasharray']);
   if (dash?.some(value => value < 0)) throw new TypeError('import.stroke-unsupported');
   return { fill: attributes.fill === undefined ? parent.fill : paint(attributes.fill), fillOpacity, fillRule,
     stroke: attributes.stroke === undefined ? parent.stroke : paint(attributes.stroke),

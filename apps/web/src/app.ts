@@ -178,11 +178,23 @@ import type { IconGridPreset } from '@iconforge/commands';
           <button type="button" (click)="toggleSizePreview()" [disabled]="!hasIcon()">{{ showSizePreview() ? 'Hide size preview' : 'Preview sizes' }}</button>
           <section class="size-preview" aria-label="Icon size and theme preview" [hidden]="!showSizePreview()">
             <h3>Sizes and themes</h3>
+            <label class="preview-context-picker">Preview in
+              <select [value]="previewContext()" (change)="setPreviewContext($event)">
+                <option value="Button">Button</option><option value="Navigation">Navigation</option>
+                <option value="Toolbar">Toolbar</option>
+              </select>
+            </label>
             <div class="size-preview-grid">
               @for (sample of previewSamples(); track sample.theme + sample.size) {
                 <div class="size-preview-tile" [class.dark]="sample.theme === 'Dark'">
-                  <img [src]="sample.source" [alt]="sample.theme + ' ' + sample.size + ' px preview'"
-                    [style.width.px]="sample.size" [style.height.px]="sample.size">
+                  <div class="preview-context" [class.as-button]="previewContext() === 'Button'"
+                    [class.as-navigation]="previewContext() === 'Navigation'"
+                    [class.as-toolbar]="previewContext() === 'Toolbar'">
+                    <img [src]="sample.source" [alt]="sample.theme + ' ' + sample.size + ' px preview'"
+                      [style.width.px]="sample.size" [style.height.px]="sample.size">
+                    @if (previewContext() === 'Navigation') { <span>Home</span> }
+                    @if (previewContext() === 'Toolbar') { <span aria-hidden="true">⋯</span> }
+                  </div>
                   <span>{{ sample.theme }} · {{ sample.size }} px</span>
                 </div>
               }
@@ -243,6 +255,7 @@ export class App implements OnInit, OnDestroy {
   readonly checkpointRecovery = signal(false);
   readonly showGrid = signal(true);
   readonly showSizePreview = signal(false);
+  readonly previewContext = signal<'Button' | 'Navigation' | 'Toolbar'>('Button');
   readonly previewSamples = signal<{ theme: 'Light' | 'Dark'; size: number; source: string }[]>([]);
   readonly showOverview = signal(false);
   readonly showStarters = signal(false);
@@ -554,6 +567,13 @@ export class App implements OnInit, OnDestroy {
   toggleOverview(): void { this.showOverview.update(value => !value); this.refresh(); }
 
   toggleSizePreview(): void { this.showSizePreview.update(value => !value); this.refresh(); }
+
+  setPreviewContext(event: Event): void {
+    const input = event.target;
+    if (input instanceof HTMLSelectElement && ['Button', 'Navigation', 'Toolbar'].includes(input.value)) {
+      this.previewContext.set(input.value as 'Button' | 'Navigation' | 'Toolbar');
+    }
+  }
 
   setOverviewQuery(event: Event): void {
     const input = event.target;

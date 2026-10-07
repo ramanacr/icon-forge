@@ -586,6 +586,14 @@ test('M2 previews the active icon at four sizes in light and dark without edits'
   }
   const darkSource = await previews.getByRole('img', { name: 'Dark 24 px preview' }).getAttribute('src');
   expect(decodeURIComponent(darkSource!.split(',')[1]!)).toContain('color="#ffffff"');
+  const contextPicker = previews.getByRole('combobox', { name: 'Preview in' });
+  await expect(previews.locator('.preview-context.as-button')).toHaveCount(8);
+  await contextPicker.selectOption('Navigation');
+  await expect(previews.locator('.preview-context.as-navigation')).toHaveCount(8);
+  await expect(previews.getByText('Home')).toHaveCount(8);
+  await contextPicker.selectOption('Toolbar');
+  await expect(previews.locator('.preview-context.as-toolbar')).toHaveCount(8);
+  await expect(previews.getByRole('img')).toHaveCount(8);
   downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download project' }).click();
   const after = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;

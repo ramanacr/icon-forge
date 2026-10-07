@@ -3,6 +3,7 @@ import type { BrowserWorkspace } from './workspace.js';
 import { assertBrowserCapabilities } from './browser-capabilities.js';
 import { iconConsistencyWarnings, type IconConsistencyWarning } from './consistency.js';
 import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
+import type { IconGridPreset } from '@iconforge/commands';
 
 @Component({
   selector: 'iconforge-root',
@@ -21,7 +22,12 @@ import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
           <button type="button" (click)="runRecover()" [disabled]="busy() || readOnly() || previewOnly()">{{ checkpointRecovery() ? 'Recover as copy' : 'Recover valid edits' }}</button>
           <button type="button" (click)="runDownloadRecoveryData()" [disabled]="busy() || previewOnly()">Download recovery data</button>
         }
-        <button type="button" (click)="runCreate()" [disabled]="busy() || previewOnly()">Create project</button>
+        <label class="grid-preset">Grid preset
+          <select #gridPreset [disabled]="busy() || previewOnly()">
+            <option value="16">16 × 16</option><option value="24" selected>24 × 24</option><option value="32">32 × 32</option>
+          </select>
+        </label>
+        <button type="button" (click)="runCreate(gridPreset.value)" [disabled]="busy() || previewOnly()">Create project</button>
         <label class="open-file">Open project file
           <input type="file" accept=".iconproj,application/zip" (change)="runOpenProject($event)" [disabled]="busy() || previewOnly()">
         </label>
@@ -170,7 +176,7 @@ import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
               }
             </div>
           </section>
-          <p class="hint">24 × 24 icon grid · drag snaps to whole units</p>
+          <p class="hint">{{ gridHint() }} icon grid · drag snaps to whole units</p>
         </aside>
       </div>
       @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
@@ -215,6 +221,7 @@ export class App implements OnInit, OnDestroy {
   readonly setStyleValue = signal('outline');
   readonly setStrokeWidth = signal(1.75);
   readonly setCornerRadius = signal(2);
+  readonly gridHint = signal('24 × 24');
   readonly canEditStroke = signal(false);
   readonly previewOnly = signal(this.phoneMedia.matches);
   readonly readOnly = signal(false);
@@ -303,6 +310,8 @@ export class App implements OnInit, OnDestroy {
     this.setStyleValue.set(project?.designSystem.style ?? 'outline');
     this.setStrokeWidth.set(project?.designSystem.stroke.width ?? 1.75);
     this.setCornerRadius.set(project?.designSystem.cornerRadius ?? 2);
+    this.gridHint.set(icon ? `${icon.viewBox[2]} × ${icon.viewBox[3]}` : project
+      ? `${project.designSystem.grid.width} × ${project.designSystem.grid.height}` : '24 × 24');
     this.canEditStroke.set(this.workspace.strokeWidth !== null && !this.workspace.selectedNode?.locked);
     this.hasIcon.set(Boolean(icon));
     this.hasProject.set(Boolean(project));
@@ -437,7 +446,11 @@ export class App implements OnInit, OnDestroy {
     this.overviewPage = 0;
   }
 
-  runCreate(): void { void this.run(async () => { await this.workspace.create(); this.resetOverview(); }); }
+  runCreate(value = '24'): void {
+    const size = Number(value);
+    if (size !== 16 && size !== 24 && size !== 32) { this.error.set('Unknown icon grid preset'); return; }
+    void this.run(async () => { await this.workspace.create(size as IconGridPreset); this.resetOverview(); });
+  }
   runOpenProject(event: Event): void {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || !input.files?.length) return;

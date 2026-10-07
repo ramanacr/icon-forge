@@ -95,6 +95,14 @@ const DEFAULT_DESIGN_SYSTEM: DesignSystemV1 = {
   severities: {},
 };
 
+export type IconGridPreset = 16 | 24 | 32;
+
+export function defaultDesignSystem(gridSize: IconGridPreset = 24): DesignSystemV1 {
+  const margin = gridSize === 16 ? 1 : gridSize === 32 ? 3 : 2;
+  return { ...structuredClone(DEFAULT_DESIGN_SYSTEM), grid: { width: gridSize, height: gridSize },
+    safeArea: { top: margin, right: margin, bottom: margin, left: margin } };
+}
+
 function validName(name: string): void {
   if (name.length < 1 || name.length > 120) throw new TypeError('project.name.invalid');
 }

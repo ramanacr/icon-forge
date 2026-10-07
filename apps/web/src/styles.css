@@ -38,9 +38,11 @@ button:hover:not(:disabled) { border-color: var(--selection-border); background:
 button:disabled { opacity: .48; cursor: default; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .shell { height: 100dvh; min-height: 600px; display: flex; flex-direction: column; }
-.topbar { height: 64px; display: flex; gap: var(--space-4); align-items: center; padding: 0 22px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); }
+.topbar { min-height: 64px; display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; padding: 8px 22px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); }
 .brand { font-size: 21px; letter-spacing: -.04em; color: var(--accent); }
 .project-name { font-weight: 600; }
+.grid-preset { display: flex; align-items: center; gap: var(--space-1); font-size: 13px; white-space: nowrap; }
+.grid-preset select { min-height: 44px; padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); font: inherit; }
 .status { margin-left: auto; font-size: 13px; color: var(--text-muted); }
 .storage-warning { color: var(--warning); font-size: 13px; }
 .file-reminder { color: var(--warning); font-size: 13px; max-width: 190px; }

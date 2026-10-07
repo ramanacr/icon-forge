@@ -451,6 +451,35 @@ test('M2 starter library creates five editable icons with licensed source in bac
   }
 });
 
+test('M2 grid presets set the project, new icon geometry and starter artboard', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('combobox', { name: 'Grid preset' }).selectOption('16');
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await expect(page.locator('.canvas svg')).toHaveAttribute('viewBox', '0 0 16 16');
+  await expect(page.locator('.canvas svg rect[data-node-id]')).toHaveAttribute('width', '10');
+  await expect(page.getByText('16 × 16 icon grid')).toBeVisible();
+  await page.getByRole('button', { name: 'Pick starter' }).click();
+  await page.locator('.starter-list').getByRole('button', { name: 'Home' }).click();
+  await expect(page.locator('.canvas svg')).toHaveAttribute('viewBox', '0 0 16 16');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const archive = await decodeProjectArchive(await readFile((await (await downloadPromise).path())!));
+  expect(archive.project.designSystem.grid).toEqual({ width: 16, height: 16 });
+  expect(archive.project.icons.map(icon => icon.viewBox)).toEqual([[0, 0, 16, 16], [0, 0, 16, 16]]);
+  expect(new TextDecoder().decode(archive.attachments[`originals/${archive.project.provenance[0]!.originalSha256}.svg`]))
+    .toContain('viewBox="0 0 16 16"');
+
+  await page.getByRole('combobox', { name: 'Grid preset' }).selectOption('32');
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await expect(page.locator('.canvas svg')).toHaveAttribute('viewBox', '0 0 32 32');
+  await expect(page.locator('.canvas svg line[data-node-id]')).toHaveAttribute('x2', '27');
+  await expect(page.getByText('32 × 32 icon grid')).toBeVisible();
+});
+
 test('M2 set style changes are undoable without rewriting icon geometry', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

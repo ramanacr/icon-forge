@@ -1,5 +1,5 @@
 import { ProjectDispatcher } from '@iconforge/application';
-import type { CommandEnvelopeV1, ImportDiagnosticV1 } from '@iconforge/commands';
+import { defaultDesignSystem, type CommandEnvelopeV1, type IconGridPreset, type ImportDiagnosticV1 } from '@iconforge/commands';
 import { compileSpriteProfile, compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
@@ -291,7 +291,8 @@ export class BrowserWorkspace {
     await this.scheduleCompaction(command.projectId);
   }
 
-  async create(): Promise<void> {
+  async create(gridSize: IconGridPreset = 24): Promise<void> {
+    if (![16, 24, 32].includes(gridSize)) throw new TypeError('Unknown icon grid preset');
     const id = uuidV7();
     this.fileHandle = null;
     this.fileSavedProjectId = null;
@@ -302,7 +303,9 @@ export class BrowserWorkspace {
     this.selection.clear();
     this.currentIconId = null;
     this.storageDurability = null;
-    await this.persist({ ...this.base(id), type: 'project.create', payload: { id, name: 'Untitled project' } });
+    await this.persist({ ...this.base(id), type: 'project.create', payload: {
+      id, name: 'Untitled project', designSystem: defaultDesignSystem(gridSize),
+    } });
     localStorage.setItem(POINTER, id);
     await this.persist({ ...this.base(id), type: 'exportProfile.upsert',
       payload: { profile: { id: uuidV7(), name: 'web-svg', target: 'svg',
@@ -328,7 +331,8 @@ export class BrowserWorkspace {
     let index = 1;
     while (project.icons.some(icon => icon.name === `icon-${index}`)) index++;
     const icon: IconV1 = { id: uuidV7(), name: `icon-${index}`, aliases: [], tags: [],
-      viewBox: [0, 0, 24, 24], nodes: [], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
+      viewBox: [0, 0, project.designSystem.grid.width, project.designSystem.grid.height],
+      nodes: [], variants: [], accessibility: { kind: 'decorative' }, provenanceIds: [] };
     await this.persist({ ...this.base(project.id), type: 'icon.add', payload: { icon } });
     this.currentIconId = icon.id;
     this.selection.clear();
@@ -391,7 +395,7 @@ export class BrowserWorkspace {
 
   async addStarterIcon(name: StarterIconName): Promise<void> {
     if (!STARTER_ICONS.some(icon => icon.name === name)) throw new TypeError('starter.not-found');
-    const originalSvg = new TextEncoder().encode(starterSvg(name));
+    const originalSvg = new TextEncoder().encode(starterSvg(name, this.project?.designSystem.grid.width ?? 24));
     await this.importSvg(originalSvg, `${name}.svg`, {
       source: `IconForge starter library/${name}.svg`, author: 'Ramana Reddy Chamakura',
       license: 'MIT', attribution: 'Copyright (c) 2026 Ramana Reddy Chamakura',
@@ -402,8 +406,11 @@ export class BrowserWorkspace {
     const project = this.project;
     const icon = this.icon;
     if (!project || !icon) throw new TypeError('Add an icon first');
+    const size = project.designSystem.grid.width;
+    const inset = Math.round(size / 6);
     const node: SceneNodeV1 = { id: uuidV7(), type: 'rect', visible: true, locked: false,
-      x: 4, y: 4, width: 16, height: 16, rx: 0, ry: 0, fill: { kind: 'token', token: 'currentColor' } };
+      x: inset, y: inset, width: size - inset * 2, height: size - inset * 2,
+      rx: 0, ry: 0, fill: { kind: 'token', token: project.designSystem.defaultPaintToken } };
     await this.persist({ ...this.base(project.id), type: 'node.add',
       payload: { iconId: icon.id, index: icon.nodes.length, node } });
   }
@@ -412,8 +419,11 @@ export class BrowserWorkspace {
     const project = this.project;
     const icon = this.icon;
     if (!project || !icon) throw new TypeError('Add an icon first');
+    const size = project.designSystem.grid.width;
+    const radius = Math.round(size / 3);
     const node: SceneNodeV1 = { id: uuidV7(), type: 'ellipse', visible: true, locked: false,
-      cx: 12, cy: 12, rx: 8, ry: 8, fill: { kind: 'token', token: 'currentColor' } };
+      cx: size / 2, cy: size / 2, rx: radius, ry: radius,
+      fill: { kind: 'token', token: project.designSystem.defaultPaintToken } };
     await this.persist({ ...this.base(project.id), type: 'node.add',
       payload: { iconId: icon.id, index: icon.nodes.length, node } });
   }
@@ -422,10 +432,12 @@ export class BrowserWorkspace {
     const project = this.project;
     const icon = this.icon;
     if (!project || !icon) throw new TypeError('Add an icon first');
+    const size = project.designSystem.grid.width;
+    const inset = Math.round(size / 6);
     const node: SceneNodeV1 = { id: uuidV7(), type: 'line', visible: true, locked: false,
-      x1: 4, y1: 20, x2: 20, y2: 4,
-      stroke: { paint: { kind: 'token', token: 'currentColor' }, width: 1.75,
-        cap: 'round', join: 'round', miterLimit: 4 } };
+      x1: inset, y1: size - inset, x2: size - inset, y2: inset,
+      stroke: { paint: { kind: 'token', token: project.designSystem.defaultPaintToken },
+        ...project.designSystem.stroke } };
     await this.persist({ ...this.base(project.id), type: 'node.add',
       payload: { iconId: icon.id, index: icon.nodes.length, node } });
   }

@@ -9,8 +9,10 @@ export const STARTER_ICONS = [
 
 export type StarterIconName = typeof STARTER_ICONS[number]['name'];
 
-export function starterSvg(name: StarterIconName): string {
+export function starterSvg(name: StarterIconName, gridSize = 24): string {
   const icon = STARTER_ICONS.find(candidate => candidate.name === name);
   if (!icon) throw new TypeError('starter.not-found');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#17233d" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${icon.body}</svg>`;
+  const body = gridSize === 24 ? icon.body : icon.body.replace(/\d+(?:\.\d+)?/g, value =>
+    String(Math.round(Number(value) * gridSize / 24 * 1000) / 1000));
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${gridSize} ${gridSize}" fill="none" stroke="#17233d" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 }

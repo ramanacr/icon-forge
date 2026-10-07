@@ -1076,6 +1076,34 @@ test('M1 repeated shapes have distinct keyboard-accessible layer names', async (
   await expect(page.locator('svg rect[data-node-id]').nth(1)).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
 });
 
+test('M2 rounded rectangle uses set roundness and polygon exports as an editable shape', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('spinbutton', { name: 'Roundness' }).fill('3');
+  await page.getByRole('button', { name: 'Apply set style' }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Roundness' })).toHaveValue('3');
+  await page.getByRole('button', { name: 'Add rounded rectangle' }).click();
+  await expect(page.locator('.canvas svg rect[data-node-id]')).toHaveAttribute('rx', '3');
+  await page.getByRole('button', { name: 'Add polygon' }).click();
+  await expect(page.locator('.canvas svg polygon[data-node-id]')).toBeVisible();
+  let downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const exported = await readFile((await (await downloadPromise).path())!, 'utf8');
+  expect(exported).toContain('rx="3" ry="3"');
+  expect(exported).toContain('<polygon');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('.canvas svg polygon[data-node-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('.canvas svg polygon[data-node-id]')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.canvas svg polygon[data-node-id]')).toBeVisible();
+  downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const saved = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;
+  expect(saved.icons[0]!.nodes.map(node => node.type)).toEqual(['rect', 'polyline']);
+});
+
 test('M1 composite browser icon exports byte-identically through the CLI', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

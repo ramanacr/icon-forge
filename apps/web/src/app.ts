@@ -75,8 +75,10 @@ import type { IconGridPreset } from '@iconforge/commands';
             <button type="button" (click)="toggleOverview()" [disabled]="!hasProject()">{{ showOverview() ? 'Return to editor' : 'Set overview' }}</button>
             @if (!showOverview()) {
             <button type="button" (click)="runAddRectangle()" [disabled]="!canEdit() || !hasIcon()">Add rectangle</button>
+            <button type="button" (click)="runAddRoundedRectangle()" [disabled]="!canEdit() || !hasIcon()">Add rounded rectangle</button>
             <button type="button" (click)="runAddEllipse()" [disabled]="!canEdit() || !hasIcon()">Add ellipse</button>
             <button type="button" (click)="runAddLine()" [disabled]="!canEdit() || !hasIcon()">Add line</button>
+            <button type="button" (click)="runAddPolygon()" [disabled]="!canEdit() || !hasIcon()">Add polygon</button>
             <button type="button" (click)="runMoveRight()" [disabled]="!canEdit() || !selected()">Move right</button>
             <button type="button" (click)="runUndo()" [disabled]="!canEdit()">Undo</button>
             <button type="button" (click)="runRedo()" [disabled]="!canEdit()">Redo</button>
@@ -523,8 +525,10 @@ export class App implements OnInit, OnDestroy {
     }, 'Import failed');
   }
   runAddRectangle(): void { void this.run(() => this.workspace.addRectangle()); }
+  runAddRoundedRectangle(): void { void this.run(() => this.workspace.addRectangle(true)); }
   runAddEllipse(): void { void this.run(() => this.workspace.addEllipse()); }
   runAddLine(): void { void this.run(() => this.workspace.addLine()); }
+  runAddPolygon(): void { void this.run(() => this.workspace.addPolygon()); }
   runTakeOver(): void { void this.run(() => this.workspace.takeOver()); }
   runRecover(): void { void this.run(() => this.workspace.recover()); }
   runGroup(): void { void this.run(() => this.workspace.groupSelected()); }

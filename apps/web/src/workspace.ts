@@ -417,15 +417,29 @@ export class BrowserWorkspace {
     });
   }
 
-  async addRectangle(): Promise<void> {
+  async addRectangle(rounded = false): Promise<void> {
     const project = this.project;
     const icon = this.icon;
     if (!project || !icon) throw new TypeError('Add an icon first');
     const size = project.designSystem.grid.width;
     const inset = Math.round(size / 6);
+    const radius = rounded ? Math.min(project.designSystem.cornerRadius, (size - inset * 2) / 2) : 0;
     const node: SceneNodeV1 = { id: uuidV7(), type: 'rect', visible: true, locked: false,
       x: inset, y: inset, width: size - inset * 2, height: size - inset * 2,
-      rx: 0, ry: 0, fill: { kind: 'token', token: project.designSystem.defaultPaintToken } };
+      rx: radius, ry: radius, fill: { kind: 'token', token: project.designSystem.defaultPaintToken } };
+    await this.persist({ ...this.base(project.id), type: 'node.add',
+      payload: { iconId: icon.id, index: icon.nodes.length, node } });
+  }
+
+  async addPolygon(): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    if (!project || !icon) throw new TypeError('Add an icon first');
+    const size = project.designSystem.grid.width;
+    const inset = Math.round(size / 6);
+    const node: SceneNodeV1 = { id: uuidV7(), type: 'polyline', visible: true, locked: false,
+      points: [size / 2, inset, size - inset, size - inset, inset, size - inset], closed: true,
+      fill: { kind: 'token', token: project.designSystem.defaultPaintToken } };
     await this.persist({ ...this.base(project.id), type: 'node.add',
       payload: { iconId: icon.id, index: icon.nodes.length, node } });
   }

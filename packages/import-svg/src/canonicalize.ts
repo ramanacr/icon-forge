@@ -18,8 +18,10 @@ export interface CanonicalSvgImport {
 
 interface Style {
   fill: PaintV1;
+  fillOpacity: number;
   fillRule: 'nonzero' | 'evenodd';
   stroke: PaintV1;
+  strokeOpacity: number;
   strokeWidth: number;
   cap: StrokeV1['cap'];
   join: StrokeV1['join'];
@@ -125,10 +127,10 @@ function paint(value: string): PaintV1 {
 }
 
 function styled(parent: Style, attributes: Record<string, string>): Style {
-  for (const attribute of ['fill-opacity', 'stroke-opacity']) {
-    if (attributes[attribute] !== undefined && Number(attributes[attribute]) !== 1) {
-      throw new TypeError('import.opacity-unsupported');
-    }
+  const fillOpacity = attributes['fill-opacity'] === undefined ? parent.fillOpacity : Number(attributes['fill-opacity']);
+  const strokeOpacity = attributes['stroke-opacity'] === undefined ? parent.strokeOpacity : Number(attributes['stroke-opacity']);
+  if (fillOpacity < 0 || fillOpacity > 1 || strokeOpacity < 0 || strokeOpacity > 1) {
+    throw new TypeError('import.opacity-unsupported');
   }
   const cap = attributes['stroke-linecap'] ?? parent.cap;
   const join = attributes['stroke-linejoin'] ?? parent.join;
@@ -141,9 +143,9 @@ function styled(parent: Style, attributes: Record<string, string>): Style {
   if (strokeWidth < 0 || miterLimit < 1) throw new TypeError('import.stroke-unsupported');
   const dash = attributes['stroke-dasharray'] === undefined ? parent.dash : list(attributes['stroke-dasharray']);
   if (dash?.some(value => value < 0)) throw new TypeError('import.stroke-unsupported');
-  return { fill: attributes.fill === undefined ? parent.fill : paint(attributes.fill), fillRule,
+  return { fill: attributes.fill === undefined ? parent.fill : paint(attributes.fill), fillOpacity, fillRule,
     stroke: attributes.stroke === undefined ? parent.stroke : paint(attributes.stroke),
-    strokeWidth, cap, join, miterLimit, ...(dash ? { dash } : {}) };
+    strokeOpacity, strokeWidth, cap, join, miterLimit, ...(dash ? { dash } : {}) };
 }
 
 function multiply(a: MatrixV1, b: MatrixV1): MatrixV1 {
@@ -182,8 +184,16 @@ function transform(value: string | undefined): MatrixV1 | undefined {
   return quantizeMatrix(result);
 }
 
+function withOpacity(value: PaintV1, opacity: number): PaintV1 {
+  if (opacity === 1 || value.kind === 'none') return value;
+  if (value.kind !== 'color') throw new TypeError('import.opacity-unsupported');
+  const originalAlpha = value.value.length === 9 ? Number.parseInt(value.value.slice(7), 16) : 255;
+  const alpha = Math.round(originalAlpha * opacity).toString(16).padStart(2, '0');
+  return { kind: 'color', value: `${value.value.slice(0, 7)}${alpha}` };
+}
+
 function stroke(style: Style): StrokeV1 {
-  return { paint: style.stroke, width: style.strokeWidth, cap: style.cap, join: style.join,
+  return { paint: withOpacity(style.stroke, style.strokeOpacity), width: style.strokeWidth, cap: style.cap, join: style.join,
     miterLimit: style.miterLimit, ...(style.dash ? { dash: style.dash } : {}) };
 }
 
@@ -196,7 +206,8 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
     ? rootWidth !== undefined && rootHeight !== undefined ? [0, 0, num(String(rootWidth)), num(String(rootHeight))] : []
     : list(ast.attributes.viewBox);
   if (viewBox.length !== 4 || viewBox[2]! <= 0 || viewBox[3]! <= 0) throw new TypeError('import.viewbox-invalid');
-  const initial: Style = { fill: { kind: 'color', value: '#000000' }, stroke: { kind: 'none' },
+  const initial: Style = { fill: { kind: 'color', value: '#000000' }, fillOpacity: 1,
+    stroke: { kind: 'none' }, strokeOpacity: 1,
     fillRule: 'nonzero', strokeWidth: 1, cap: 'butt', join: 'miter', miterLimit: 4 };
   let arcConverted = false;
   const convert = (element: SvgElement, inherited: Style): SceneNodeV1 | null => {
@@ -224,7 +235,8 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
       return { ...base, type: 'group', children };
     }
     if (element.children.length) throw new TypeError('import.element-children');
-    const fills = { fill: style.fill, ...(style.stroke.kind === 'none' ? {} : { stroke: stroke(style) }) };
+    const fills = { fill: withOpacity(style.fill, style.fillOpacity),
+      ...(style.stroke.kind === 'none' ? {} : { stroke: stroke(style) }) };
     if (element.name === 'rect') {
       const a = element.attributes;
       const rx = num(a.rx, num(a.ry));

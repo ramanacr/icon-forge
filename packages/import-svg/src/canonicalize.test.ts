@@ -41,7 +41,8 @@ describe('SVG canonicalization', () => {
     ['out-of-range color', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="rgb(120% 0% 0%)"/></svg>', 'import.paint-unsupported'],
     ['invalid HSL saturation', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="hsl(60 150% 50%)"/></svg>', 'import.paint-unsupported'],
     ['prototype-like paint', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="constructor"/></svg>', 'import.paint-unsupported'],
-    ['lossy fill opacity', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill-opacity="0.5"/></svg>', 'import.opacity-unsupported'],
+    ['unresolved token opacity', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="currentColor" fill-opacity="0.5"/></svg>', 'import.opacity-unsupported'],
+    ['invalid fill opacity', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill-opacity="1.5"/></svg>', 'import.opacity-unsupported'],
     ['malformed path', '<svg viewBox="0 0 24 24"><path d="M0 0 L1"/></svg>', 'import.path-invalid'],
     ['unmapped attribute', '<svg viewBox="0 0 24 24"><rect width="2" height="2" cx="3"/></svg>', 'import.attribute-unsupported'],
     ['nested viewport', '<svg viewBox="0 0 24 24"><svg viewBox="0 0 8 8"><rect width="2" height="2"/></svg></svg>', 'import.nested-svg-unsupported'],
@@ -115,6 +116,21 @@ describe('SVG canonicalization', () => {
       { fill: { kind: 'color', value: '#0000ff80' } },
       { fill: { kind: 'color', value: '#ff800040' } },
       { fill: { kind: 'color', value: '#10203000' } },
+    ]);
+  });
+
+  it('keeps inherited fill and stroke opacities separate from node opacity', () => {
+    const source = '<svg viewBox="0 0 24 24" fill-opacity="0.5"><g stroke="#00ff00" stroke-opacity="0.25">'
+      + '<rect width="4" height="4" fill="#ff000080" opacity="0.75"/>'
+      + '<line x1="0" y1="0" x2="4" y2="4" stroke-opacity="0.5"/>'
+      + '</g></svg>';
+    const { icon } = canonicalizeSvgAst(parseSvgAst(source), options());
+    const group = icon.nodes[0]!;
+    if (group.type !== 'group') throw new Error('Expected group');
+    expect(group.children).toMatchObject([
+      { type: 'rect', opacity: 0.75, fill: { kind: 'color', value: '#ff000040' },
+        stroke: { paint: { kind: 'color', value: '#00ff0040' } } },
+      { type: 'line', stroke: { paint: { kind: 'color', value: '#00ff0080' } } },
     ]);
   });
 

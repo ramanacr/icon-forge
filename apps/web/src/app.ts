@@ -175,6 +175,10 @@ import type { IconGridPreset } from '@iconforge/commands';
               [disabled]="!canEdit() || !canPosition()"></label>
             <button type="button" (click)="runRotation(rotateDegrees.value)"
               [disabled]="!canEdit() || !canPosition()">Apply rotation</button>
+            <button type="button" (click)="runFlip('horizontal')"
+              [disabled]="!canEdit() || !canPosition()">Flip horizontal</button>
+            <button type="button" (click)="runFlip('vertical')"
+              [disabled]="!canEdit() || !canPosition()">Flip vertical</button>
           </div>
           <button type="button" (click)="runAppearance('filled')" [disabled]="!canEdit() || !canStyle()">Fill shape</button>
           <button type="button" (click)="runAppearance('outline')" [disabled]="!canEdit() || !canStyle()">Outline shape</button>
@@ -567,6 +571,9 @@ export class App implements OnInit, OnDestroy {
   runRotation(degrees: string): void {
     if (!degrees.trim()) { this.error.set('Enter rotation degrees'); return; }
     void this.run(() => this.workspace.rotateSelected(Number(degrees)));
+  }
+  runFlip(axis: 'horizontal' | 'vertical'): void {
+    void this.run(() => this.workspace.flipSelected(axis));
   }
   runFillColor(color: string): void { void this.run(() => this.workspace.setFillColor(color)); }
   runStrokeWidth(width: string): void {

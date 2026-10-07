@@ -683,6 +683,11 @@ export class BrowserWorkspace {
     await this.transformSelectedAroundCenter(cosine, sine, -sine, cosine);
   }
 
+  async flipSelected(axis: 'horizontal' | 'vertical'): Promise<void> {
+    await this.transformSelectedAroundCenter(axis === 'horizontal' ? -1 : 1, 0,
+      0, axis === 'vertical' ? -1 : 1);
+  }
+
   async moveRight(): Promise<void> { await this.translateSelected(1, 0); }
 
   async undo(): Promise<void> {

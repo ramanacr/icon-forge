@@ -1060,6 +1060,24 @@ test('M1 selection scales and rotates around its center with undo and export', a
   await expect(rect).toHaveAttribute('transform', scaled!);
 });
 
+test('M1 selection flips around its center and each flip can be undone', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  const rect = page.locator('svg rect[data-node-id]');
+  await page.getByRole('button', { name: 'Flip horizontal' }).click();
+  await expect(rect).toHaveAttribute('transform', /^matrix\(-1 0 0 1 /);
+  const horizontal = await rect.getAttribute('transform');
+  await page.getByRole('button', { name: 'Flip vertical' }).click();
+  await expect(rect).toHaveAttribute('transform', /^matrix\(-1 0 0 -1 /);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rect).toHaveAttribute('transform', horizontal!);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rect).not.toHaveAttribute('transform');
+});
+
 test('M1 inspector color and stroke width changes survive export and reload', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

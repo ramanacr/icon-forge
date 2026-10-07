@@ -273,6 +273,52 @@ test('M2 browser downloads a sprite archive matching the pure compiler', async (
   expect(archive['manifest.json']).toEqual(expected.manifestBytes);
 });
 
+test('M2 set overview previews and filters icons without changing the project', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('button', { name: 'Add icon' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add ellipse' }).click();
+  let downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const before = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;
+
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  const overview = page.getByRole('region', { name: 'Set overview' });
+  await expect(overview.getByRole('img', { name: 'icon-1 preview' })).toHaveAttribute('src', /^data:image\/svg\+xml,/);
+  await expect.poll(() => overview.getByRole('img', { name: 'icon-1 preview' })
+    .evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(overview.getByRole('img', { name: 'icon-2 preview' })).toBeVisible();
+  await overview.getByRole('searchbox', { name: 'Find icons' }).fill('icon-2');
+  await expect(overview.getByRole('img')).toHaveCount(1);
+  await overview.getByRole('button', { name: 'Open icon-2' }).click();
+  await expect(page.getByRole('button', { name: 'Set overview' })).toBeVisible();
+  await expect(page.locator('.canvas svg ellipse[data-node-id]')).toBeVisible();
+
+  downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const after = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;
+  expect(after).toEqual(before);
+
+  const fixtureId = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
+  const templateIcon = before.icons[0]!;
+  const many = { ...before, icons: Array.from({ length: 25 }, (_, index) => ({ ...templateIcon,
+    id: fixtureId(100 + index), name: `sample-${String(index + 1).padStart(2, '0')}`,
+    nodes: templateIcon.nodes.map((node, nodeIndex) => ({ ...node, id: fixtureId(200 + index * 10 + nodeIndex) })),
+  })) };
+  await page.getByLabel('Open project file').setInputFiles({ name: 'many.iconproj',
+    mimeType: 'application/zip', buffer: Buffer.from(await encodeProjectArchive(many)) });
+  await expect(page.getByRole('button', { name: 'sample-25' })).toBeVisible();
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  await overview.getByRole('searchbox', { name: 'Find icons' }).fill('');
+  await expect(overview.getByRole('img')).toHaveCount(24);
+  await overview.getByRole('button', { name: 'Next icons' }).click();
+  await expect(overview.getByRole('img', { name: 'sample-25 preview' })).toBeVisible();
+  await expect(overview.getByRole('button', { name: 'Next icons' })).toBeDisabled();
+});
+
 test('S-06 idle compaction keeps undo available after reload', async ({ page }) => {
   await page.clock.install();
   await page.goto(baseUrl);
@@ -799,7 +845,7 @@ test('M1 editor passes automated WCAG 2.2 AA checks', async ({ page }) => {
   await page.getByRole('button', { name: 'Create project' }).click();
   await page.getByRole('button', { name: 'Add icon' }).click();
   await page.getByRole('button', { name: 'Add rectangle' }).click();
-  const violations = await page.evaluate(async () => {
+  const audit = () => page.evaluate(async () => {
     const axe = (window as unknown as { axe: { run(context: Document, options: unknown): Promise<{
       violations: { id: string; nodes: { target: string[] }[] }[] }>; } }).axe;
     const results = await axe.run(document, { runOnly: { type: 'tag',
@@ -807,7 +853,9 @@ test('M1 editor passes automated WCAG 2.2 AA checks', async ({ page }) => {
     return results.violations.map(violation => ({ id: violation.id,
       targets: violation.nodes.map(node => node.target.join(' ')) }));
   });
-  expect(violations).toEqual([]);
+  expect(await audit()).toEqual([]);
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  expect(await audit()).toEqual([]);
 });
 
 test('M1 phone preview controls meet the 44 pixel target minimum', async ({ browser }) => {

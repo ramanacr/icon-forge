@@ -54,6 +54,8 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
         </aside>
         <section class="studio" aria-label="Icon editor">
           <div class="toolbar">
+            <button type="button" (click)="toggleOverview()" [disabled]="!hasProject()">{{ showOverview() ? 'Return to editor' : 'Set overview' }}</button>
+            @if (!showOverview()) {
             <button type="button" (click)="runAddRectangle()" [disabled]="!canEdit() || !hasIcon()">Add rectangle</button>
             <button type="button" (click)="runAddEllipse()" [disabled]="!canEdit() || !hasIcon()">Add ellipse</button>
             <button type="button" (click)="runAddLine()" [disabled]="!canEdit() || !hasIcon()">Add line</button>
@@ -64,8 +66,28 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
             <button type="button" (click)="runUngroup()" [disabled]="!canEdit() || !canUngroup()">Ungroup selection</button>
             <button type="button" (click)="runDeleteSelection()" [disabled]="!canEdit() || !selected()">Delete selection</button>
             <button type="button" (click)="toggleGrid()" [disabled]="!hasIcon()">{{ showGrid() ? 'Hide grid' : 'Show grid' }}</button>
+            }
           </div>
-          <div class="stage">
+          <section class="set-overview" aria-label="Set overview" [hidden]="!showOverview()">
+            <div class="overview-heading">
+              <h2>Set overview</h2>
+              <label>Find icons <input type="search" [value]="overviewQuery()" (input)="setOverviewQuery($event)"></label>
+            </div>
+            <p class="overview-count" role="status">{{ overviewSummary() }}</p>
+            <div class="overview-grid">
+              @for (item of overviewItems(); track item.id) {
+                <button type="button" class="overview-card" [attr.aria-label]="'Open ' + item.name" (click)="chooseIcon(item.id)">
+                  <img [src]="item.preview" [alt]="item.name + ' preview'" loading="lazy">
+                  <span>{{ item.name }}</span>
+                </button>
+              }
+            </div>
+            <div class="overview-pages">
+              <button type="button" (click)="changeOverviewPage(-1)" [disabled]="!overviewHasPrevious()">Previous icons</button>
+              <button type="button" (click)="changeOverviewPage(1)" [disabled]="!overviewHasNext()">Next icons</button>
+            </div>
+          </section>
+          <div class="stage" [hidden]="showOverview()">
             @if (!hasIcon()) { <p class="empty">Create a project and add an icon to start drawing.</p> }
             <div #canvas class="canvas" (click)="onCanvasClick($event)"
               (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)"
@@ -137,6 +159,13 @@ export class App implements OnInit, OnDestroy {
   readonly needsRecovery = signal(false);
   readonly checkpointRecovery = signal(false);
   readonly showGrid = signal(true);
+  readonly showOverview = signal(false);
+  readonly overviewQuery = signal('');
+  readonly overviewItems = signal<{ id: string; name: string; preview: string }[]>([]);
+  readonly overviewSummary = signal('');
+  readonly overviewHasPrevious = signal(false);
+  readonly overviewHasNext = signal(false);
+  private overviewPage = 0;
   private readonly onFocus = (): void => {
     if (!this.workspace) return;
     void this.workspace.refreshReadonly().then(() => this.refresh()).catch(error => this.error.set(this.message(error)));
@@ -209,6 +238,7 @@ export class App implements OnInit, OnDestroy {
       && !this.busy() && !this.previewOnly());
     this.status.set(this.workspace.saveStatus);
     this.error.set(this.workspace.error);
+    this.refreshOverview(project);
     const host = this.canvas?.nativeElement;
     if (host) {
       host.replaceChildren();
@@ -223,6 +253,26 @@ export class App implements OnInit, OnDestroy {
         host.append(svg);
       }
     }
+  }
+
+  private refreshOverview(project: NonNullable<BrowserWorkspace['project']> | null): void {
+    if (!project || !this.showOverview()) { this.overviewItems.set([]); return; }
+    const query = this.overviewQuery().trim().toLowerCase();
+    const filtered = project.icons.filter(icon => icon.name.toLowerCase().includes(query))
+      .sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
+    const pageSize = 24;
+    this.overviewPage = Math.min(this.overviewPage, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
+    const start = this.overviewPage * pageSize;
+    this.overviewItems.set(filtered.slice(start, start + pageSize).map(icon => {
+      const svg = this.renderIconSvg(document, project, icon);
+      const preview = `data:image/svg+xml,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+      return { id: icon.id, name: icon.name, preview };
+    }));
+    this.overviewSummary.set(filtered.length
+      ? `Showing ${start + 1}–${Math.min(start + pageSize, filtered.length)} of ${filtered.length} icons`
+      : 'No matching icons');
+    this.overviewHasPrevious.set(this.overviewPage > 0);
+    this.overviewHasNext.set(start + pageSize < filtered.length);
   }
 
   private addGuides(svg: SVGSVGElement,
@@ -273,14 +323,23 @@ export class App implements OnInit, OnDestroy {
     finally { this.busy.set(false); this.refresh(); }
   }
 
-  runCreate(): void { void this.run(() => this.workspace.create()); }
+  private resetOverview(): void {
+    this.showOverview.set(false);
+    this.overviewQuery.set('');
+    this.overviewPage = 0;
+  }
+
+  runCreate(): void { void this.run(async () => { await this.workspace.create(); this.resetOverview(); }); }
   runOpenProject(event: Event): void {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
     const file = input.files[0]!;
     input.value = '';
     if (file.size > 64 * 1024 * 1024) { this.error.set('project-archive.size-limit'); return; }
-    void this.run(() => file.arrayBuffer().then(buffer => this.workspace.openProjectFile(new Uint8Array(buffer))), 'Open failed');
+    void this.run(async () => {
+      await this.workspace.openProjectFile(new Uint8Array(await file.arrayBuffer()));
+      this.resetOverview();
+    }, 'Open failed');
   }
   runAddIcon(): void { void this.run(() => this.workspace.addIcon()); }
   runImportSvg(event: Event): void {
@@ -328,7 +387,27 @@ export class App implements OnInit, OnDestroy {
     void this.workspace.downloadRecoveryData().catch(error => this.error.set(this.message(error)));
   }
 
-  chooseIcon(id: string): void { this.workspace.currentIconId = id; this.workspace.selection.clear(); this.refresh(); }
+  toggleOverview(): void { this.showOverview.update(value => !value); this.refresh(); }
+
+  setOverviewQuery(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    this.overviewQuery.set(input.value);
+    this.overviewPage = 0;
+    this.refresh();
+  }
+
+  changeOverviewPage(delta: number): void {
+    this.overviewPage = Math.max(0, this.overviewPage + delta);
+    this.refresh();
+  }
+
+  chooseIcon(id: string): void {
+    this.workspace.currentIconId = id;
+    this.workspace.selection.clear();
+    this.showOverview.set(false);
+    this.refresh();
+  }
 
   chooseLayer(id: string, event: MouseEvent): void {
     this.workspace.select(id, event.shiftKey);

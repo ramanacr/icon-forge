@@ -91,6 +91,8 @@ h2 { margin: 0 0 18px; font-size: 15px; }
 .empty { position: absolute; top: 14px; color: var(--text-muted); }
 .hint { color: var(--text-muted); font-size: 13px; }
 .inspector button { display: block; width: 100%; margin-bottom: 8px; }
+.icon-name-field { display: block; font-size: 13px; margin-bottom: var(--space-2); }
+.icon-name-field input { display: block; width: 100%; margin-top: var(--space-1); padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-control); font: inherit; }
 .position-fields { margin: 18px 0; }
 .position-fields label { display: block; font-size: 13px; margin-bottom: 8px; }
 .position-fields input { display: block; width: 100%; margin-top: var(--space-1); padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-control); font: inherit; }

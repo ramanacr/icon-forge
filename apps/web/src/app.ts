@@ -96,6 +96,12 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
           </div>
         </section>
         <aside class="inspector" aria-label="Selection inspector">
+          <h2>Icon</h2>
+          <label class="icon-name-field">Icon name
+            <input #iconName type="text" [value]="activeIconName()" [disabled]="!canEdit() || !hasIcon()">
+          </label>
+          <button type="button" (click)="runRenameIcon(iconName.value)" [disabled]="!canEdit() || !hasIcon()">Apply icon name</button>
+          <p class="hint">Names become SVG filenames and sprite IDs.</p>
           <h2>Selection</h2>
           <p>{{ selected() ? 'Shape selected' : 'Select a shape on the canvas' }}</p>
           <div class="position-fields">
@@ -152,6 +158,7 @@ export class App implements OnInit, OnDestroy {
   readonly importMessages = signal<string[]>([]);
   readonly layers = signal<{ id: string; label: string; selected: boolean }[]>([]);
   readonly activeIconId = signal<string | null>(null);
+  readonly activeIconName = signal('');
   readonly selected = signal(false);
   readonly hasIcon = signal(false);
   readonly hasProject = signal(false);
@@ -218,6 +225,7 @@ export class App implements OnInit, OnDestroy {
     this.projectName.set(project?.name ?? 'No project');
     this.icons.set(project?.icons.map(item => ({ id: item.id, name: item.name })) ?? []);
     this.activeIconId.set(icon?.id ?? null);
+    this.activeIconName.set(icon?.name ?? '');
     const selectedIds = this.workspace.selection.snapshot.nodeIds;
     this.selected.set(selectedIds.length > 0);
     const layerBases = icon?.nodes.map(node => ({ id: node.id,
@@ -372,6 +380,7 @@ export class App implements OnInit, OnDestroy {
     }, 'Open failed');
   }
   runAddIcon(): void { void this.run(() => this.workspace.addIcon()); }
+  runRenameIcon(name: string): void { void this.run(() => this.workspace.renameIcon(name)); }
   runImportSvg(event: Event): void {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || !input.files?.length) return;

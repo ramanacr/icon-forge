@@ -306,6 +306,18 @@ export class BrowserWorkspace {
     this.selection.clear();
   }
 
+  async renameIcon(requestedName: string): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    if (!project || !icon) throw new TypeError('Select an icon first');
+    const name = requestedName.trim().toLowerCase().replace(/[\s_]+/g, '-');
+    if (name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) {
+      throw new TypeError('Icon name must use letters, numbers and hyphens');
+    }
+    if (name === icon.name) return;
+    await this.persist({ ...this.base(project.id), type: 'icon.rename', payload: { iconId: icon.id, name } });
+  }
+
   async importSvg(originalSvg: Uint8Array, requestedName: string): Promise<ImportDiagnosticV1[]> {
     const project = this.project;
     if (!project) throw new TypeError('Create a project first');

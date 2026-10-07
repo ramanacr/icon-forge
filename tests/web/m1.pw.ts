@@ -348,6 +348,33 @@ test('M2 previews the active icon at four sizes in light and dark without edits'
   expect(after).toEqual(before);
 });
 
+test('M2 semantic icon names are journalled and drive sprite IDs', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('button', { name: 'Add icon' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('textbox', { name: 'Icon name' }).fill('Medical Plus');
+  await page.getByRole('button', { name: 'Apply icon name' }).click();
+  await expect(page.getByRole('button', { name: 'medical-plus' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'icon-1' }).click();
+  await expect(page.getByRole('textbox', { name: 'Icon name' })).toHaveValue('icon-1');
+  await page.getByRole('textbox', { name: 'Icon name' }).fill('medical-plus');
+  await page.getByRole('button', { name: 'Apply icon name' }).click();
+  await expect(page.getByRole('alert')).toContainText('Duplicate icon name');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('button', { name: 'icon-2' })).toBeVisible();
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.getByRole('button', { name: 'medical-plus' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'medical-plus' })).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download sprite' }).click();
+  const sprite = new TextDecoder().decode(unzipSync(await readFile((await (await downloadPromise).path())!))['sprite.svg']);
+  expect(sprite).toContain('id="if-medical-plus"');
+});
+
 test('S-06 idle compaction keeps undo available after reload', async ({ page }) => {
   await page.clock.install();
   await page.goto(baseUrl);

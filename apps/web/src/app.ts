@@ -109,6 +109,12 @@ import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
           </div>
         </section>
         <aside class="inspector" aria-label="Selection inspector">
+          <h2>Project</h2>
+          <div class="project-name-fields">
+            <label>Project name <input #projectNameInput type="text" maxlength="120"
+              [value]="projectName()" [disabled]="!canEdit()"></label>
+            <button type="button" (click)="runRenameProject(projectNameInput.value)" [disabled]="!canEdit()">Apply project name</button>
+          </div>
           <h2>Set style</h2>
           <div class="set-style-fields">
             <label>Visual language
@@ -418,6 +424,7 @@ export class App implements OnInit, OnDestroy {
     }, 'Open failed');
   }
   runAddIcon(): void { void this.run(() => this.workspace.addIcon()); }
+  runRenameProject(name: string): void { void this.run(() => this.workspace.renameProject(name)); }
   runAddStarter(name: StarterIconName): void { void this.run(() => this.workspace.addStarterIcon(name)); }
   toggleStarters(): void { this.showStarters.update(value => !value); }
   runRenameIcon(name: string): void { void this.run(() => this.workspace.renameIcon(name)); }

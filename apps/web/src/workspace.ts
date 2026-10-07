@@ -295,6 +295,15 @@ export class BrowserWorkspace {
     void this.refreshStorageDurability(id, true);
   }
 
+  async renameProject(requestedName: string): Promise<void> {
+    const project = this.project;
+    if (!project) throw new TypeError('Create a project first');
+    const name = requestedName.trim();
+    if (!name || name.length > 120) throw new TypeError('Project name must be 1–120 characters');
+    if (name === project.name) return;
+    await this.persist({ ...this.base(project.id), type: 'project.rename', payload: { name } });
+  }
+
   async addIcon(): Promise<void> {
     const project = this.project;
     if (!project) throw new TypeError('Create a project first');

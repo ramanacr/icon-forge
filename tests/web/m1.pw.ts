@@ -393,6 +393,21 @@ test('M2 set style changes are undoable without rewriting icon geometry', async 
   await expect(page.getByRole('spinbutton', { name: 'Set stroke width' })).toHaveValue('1.75');
 });
 
+test('M2 project name survives reload and can be undone', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('textbox', { name: 'Project name' })).toHaveValue('Untitled project');
+  await page.getByRole('textbox', { name: 'Project name' }).fill('Navigation Icons');
+  await page.getByRole('button', { name: 'Apply project name' }).click();
+  await expect(page.locator('.project-name')).toHaveText('Navigation Icons');
+  await page.reload();
+  await expect(page.locator('.project-name')).toHaveText('Navigation Icons');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('.project-name')).toHaveText('Untitled project');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('.project-name')).toHaveText('Navigation Icons');
+});
+
 test('M2 previews the active icon at four sizes in light and dark without edits', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

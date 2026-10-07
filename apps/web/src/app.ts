@@ -27,6 +27,14 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
         <aside class="sidebar" aria-label="Project assets">
           <h2>Icons</h2>
           <button type="button" (click)="runAddIcon()" [disabled]="!canEdit()">Add icon</button>
+          <label class="import-file">Import SVG
+            <input type="file" accept=".svg,image/svg+xml" (change)="runImportSvg($event)" [disabled]="!canEdit()">
+          </label>
+          @if (importMessages().length) {
+            <div role="status">
+              @for (message of importMessages(); track message) { <p>{{ message }}</p> }
+            </div>
+          }
           @for (icon of icons(); track icon.id) {
             <button type="button" class="asset" [class.active]="icon.id === activeIconId()"
               (click)="chooseIcon(icon.id)">{{ icon.name }}</button>
@@ -102,6 +110,7 @@ export class App implements OnInit, OnDestroy {
   readonly error = signal('');
   readonly projectName = signal('No project');
   readonly icons = signal<{ id: string; name: string }[]>([]);
+  readonly importMessages = signal<string[]>([]);
   readonly layers = signal<{ id: string; label: string; selected: boolean }[]>([]);
   readonly activeIconId = signal<string | null>(null);
   readonly selected = signal(false);
@@ -245,7 +254,7 @@ export class App implements OnInit, OnDestroy {
     svg.insertBefore(group, svg.querySelector('[data-node-id]'));
   }
 
-  private async run(action: () => Promise<void>): Promise<void> {
+  private async run(action: () => Promise<void>, failureStatus = 'Save failed'): Promise<void> {
     if (this.busy() || this.previewOnly()) return;
     this.busy.set(true);
     this.canEdit.set(false);
@@ -253,13 +262,25 @@ export class App implements OnInit, OnDestroy {
     try { await action(); }
     catch (error) {
       this.workspace.error = this.message(error);
-      this.workspace.saveStatus = 'Save failed';
+      this.workspace.saveStatus = failureStatus;
     }
     finally { this.busy.set(false); this.refresh(); }
   }
 
   runCreate(): void { void this.run(() => this.workspace.create()); }
   runAddIcon(): void { void this.run(() => this.workspace.addIcon()); }
+  runImportSvg(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
+    const file = input.files[0]!;
+    input.value = '';
+    this.importMessages.set([]);
+    if (file.size > 2 * 1024 * 1024) { this.error.set('import.source-limit'); return; }
+    void this.run(async () => {
+      const diagnostics = await this.workspace.importSvg(new Uint8Array(await file.arrayBuffer()), file.name);
+      this.importMessages.set(diagnostics.map(diagnostic => diagnostic.message));
+    }, 'Import failed');
+  }
   runAddRectangle(): void { void this.run(() => this.workspace.addRectangle()); }
   runAddEllipse(): void { void this.run(() => this.workspace.addEllipse()); }
   runAddLine(): void { void this.run(() => this.workspace.addLine()); }

@@ -49,6 +49,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
 .inspector { border-left: 1px solid var(--border-subtle); }
 h2 { margin: 0 0 18px; font-size: 15px; }
 .sidebar > button { width: 100%; text-align: left; margin-bottom: var(--space-2); }
+.import-file { display: block; margin: var(--space-2) 0 var(--space-4); font-size: 13px; }
+.import-file input { display: block; width: 100%; margin-top: var(--space-1); color: var(--text); }
+.sidebar [role="status"] { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 .layers-heading { margin-top: 28px; }
 .layer { padding-left: 20px; }
 .asset.active, .layer.active { background: var(--selection-surface); border-color: var(--selection-border); }

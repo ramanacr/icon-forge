@@ -102,6 +102,9 @@ importers:
       '@iconforge/geometry':
         specifier: workspace:*
         version: link:../../packages/geometry
+      '@iconforge/import-svg':
+        specifier: workspace:*
+        version: link:../../packages/import-svg
       '@iconforge/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
@@ -214,9 +217,15 @@ importers:
 
   packages/import-svg:
     dependencies:
+      '@iconforge/project-model':
+        specifier: workspace:*
+        version: link:../project-model
       saxes:
         specifier: 6.0.0
         version: 6.0.0
+      svgpath:
+        specifier: 2.6.0
+        version: 2.6.0
 
   packages/outline:
     dependencies:
@@ -4381,6 +4390,9 @@ packages:
   supports-preserve-symlinks-flag@1.0.0:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
+
+  svgpath@2.6.0:
+    resolution: {integrity: sha512-OIWR6bKzXvdXYyO4DK/UWa1VA1JeKq8E+0ug2DG98Y/vOmMpfZNj+TIG988HjfYSqtcy/hFOtZq/n/j5GSESNg==}
 
   tar-stream@2.2.0:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
@@ -9085,6 +9097,8 @@ snapshots:
       has-flag: 4.0.0
 
   supports-preserve-symlinks-flag@1.0.0: {}
+
+  svgpath@2.6.0: {}
 
   tar-stream@2.2.0:
     dependencies:

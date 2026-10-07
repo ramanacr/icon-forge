@@ -22,7 +22,7 @@ test.beforeAll(async () => {
       const content = await readFile(target);
       const type = extname(target) === '.js' ? 'text/javascript' : extname(target) === '.css' ? 'text/css' : 'text/html';
       response.writeHead(200, { 'content-type': type,
-        'content-security-policy': "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; require-trusted-types-for 'script'; trusted-types angular angular#bundler iconforge-preview" });
+        'content-security-policy': "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; require-trusted-types-for 'script'; trusted-types angular angular#bundler iconforge-preview default" });
       response.end(content);
     } catch { response.writeHead(404).end(); }
   });
@@ -80,6 +80,80 @@ test('M1 browser workflow creates, edits, undoes, exports, and reloads an icon',
   await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 1 0)');
   await expect(page.getByText('Saved in browser only')).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('Phase 2 browser imports an SVG file, retains its original, and rejects unsafe SVG', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  const input = page.getByLabel('Import SVG');
+  await expect(input).toBeEnabled();
+  const original = Buffer.from('<svg viewBox="0 0 24 24"><path d="M1 1 L4 1 L4 4 Z"/></svg>');
+  await input.setInputFiles({ name: 'triangle.svg', mimeType: 'image/svg+xml', buffer: original });
+  await expect(page.getByRole('button', { name: 'triangle' })).toBeVisible();
+  await expect(page.locator('svg path[data-node-id]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('button', { name: 'triangle' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('svg path[data-node-id]')).toHaveCount(1);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const archive = await decodeProjectArchive(await readFile((await (await downloadPromise).path())!));
+  expect(archive.project.icons[0]?.name).toBe('triangle');
+  expect(Object.values(archive.attachments)).toHaveLength(1);
+  expect(Buffer.from(Object.values(archive.attachments)[0]!)).toEqual(original);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'triangle' })).toBeVisible();
+  await expect(page.locator('svg path[data-node-id]')).toHaveCount(1);
+  await input.setInputFiles({ name: 'arc.svg', mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg viewBox="0 0 24 24"><path d="M2 2 A4 4 0 0 1 8 8"/></svg>') });
+  await expect(page.getByText('SVG arcs were converted to cubic segments')).toBeVisible();
+  await input.setInputFiles({ name: 'unsafe.svg', mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg viewBox="0 0 24 24"><script/></svg>') });
+  await expect(page.getByRole('alert')).toContainText('import.element-unsupported');
+  await expect(page.getByRole('button', { name: 'unsafe' })).toHaveCount(0);
+});
+
+test('Phase 2 imported primitives and arc paths retain their raster silhouette', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  const source = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(2 1)" fill="#123456">'
+    + '<rect x="1" y="2" width="4" height="6" rx="1"/>'
+    + '<path d="M8 4 A4 4 0 0 1 16 4 L16 10 Z"/></g></svg>';
+  const input = page.getByLabel('Import SVG');
+  await expect(input).toBeEnabled();
+  await input.setInputFiles({ name: 'fidelity.svg', mimeType: 'image/svg+xml',
+    buffer: Buffer.from(source) });
+  await expect(page.getByRole('button', { name: 'fidelity' })).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const exported = await readFile((await (await downloadPromise).path())!, 'utf8');
+  const iou = await page.evaluate(async ({ source, exported }) => {
+    const pixels = async (svg: string): Promise<Uint8ClampedArray> => {
+      const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 192;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0, 192, 192);
+        return context.getImageData(0, 0, 192, 192).data;
+      } finally { URL.revokeObjectURL(url); }
+    };
+    const a = await pixels(source);
+    const b = await pixels(exported);
+    let intersection = 0;
+    let union = 0;
+    for (let index = 3; index < a.length; index += 4) {
+      const sourceFilled = a[index]! >= 128;
+      const outputFilled = b[index]! >= 128;
+      if (sourceFilled && outputFilled) intersection++;
+      if (sourceFilled || outputFilled) union++;
+    }
+    return intersection / union;
+  }, { source, exported });
+  expect(iou).toBeGreaterThanOrEqual(0.995);
 });
 
 test('M1 explains a missing required browser capability before enabling edits', async ({ page }) => {

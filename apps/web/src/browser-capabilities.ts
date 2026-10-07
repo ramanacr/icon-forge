@@ -15,6 +15,14 @@ export async function assertBrowserCapabilities(): Promise<void> {
       const trustedTypes = (globalThis as typeof globalThis & { trustedTypes?: {
         createPolicy(name: string, rules: { createScriptURL(value: string): string }): {
           createScriptURL(value: string): unknown } } }).trustedTypes;
+      trustedTypes?.createPolicy('default', { createScriptURL(value) {
+        const workerUrl = new URL(value, location.href);
+        if (workerUrl.origin !== location.origin
+          || !/^worker-[A-Z0-9]{8}\.js$/.test(workerUrl.pathname.split('/').at(-1) ?? '')) {
+          throw new TypeError('worker.url.invalid');
+        }
+        return value;
+      } });
       const source = trustedTypes?.createPolicy('iconforge-preview', {
         createScriptURL(value) {
           if (value !== url.href || url.origin !== location.origin) throw new TypeError('worker.url.invalid');

@@ -1,8 +1,9 @@
 import { ProjectDispatcher } from '@iconforge/application';
-import type { CommandEnvelopeV1 } from '@iconforge/commands';
+import type { CommandEnvelopeV1, ImportDiagnosticV1 } from '@iconforge/commands';
 import { compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
+import { prepareSvgImportInWorker } from '@iconforge/import-svg';
 import { DexieProjectRepository, ProjectWriteLock, downloadProjectFile, readStorageDurability,
   requestPersistentStorage, type StorageDurability } from '@iconforge/persistence';
 import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
@@ -241,15 +242,18 @@ export class BrowserWorkspace {
     }
   }
 
-  private async persist(command: CommandEnvelopeV1): Promise<void> {
+  private async persist(command: CommandEnvelopeV1, originalSvg?: Uint8Array): Promise<void> {
     if (!this.writable || this.recovery) throw new TypeError('Project is read only until recovery is complete');
+    if (command.type === 'icon.importSvg' && !originalSvg) throw new TypeError('import.original-required');
     if (this.idleCompaction) clearTimeout(this.idleCompaction);
     this.idleCompaction = null;
     const before = this.dispatcher.revision;
     try { this.dispatcher.dispatch(command); }
     catch (error) { await this.scheduleCompaction(command.projectId); throw error; }
     const entry = this.dispatcher.journal.at(-1)!;
-    const write = this.repository.append(command.projectId, before, this.dispatcher.revision, entry);
+    const write = command.type === 'icon.importSvg'
+      ? this.repository.appendImport(command.projectId, before, this.dispatcher.revision, entry, originalSvg!)
+      : this.repository.append(command.projectId, before, this.dispatcher.revision, entry);
     this.pendingSave = write;
     try {
       await write;
@@ -296,6 +300,31 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(project.id), type: 'icon.add', payload: { icon } });
     this.currentIconId = icon.id;
     this.selection.clear();
+  }
+
+  async importSvg(originalSvg: Uint8Array, requestedName: string): Promise<ImportDiagnosticV1[]> {
+    const project = this.project;
+    if (!project) throw new TypeError('Create a project first');
+    if (!this.writable || this.recovery) throw new TypeError('Project is read only until recovery is complete');
+    const baseName = requestedName.replace(/\.svg$/i, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64)
+      || 'imported-icon';
+    let name = baseName;
+    let suffix = 2;
+    while (project.icons.some(icon => icon.name === name)) {
+      const tail = `-${suffix++}`;
+      name = `${baseName.slice(0, 64 - tail.length)}${tail}`;
+    }
+    const prepared = await prepareSvgImportInWorker(originalSvg, {
+      iconId: uuidV7(), provenanceId: uuidV7(), name,
+    });
+    await this.persist({ ...this.base(project.id), type: 'icon.importSvg',
+      payload: { icon: prepared.icon, provenance: { ...prepared.provenance, source: requestedName },
+        diagnostics: prepared.diagnostics } },
+    prepared.originalSvg);
+    this.currentIconId = prepared.icon.id;
+    this.selection.clear();
+    return prepared.diagnostics;
   }
 
   async addRectangle(): Promise<void> {

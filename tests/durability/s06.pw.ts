@@ -21,12 +21,13 @@ test.beforeAll(async () => {
       application: resolve('packages/application/src/index.ts'),
       persistence: resolve('packages/persistence/src/index.ts'),
       workspace: resolve('apps/web/src/workspace.ts'),
+      worker: resolve('packages/import-svg/src/worker.ts'),
     },
     outdir: outputDir, bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
   });
   server = createServer(async (request, response) => {
     const name = request.url?.slice(1);
-    if (name !== 'application.js' && name !== 'persistence.js' && name !== 'workspace.js') {
+    if (name !== 'application.js' && name !== 'persistence.js' && name !== 'workspace.js' && name !== 'worker.js') {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html>');
       return;
     }
@@ -158,6 +159,33 @@ test('S-06 SVG original and import journal commit atomically', async ({ page }) 
   });
   expect(result).toEqual({ hashRejected: true, beforeRevision: 1, originalCountBefore: 0,
     revision: 2, iconCount: 1, attachmentMatches: true, staleRejected: true });
+});
+
+test('S-06 workspace imports SVG and includes its original in the project backup', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const { BrowserWorkspace } = await import(new URL('/workspace.js', location.origin).href);
+    const { DexieProjectRepository, encodeProjectArchive, decodeProjectArchive } =
+      await import(new URL('/persistence.js', location.origin).href);
+    const workspace = new BrowserWorkspace();
+    await workspace.create();
+    const bytes = new TextEncoder().encode('<svg viewBox="0 0 24 24"><path d="M1 1 L4 1 L4 4 Z"/></svg>');
+    await workspace.importSvg(bytes, 'triangle');
+    const project = workspace.project!;
+    const repository = new DexieProjectRepository('iconforge-web-v1');
+    const saved = await repository.load(project.id);
+    const originals = await repository.loadOriginals(project.id);
+    const archive = await decodeProjectArchive(await encodeProjectArchive(project, originals));
+    const archivedOriginal = Object.values(archive.attachments)[0] as Uint8Array;
+    await workspace.close();
+    repository.close();
+    return { iconName: project.icons[0]?.name, nodeType: project.icons[0]?.nodes[0]?.type,
+      provenanceCount: project.provenance.length, journalType: saved?.journal.at(-1)?.command.type,
+      backupOriginals: Object.keys(archive.attachments).length,
+      originalMatches: new TextDecoder().decode(archivedOriginal) === new TextDecoder().decode(bytes) };
+  });
+  expect(result).toEqual({ iconName: 'triangle', nodeType: 'path', provenanceCount: 1,
+    journalType: 'icon.importSvg', backupOriginals: 1, originalMatches: true });
 });
 
 test('S-06 IndexedDB v1 rows survive the originals-table upgrade', async ({ page }) => {

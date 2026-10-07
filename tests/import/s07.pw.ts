@@ -65,6 +65,34 @@ test('S-07 worker parses safe SVG under CSP and rejects malicious inputs', async
     'import.reference-invalid', 'import.use-cycle', 'import.element-limit']);
 });
 
+test('S-07 worker prepares a canonical icon with original-byte provenance', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    const browserUrl = '/browser.js';
+    const { prepareSvgImportInWorker } = await import(browserUrl) as {
+      prepareSvgImportInWorker(bytes: Uint8Array, options: { iconId: string; provenanceId: string; name: string }):
+        Promise<{ icon: { id: string; nodes: Array<{ id: string; type: string; x: number }> };
+          provenance: { id: string; originalSha256: string; modified: boolean }; diagnostics: unknown[]; originalSvg: Uint8Array }> };
+    const original = new TextEncoder().encode('<svg viewBox="0 0 24 24"><rect x="1.2345" width="4" height="4"/></svg>');
+    const payload = await prepareSvgImportInWorker(original, {
+      iconId: '0198e09b-a810-7000-8000-000000000101',
+      provenanceId: '0198e09b-a810-7000-8000-000000000102', name: 'imported',
+    });
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', original)),
+      byte => byte.toString(16).padStart(2, '0')).join('');
+    return { iconId: payload.icon.id, node: payload.icon.nodes[0], provenance: payload.provenance,
+      diagnostics: payload.diagnostics, originalMatches: new TextDecoder().decode(payload.originalSvg) ===
+        new TextDecoder().decode(original), hash };
+  });
+  expect(result.iconId).toBe('0198e09b-a810-7000-8000-000000000101');
+  expect(result.node).toMatchObject({ type: 'rect', x: 1.234 });
+  expect(result.node?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(result.provenance).toEqual({ id: '0198e09b-a810-7000-8000-000000000102',
+    originalSha256: result.hash, license: 'UNKNOWN', modified: false });
+  expect(result.diagnostics).toEqual([]);
+  expect(result.originalMatches).toBe(true);
+});
+
 test('S-07 browser wrapper terminates a worker that never replies', async ({ page }) => {
   await page.goto(baseUrl);
   const result = await page.evaluate(async () => {

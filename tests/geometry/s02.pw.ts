@@ -119,6 +119,59 @@ test('S-02 reports an intersection that collapses below coordinate quantum', asy
     diagnostics: [{ code: 'boolean.unsupported-geometry', severity: 'error' }] });
 });
 
+test('S-02 clip-like intersection preserves a nested hole and matches Canvas', async ({ page }) => {
+  await page.goto(baseUrl);
+  const result = await page.evaluate(async () => {
+    type Point = [number, number];
+    type Subpath = { start: Point; segments: Array<{ k: 'L' | 'Q' | 'C'; to: Point;
+      c?: Point; c1?: Point; c2?: Point }>; closed: boolean };
+    const fixture = await new Promise<{ left: Subpath[]; right: Subpath[];
+      result: { path: Subpath[] | null; diagnostics: unknown[] }; inputsUnchanged: boolean }>((resolve, reject) => {
+      const worker = new Worker('/worker.js', { type: 'module' });
+      worker.onmessage = event => { worker.terminate(); resolve(event.data); };
+      worker.onerror = event => { worker.terminate(); reject(new Error(event.message)); };
+      worker.postMessage({ case: 'clip-like' });
+    });
+    if (!fixture.inputsUnchanged || !fixture.result.path || fixture.result.diagnostics.length) {
+      throw new Error('Clip-like Boolean failed or mutated its inputs');
+    }
+    const pathFor = (parts: Subpath[]): Path2D => {
+      const path = new Path2D();
+      for (const part of parts) {
+        path.moveTo(...part.start);
+        for (const segment of part.segments) {
+          if (segment.k === 'L') path.lineTo(...segment.to);
+          else if (segment.k === 'Q') path.quadraticCurveTo(...segment.c!, ...segment.to);
+          else path.bezierCurveTo(...segment.c1!, ...segment.c2!, ...segment.to);
+        }
+        if (part.closed) path.closePath();
+      }
+      return path;
+    };
+    const render = (first: Path2D, second?: Path2D): Uint8Array => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 480; canvas.height = 480;
+      const context = canvas.getContext('2d')!;
+      context.scale(20, 20);
+      context.fill(first);
+      if (second) { context.globalCompositeOperation = 'source-in'; context.fill(second); }
+      const pixels = context.getImageData(0, 0, 480, 480).data;
+      return Uint8Array.from({ length: 480 * 480 }, (_, index) => pixels[index * 4 + 3]! > 127 ? 1 : 0);
+    };
+    const expected = render(pathFor(fixture.left), pathFor(fixture.right));
+    const actual = render(pathFor(fixture.result.path));
+    let intersection = 0; let union = 0;
+    for (let index = 0; index < expected.length; index++) {
+      if (expected[index] && actual[index]) intersection++;
+      if (expected[index] || actual[index]) union++;
+    }
+    return { iou: intersection / union,
+      holeAlpha: actual[(12 * 20 + 10) * 480 + (12 * 20 + 10)] };
+  });
+  expect(result.iou).toBeGreaterThanOrEqual(0.999);
+  expect(result.holeAlpha).toBe(0);
+});
+
 test('S-02 curved Boolean output matches Canvas compositing', async ({ page }) => {
   await page.goto(baseUrl);
   const scores = await page.evaluate(async () => {

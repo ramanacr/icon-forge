@@ -10,6 +10,25 @@ type SpikeResult = { domAvailable: boolean; canvasAvailable: boolean; areas?: Re
   invalidResult?: unknown; canonicalInputsUnchanged?: boolean; canonicalOperations?: unknown; error?: string };
 
 self.addEventListener('message', (event: MessageEvent) => {
+  if (event.data?.case === 'clip-like') {
+    const left = [
+      { start: [2, 2] as [number, number], segments: [
+        { k: 'L' as const, to: [22, 2] as [number, number] }, { k: 'L' as const, to: [22, 22] as [number, number] },
+        { k: 'L' as const, to: [2, 22] as [number, number] },
+      ], closed: true },
+      { start: [8, 8] as [number, number], segments: [
+        { k: 'L' as const, to: [8, 16] as [number, number] }, { k: 'L' as const, to: [16, 16] as [number, number] },
+        { k: 'L' as const, to: [16, 8] as [number, number] },
+      ], closed: true },
+    ];
+    const right = [{ start: [4, 4] as [number, number], segments: [
+      { k: 'L' as const, to: [20, 4] as [number, number] }, { k: 'L' as const, to: [12, 22] as [number, number] },
+    ], closed: true }];
+    const original = JSON.stringify({ left, right });
+    const result = new PaperGeometryEngine().boolean(left, right, 'intersect');
+    self.postMessage({ left, right, result, inputsUnchanged: JSON.stringify({ left, right }) === original });
+    return;
+  }
   if (event.data?.case === 'near-degenerate') {
     const rectangle = (x: number) => [{ start: [x, 0] as [number, number], segments: [
       { k: 'L' as const, to: [x + 1, 0] as [number, number] },

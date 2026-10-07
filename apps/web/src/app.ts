@@ -79,6 +79,7 @@ import type { IconGridPreset } from '@iconforge/commands';
             <button type="button" (click)="runAddEllipse()" [disabled]="!canEdit() || !hasIcon()">Add ellipse</button>
             <button type="button" (click)="runAddLine()" [disabled]="!canEdit() || !hasIcon()">Add line</button>
             <button type="button" (click)="runAddPolygon()" [disabled]="!canEdit() || !hasIcon()">Add polygon</button>
+            <button type="button" (click)="runAddPolyline()" [disabled]="!canEdit() || !hasIcon()">Add polyline</button>
             <button type="button" (click)="runMoveRight()" [disabled]="!canEdit() || !selected()">Move right</button>
             <button type="button" (click)="runUndo()" [disabled]="!canEdit()">Undo</button>
             <button type="button" (click)="runRedo()" [disabled]="!canEdit()">Redo</button>
@@ -540,6 +541,7 @@ export class App implements OnInit, OnDestroy {
   runAddEllipse(): void { void this.run(() => this.workspace.addEllipse()); }
   runAddLine(): void { void this.run(() => this.workspace.addLine()); }
   runAddPolygon(): void { void this.run(() => this.workspace.addPolygon()); }
+  runAddPolyline(): void { void this.run(() => this.workspace.addPolygon(false)); }
   runTakeOver(): void { void this.run(() => this.workspace.takeOver()); }
   runRecover(): void { void this.run(() => this.workspace.recover()); }
   runGroup(): void { void this.run(() => this.workspace.groupSelected()); }

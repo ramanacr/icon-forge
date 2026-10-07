@@ -1135,6 +1135,28 @@ test('M2 rectangle roundness edits are reversible and reject out-of-range values
   await expect(page.getByText('Select an unlocked rectangle to edit its roundness.')).toBeVisible();
 });
 
+test('M1 open polyline uses the set stroke and exports without a fill', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('spinbutton', { name: 'Set stroke width' }).fill('2.25');
+  await page.getByRole('button', { name: 'Apply set style' }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Set stroke width' })).toHaveValue('2.25');
+  await page.getByRole('button', { name: 'Add polyline' }).click();
+  const line = page.locator('.canvas svg polyline[data-node-id]');
+  await expect(line).toHaveAttribute('stroke-width', '2.25');
+  await expect(line).toHaveAttribute('fill', 'none');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const exported = await readFile((await (await downloadPromise).path())!, 'utf8');
+  expect(exported).toContain('<polyline');
+  expect(exported).toContain('fill="none" stroke="currentColor" stroke-width="2.25"');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(line).toHaveCount(0);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(line).toBeVisible();
+});
+
 test('M1 composite browser icon exports byte-identically through the CLI', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

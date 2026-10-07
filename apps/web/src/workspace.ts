@@ -435,15 +435,17 @@ export class BrowserWorkspace {
       payload: { iconId: icon.id, index: icon.nodes.length, node } });
   }
 
-  async addPolygon(): Promise<void> {
+  async addPolygon(closed = true): Promise<void> {
     const project = this.project;
     const icon = this.icon;
     if (!project || !icon) throw new TypeError('Add an icon first');
     const size = project.designSystem.grid.width;
     const inset = Math.round(size / 6);
     const node: SceneNodeV1 = { id: uuidV7(), type: 'polyline', visible: true, locked: false,
-      points: [size / 2, inset, size - inset, size - inset, inset, size - inset], closed: true,
-      fill: { kind: 'token', token: project.designSystem.defaultPaintToken } };
+      points: [inset, size - inset, size / 2, inset, size - inset, size - inset], closed,
+      fill: closed ? { kind: 'token', token: project.designSystem.defaultPaintToken } : { kind: 'none' },
+      ...(closed ? {} : { stroke: { paint: { kind: 'token' as const, token: project.designSystem.defaultPaintToken },
+        ...project.designSystem.stroke } }) };
     await this.persist({ ...this.base(project.id), type: 'node.add',
       payload: { iconId: icon.id, index: icon.nodes.length, node } });
   }

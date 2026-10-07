@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewChild, signal, type OnInit, type OnDestroy }
 import type { BrowserWorkspace } from './workspace.js';
 import { assertBrowserCapabilities } from './browser-capabilities.js';
 import { iconConsistencyWarnings, type IconConsistencyWarning } from './consistency.js';
+import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
 
 @Component({
   selector: 'iconforge-root',
@@ -32,6 +33,14 @@ import { iconConsistencyWarnings, type IconConsistencyWarning } from './consiste
         <aside class="sidebar" aria-label="Project assets">
           <h2>Icons</h2>
           <button type="button" (click)="runAddIcon()" [disabled]="!canEdit()">Add icon</button>
+          <button type="button" (click)="toggleStarters()" [disabled]="!hasProject()">{{ showStarters() ? 'Hide starters' : 'Pick starter' }}</button>
+          @if (showStarters()) {
+            <div class="starter-list" aria-label="Starter icons">
+              @for (starter of starters; track starter.name) {
+                <button type="button" (click)="runAddStarter(starter.name)" [disabled]="!canEdit()">{{ starter.label }}</button>
+              }
+            </div>
+          }
           <label class="import-file">Import SVG
             <input type="file" accept=".svg,image/svg+xml" (change)="runImportSvg($event)" [disabled]="!canEdit()">
           </label>
@@ -186,6 +195,8 @@ export class App implements OnInit, OnDestroy {
   readonly showSizePreview = signal(false);
   readonly previewSamples = signal<{ theme: 'Light' | 'Dark'; size: number; source: string }[]>([]);
   readonly showOverview = signal(false);
+  readonly showStarters = signal(false);
+  readonly starters = STARTER_ICONS;
   readonly overviewQuery = signal('');
   readonly overviewItems = signal<{ id: string; name: string; preview: string; warnings: IconConsistencyWarning[] }[]>([]);
   readonly overviewSummary = signal('');
@@ -366,6 +377,7 @@ export class App implements OnInit, OnDestroy {
 
   private resetOverview(): void {
     this.showOverview.set(false);
+    this.showStarters.set(false);
     this.showSizePreview.set(false);
     this.overviewQuery.set('');
     this.overviewPage = 0;
@@ -384,6 +396,8 @@ export class App implements OnInit, OnDestroy {
     }, 'Open failed');
   }
   runAddIcon(): void { void this.run(() => this.workspace.addIcon()); }
+  runAddStarter(name: StarterIconName): void { void this.run(() => this.workspace.addStarterIcon(name)); }
+  toggleStarters(): void { this.showStarters.update(value => !value); }
   runRenameIcon(name: string): void { void this.run(() => this.workspace.renameIcon(name)); }
   runImportSvg(event: Event): void {
     const input = event.target;

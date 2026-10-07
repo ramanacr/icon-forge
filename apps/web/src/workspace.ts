@@ -6,7 +6,8 @@ import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
 import { prepareSvgImportInWorker } from '@iconforge/import-svg';
 import { DexieProjectRepository, ProjectWriteLock, downloadBuildArchive, downloadProjectFile, openProjectArchive, readStorageDurability,
   requestPersistentStorage, type StorageDurability } from '@iconforge/persistence';
-import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
+import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type ProvenanceRecordV1, type SceneNodeV1 } from '@iconforge/project-model';
+import { STARTER_ICONS, starterSvg, type StarterIconName } from './starter-library.js';
 
 const POINTER = 'iconforge:last-project';
 
@@ -318,7 +319,8 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(project.id), type: 'icon.rename', payload: { iconId: icon.id, name } });
   }
 
-  async importSvg(originalSvg: Uint8Array, requestedName: string): Promise<ImportDiagnosticV1[]> {
+  async importSvg(originalSvg: Uint8Array, requestedName: string,
+    provenance: Pick<ProvenanceRecordV1, 'source' | 'author' | 'license' | 'attribution'> = {}): Promise<ImportDiagnosticV1[]> {
     const project = this.project;
     if (!project) throw new TypeError('Create a project first');
     if (!this.writable || this.recovery) throw new TypeError('Project is read only until recovery is complete');
@@ -335,12 +337,21 @@ export class BrowserWorkspace {
       iconId: uuidV7(), provenanceId: uuidV7(), name,
     });
     await this.persist({ ...this.base(project.id), type: 'icon.importSvg',
-      payload: { icon: prepared.icon, provenance: { ...prepared.provenance, source: requestedName },
+      payload: { icon: prepared.icon, provenance: { ...prepared.provenance, source: requestedName, ...provenance },
         diagnostics: prepared.diagnostics } },
     prepared.originalSvg);
     this.currentIconId = prepared.icon.id;
     this.selection.clear();
     return prepared.diagnostics;
+  }
+
+  async addStarterIcon(name: StarterIconName): Promise<void> {
+    if (!STARTER_ICONS.some(icon => icon.name === name)) throw new TypeError('starter.not-found');
+    const originalSvg = new TextEncoder().encode(starterSvg(name));
+    await this.importSvg(originalSvg, `${name}.svg`, {
+      source: `IconForge starter library/${name}.svg`, author: 'Ramana Reddy Chamakura',
+      license: 'MIT', attribution: 'Copyright (c) 2026 Ramana Reddy Chamakura',
+    });
   }
 
   async addRectangle(): Promise<void> {

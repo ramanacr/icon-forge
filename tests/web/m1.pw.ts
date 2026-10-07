@@ -341,6 +341,29 @@ test('M2 set overview warns about stroke widths that differ from the set policy'
   await expect(overview.getByRole('button', { name: /Open icon-1/ })).not.toContainText('differs');
 });
 
+test('M2 starter library creates five editable icons with licensed source in backups', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('button', { name: 'Pick starter' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Pick starter' }).click();
+  for (const name of ['Home', 'Search', 'Plus', 'Check', 'Arrow right']) {
+    await page.locator('.starter-list').getByRole('button', { name }).click();
+    await expect(page.getByRole('button', { name: name.toLowerCase().replace(' ', '-') })).toBeVisible();
+  }
+  await page.locator('.asset').filter({ hasText: 'home' }).click();
+  await expect(page.locator('.canvas svg [data-node-id]').first()).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const archive = await decodeProjectArchive(await readFile((await (await downloadPromise).path())!));
+  expect(archive.project.icons).toHaveLength(5);
+  expect(archive.project.provenance).toHaveLength(5);
+  for (const record of archive.project.provenance) {
+    expect(record.license).toBe('MIT');
+    expect(record.source).toMatch(/^IconForge starter library\//);
+    expect(archive.attachments[`originals/${record.originalSha256}.svg`]).toBeDefined();
+  }
+});
+
 test('M2 previews the active icon at four sizes in light and dark without edits', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

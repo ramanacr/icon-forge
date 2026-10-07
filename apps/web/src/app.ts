@@ -176,6 +176,13 @@ import type { IconGridPreset } from '@iconforge/commands';
               [value]="currentStrokeWidth()" [disabled]="!canEdit() || !canEditStroke()"></label>
           <button type="button" (click)="runStrokeWidth(strokeWidth.value)"
               [disabled]="!canEdit() || !canEditStroke()">Apply stroke width</button>
+            <label>Shape roundness <input #shapeRoundness type="number" step="0.001" min="0"
+              [value]="currentCornerRadius()" [disabled]="!canEdit() || !canEditCornerRadius()"></label>
+            <button type="button" (click)="runCornerRadius(shapeRoundness.value)"
+              [disabled]="!canEdit() || !canEditCornerRadius()">Apply shape roundness</button>
+            @if (hasIcon() && !canEditCornerRadius()) {
+              <p class="hint">Select an unlocked rectangle to edit its roundness.</p>
+            }
           </div>
           <button type="button" (click)="toggleSizePreview()" [disabled]="!hasIcon()">{{ showSizePreview() ? 'Hide size preview' : 'Preview sizes' }}</button>
           <section class="size-preview" aria-label="Icon size and theme preview" [hidden]="!showSizePreview()">
@@ -246,6 +253,8 @@ export class App implements OnInit, OnDestroy {
   readonly yPosition = signal(0);
   readonly currentFillColor = signal('#000000');
   readonly currentStrokeWidth = signal(1.75);
+  readonly currentCornerRadius = signal(0);
+  readonly canEditCornerRadius = signal(false);
   readonly setStyleValue = signal('outline');
   readonly setStrokeWidth = signal(1.75);
   readonly setCornerRadius = signal(2);
@@ -338,6 +347,8 @@ export class App implements OnInit, OnDestroy {
     this.yPosition.set(position?.[1] ?? 0);
     this.currentFillColor.set(this.workspace.fillColor);
     this.currentStrokeWidth.set(this.workspace.strokeWidth ?? project?.designSystem.stroke.width ?? 1.75);
+    this.currentCornerRadius.set(this.workspace.cornerRadius ?? 0);
+    this.canEditCornerRadius.set(this.workspace.cornerRadius !== null);
     this.setStyleValue.set(project?.designSystem.style ?? 'outline');
     this.setStrokeWidth.set(project?.designSystem.stroke.width ?? 1.75);
     this.setCornerRadius.set(project?.designSystem.cornerRadius ?? 2);
@@ -543,6 +554,10 @@ export class App implements OnInit, OnDestroy {
   runStrokeWidth(width: string): void {
     if (!width.trim()) { this.error.set('Enter a stroke width'); return; }
     void this.run(() => this.workspace.setStrokeWidth(Number(width)));
+  }
+  runCornerRadius(radius: string): void {
+    if (!radius.trim()) { this.error.set('Enter shape roundness'); return; }
+    void this.run(() => this.workspace.setCornerRadius(Number(radius)));
   }
   toggleGrid(): void { this.showGrid.update(value => !value); this.refresh(); }
   runMoveRight(): void { void this.run(() => this.workspace.moveRight()); }

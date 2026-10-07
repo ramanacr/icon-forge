@@ -1,4 +1,4 @@
-import { assertProject, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type ProvenanceRecordV1, type StrokeV1,
+import { assertProject, quantize, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type ProvenanceRecordV1, type StrokeV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 import { findNodePath, nodeArrayAt, removalOrder } from './scene-path.js';
@@ -52,7 +52,8 @@ export interface ImportDiagnosticV1 {
 /** Explicit node field operations; callers cannot merge arbitrary scene data. */
 export type NodeUpdateOp =
   | { op: 'setFill'; fill: PaintV1 | null }
-  | { op: 'setStroke'; stroke: StrokeV1 | null };
+  | { op: 'setStroke'; stroke: StrokeV1 | null }
+  | { op: 'setCornerRadius'; radius: number };
 
 export type IconMetadataPatch = Partial<Pick<IconV1, 'aliases' | 'tags' | 'accessibility'>> & {
   /** Explicit null removes the optional font mapping. */
@@ -335,7 +336,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
           }
           if (op.fill === null) delete after.fill;
           else after.fill = structuredClone(op.fill);
-        } else {
+        } else if (op.op === 'setStroke') {
           if (before.type !== 'line' && before.type !== 'rect' && before.type !== 'ellipse'
             && before.type !== 'path' && before.type !== 'polyline') {
             throw new TypeError('node.update.stroke.unsupported');
@@ -344,6 +345,14 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
             if (before.type === 'line') throw new TypeError('node.update.stroke.required');
             delete after.stroke;
           } else after.stroke = structuredClone(op.stroke);
+        } else {
+          if (before.type !== 'rect') throw new TypeError('node.update.corner-radius.unsupported');
+          if (!Number.isFinite(op.radius) || op.radius < 0
+            || op.radius > Math.min(before.width, before.height) / 2 || quantize(op.radius) !== op.radius) {
+            throw new TypeError('node.update.corner-radius.invalid');
+          }
+          after.rx = op.radius;
+          after.ry = op.radius;
         }
       }
       container[index] = after as unknown as SceneNodeV1;

@@ -3583,6 +3583,23 @@
             "stroke"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "const": "setCornerRadius"
+            },
+            "radius": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "op",
+            "radius"
+          ],
+          "additionalProperties": false
         }
       ],
       "description": "Explicit node field operations; callers cannot merge arbitrary scene data."

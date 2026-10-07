@@ -98,6 +98,10 @@ export class BrowserWorkspace {
     const node = this.selectedNode;
     return node && 'stroke' in node && node.stroke ? node.stroke.width : null;
   }
+  get cornerRadius(): number | null {
+    const node = this.selectedNode;
+    return node?.type === 'rect' && !node.locked ? node.rx : null;
+  }
 
   private base(projectId: string) {
     return { commandVersion: '1.0' as const, commandId: uuidV7(), projectId,
@@ -550,6 +554,23 @@ export class BrowserWorkspace {
     const stroke = { ...node.stroke, width: quantize(width) };
     await this.persist({ ...this.base(project.id), type: 'node.update', payload: {
       iconId: icon.id, nodeId: node.id, ops: [{ op: 'setStroke', stroke }],
+    } });
+  }
+
+  async setCornerRadius(radius: number): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    const node = this.selectedNode;
+    if (!project || !icon || !node || node.type !== 'rect' || node.locked) {
+      throw new TypeError('Select an unlocked rectangle to edit roundness');
+    }
+    if (!Number.isFinite(radius) || radius < 0 || radius > Math.min(node.width, node.height) / 2) {
+      throw new TypeError('Roundness must fit inside the rectangle');
+    }
+    const rounded = quantize(radius);
+    if (node.rx === rounded && node.ry === rounded) return;
+    await this.persist({ ...this.base(project.id), type: 'node.update', payload: {
+      iconId: icon.id, nodeId: node.id, ops: [{ op: 'setCornerRadius', radius: rounded }],
     } });
   }
 

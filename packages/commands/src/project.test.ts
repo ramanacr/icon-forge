@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyProjectCommand } from './project.js';
+import { assertCommandEnvelope } from './validation.js';
 import type { IconV1 } from '@iconforge/project-model';
 
 const id = '0198e09b-a810-7000-8000-000000000001';
@@ -14,6 +15,33 @@ const icon: IconV1 = {
 };
 
 describe('project command handlers', () => {
+  it('updates only rectangle corners with a typed reversible operation', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const rect = { id: '0198e09b-a810-7000-8000-0000000000e9', type: 'rect' as const,
+      visible: true, locked: false, x: 4, y: 4, width: 16, height: 12, rx: 0, ry: 0 };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add',
+      payload: { icon: { ...icon, nodes: [rect] } } });
+    const command = { ...envelope, type: 'node.update' as const,
+      payload: { iconId: icon.id, nodeId: rect.id,
+        ops: [{ op: 'setCornerRadius' as const, radius: 3 }] } };
+    expect(assertCommandEnvelope(command)).toBe(command);
+    const changed = applyProjectCommand(added.project, command);
+    expect(changed.project.icons[0]!.nodes[0]).toMatchObject({ rx: 3, ry: 3 });
+    expect(changed.inversePatches).toEqual([{ op: 'replace', path: ['icons', '0', 'nodes', '0'],
+      before: { ...rect, rx: 3, ry: 3 }, after: rect }]);
+    expect(() => applyProjectCommand(added.project, { ...command,
+      payload: { ...command.payload, ops: [{ op: 'setCornerRadius', radius: 6.001 }] } }))
+      .toThrow('node.update.corner-radius.invalid');
+    expect(() => applyProjectCommand(added.project, { ...command,
+      payload: { ...command.payload, ops: [{ op: 'setCornerRadius', radius: 1.0001 }] } }))
+      .toThrow('node.update.corner-radius.invalid');
+    const line = { id: rect.id, type: 'line' as const, visible: true, locked: false,
+      x1: 0, y1: 0, x2: 4, y2: 4,
+      stroke: { paint: { kind: 'none' as const }, width: 1, cap: 'butt' as const,
+        join: 'miter' as const, miterLimit: 4 } };
+    const withLine = { ...added.project, icons: [{ ...added.project.icons[0]!, nodes: [line] }] };
+    expect(() => applyProjectCommand(withLine, command)).toThrow('node.update.corner-radius.unsupported');
+  });
   it('updates typed fill and stroke fields as one reversible node patch', () => {
     const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     const nodeId = '0198e09b-a810-7000-8000-0000000000e9';

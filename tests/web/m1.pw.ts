@@ -531,7 +531,7 @@ test('M2 set style changes are undoable without rewriting icon geometry', async 
 
   await page.getByLabel('Visual language').selectOption('duotone');
   await page.getByRole('spinbutton', { name: 'Set stroke width' }).fill('2.25');
-  await page.getByRole('spinbutton', { name: 'Roundness' }).fill('3');
+  await page.getByRole('spinbutton', { name: 'Roundness', exact: true }).fill('3');
   await page.getByRole('button', { name: 'Apply set style' }).click();
   await expect(page.locator('.canvas svg rect[data-node-id]')).toHaveAttribute('stroke-width', beforeStroke!);
   await page.getByRole('button', { name: 'Set overview' }).click();
@@ -1080,9 +1080,9 @@ test('M2 rounded rectangle uses set roundness and polygon exports as an editable
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();
   await page.getByRole('button', { name: 'Add icon' }).click();
-  await page.getByRole('spinbutton', { name: 'Roundness' }).fill('3');
+  await page.getByRole('spinbutton', { name: 'Roundness', exact: true }).fill('3');
   await page.getByRole('button', { name: 'Apply set style' }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Roundness' })).toHaveValue('3');
+  await expect(page.getByRole('spinbutton', { name: 'Roundness', exact: true })).toHaveValue('3');
   await page.getByRole('button', { name: 'Add rounded rectangle' }).click();
   await expect(page.locator('.canvas svg rect[data-node-id]')).toHaveAttribute('rx', '3');
   await page.getByRole('button', { name: 'Add polygon' }).click();
@@ -1102,6 +1102,37 @@ test('M2 rounded rectangle uses set roundness and polygon exports as an editable
   await page.getByRole('button', { name: 'Download project' }).click();
   const saved = (await decodeProjectArchive(await readFile((await (await downloadPromise).path())!))).project;
   expect(saved.icons[0]!.nodes.map(node => node.type)).toEqual(['rect', 'polyline']);
+});
+
+test('M2 rectangle roundness edits are reversible and reject out-of-range values', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rounded rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  const rect = page.locator('.canvas svg rect[data-node-id]');
+  await expect(rect).toHaveAttribute('rx', '2');
+  await page.getByRole('spinbutton', { name: 'Shape roundness' }).fill('3.5');
+  await page.getByRole('button', { name: 'Apply shape roundness' }).click();
+  await expect(rect).toHaveAttribute('rx', '3.5');
+  await expect(rect).toHaveAttribute('ry', '3.5');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  expect(await readFile((await (await downloadPromise).path())!, 'utf8')).toContain('rx="3.5" ry="3.5"');
+  await page.getByRole('spinbutton', { name: 'Shape roundness' }).fill('9');
+  await page.getByRole('button', { name: 'Apply shape roundness' }).click();
+  await expect(page.getByRole('alert')).toContainText('Roundness must fit inside the rectangle');
+  await expect(rect).toHaveAttribute('rx', '3.5');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rect).toHaveAttribute('rx', '2');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(rect).toHaveAttribute('rx', '3.5');
+  await page.reload();
+  await expect(rect).toHaveAttribute('rx', '3.5');
+  await page.getByRole('button', { name: 'Add polygon' }).click();
+  await page.getByRole('button', { name: 'Polyline layer' }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Shape roundness' })).toBeDisabled();
+  await expect(page.getByText('Select an unlocked rectangle to edit its roundness.')).toBeVisible();
 });
 
 test('M1 composite browser icon exports byte-identically through the CLI', async ({ page }) => {

@@ -4,7 +4,7 @@ import { compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
 import { prepareSvgImportInWorker } from '@iconforge/import-svg';
-import { DexieProjectRepository, ProjectWriteLock, downloadProjectFile, readStorageDurability,
+import { DexieProjectRepository, ProjectWriteLock, downloadProjectFile, openProjectArchive, readStorageDurability,
   requestPersistentStorage, type StorageDurability } from '@iconforge/persistence';
 import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type SceneNodeV1 } from '@iconforge/project-model';
 
@@ -544,6 +544,24 @@ export class BrowserWorkspace {
     const project = this.project;
     if (!project) throw new TypeError('No project to download');
     await downloadProjectFile(project, await this.repository.loadOriginals(project.id));
+  }
+
+  async openProjectFile(bytes: Uint8Array): Promise<void> {
+    const opened = await openProjectArchive(bytes);
+    if (opened.mode !== 'read-write') throw new TypeError(`project-archive.${opened.reason}`);
+    await this.pendingSave;
+    const collision = await this.repository.load(opened.project.id);
+    const project = collision ? { ...opened.project, id: uuidV7() } : opened.project;
+    await this.repository.insertArchive(project, opened.attachments);
+    await this.openLock(project.id);
+    localStorage.setItem(POINTER, project.id);
+    this.selection.clear();
+    this.currentIconId = project.icons[0]?.id ?? null;
+    this.loadRow((await this.repository.load(project.id))!);
+    this.saveStatus = collision ? 'Restored as a copy' : 'Restored from project file';
+    this.storageDurability = null;
+    void this.refreshStorageDurability(project.id, false);
+    this.onChanged?.();
   }
 
   async close(): Promise<void> {

@@ -19,6 +19,9 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
           <button type="button" (click)="runDownloadRecoveryData()" [disabled]="busy() || previewOnly()">Download recovery data</button>
         }
         <button type="button" (click)="runCreate()" [disabled]="busy() || previewOnly()">Create project</button>
+        <label class="open-file">Open project file
+          <input type="file" accept=".iconproj,application/zip" (change)="runOpenProject($event)" [disabled]="busy() || previewOnly()">
+        </label>
         <button type="button" (click)="runExport()" [disabled]="!hasIcon() || previewOnly()">Export SVG</button>
         <button type="button" (click)="runDownloadProject()" [disabled]="!hasProject() || busy() || previewOnly()">Download project</button>
       </header>
@@ -268,6 +271,14 @@ export class App implements OnInit, OnDestroy {
   }
 
   runCreate(): void { void this.run(() => this.workspace.create()); }
+  runOpenProject(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
+    const file = input.files[0]!;
+    input.value = '';
+    if (file.size > 64 * 1024 * 1024) { this.error.set('project-archive.size-limit'); return; }
+    void this.run(() => file.arrayBuffer().then(buffer => this.workspace.openProjectFile(new Uint8Array(buffer))), 'Open failed');
+  }
   runAddIcon(): void { void this.run(() => this.workspace.addIcon()); }
   runImportSvg(event: Event): void {
     const input = event.target;

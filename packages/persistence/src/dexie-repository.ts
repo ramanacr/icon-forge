@@ -102,12 +102,20 @@ export class DexieProjectRepository implements IProjectRepository {
   }
 
   async insertSnapshot(snapshot: ProjectV1): Promise<void> {
+    await this.insertArchive(snapshot, {});
+  }
+
+  async insertArchive(snapshot: ProjectV1, attachments: Record<string, Uint8Array>): Promise<void> {
     assertProject(snapshot);
+    const originals = Object.entries(attachments).map(([path, bytes]) => ({
+      key: `${snapshot.id}/${path}`, projectId: snapshot.id, path, bytes: new Uint8Array(bytes),
+    }));
     try {
-      await this.database.transaction('rw', this.database.projects, async () => {
+      await this.database.transaction('rw', this.database.projects, this.database.originals, async () => {
         if (await this.database.projects.get(snapshot.id)) throw new TypeError('snapshot.exists');
         await this.database.projects.add({ id: snapshot.id, revision: snapshot.revision,
           snapshot: structuredClone(snapshot), journal: [] });
+        if (originals.length) await this.database.originals.bulkAdd(originals);
       });
     } catch (error) { throw asProjectStorageError(error); }
   }

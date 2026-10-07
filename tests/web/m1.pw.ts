@@ -215,6 +215,44 @@ test('M1 warns on best-effort storage and downloads a project backup', async ({ 
   await expect(page.getByText('Browser storage may be cleared')).toBeVisible();
 });
 
+test('M1 restores a downloaded project with its original SVG and rejects damaged archives', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  const original = Buffer.from('<svg viewBox="0 0 24 24"><rect width="8" height="8"/></svg>');
+  const importInput = page.getByLabel('Import SVG');
+  await expect(importInput).toBeEnabled();
+  await importInput.setInputFiles({ name: 'restored.svg', mimeType: 'image/svg+xml', buffer: original });
+  await expect(page.getByRole('button', { name: 'restored' })).toBeVisible();
+  let downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const sourceBytes = await readFile((await (await downloadPromise).path())!);
+  const source = await decodeProjectArchive(sourceBytes);
+
+  await page.getByLabel('Open project file').setInputFiles({ name: 'restore.iconproj',
+    mimeType: 'application/zip', buffer: sourceBytes });
+  await expect(page.getByRole('button', { name: 'restored' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Restored as a copy' })).toBeVisible();
+  downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project' }).click();
+  const restored = await decodeProjectArchive(await readFile((await (await downloadPromise).path())!));
+  expect(restored.project.id).not.toBe(source.project.id);
+  expect(restored.project.icons).toEqual(source.project.icons);
+  expect(restored.attachments).toEqual(source.attachments);
+
+  await page.getByLabel('Open project file').setInputFiles({ name: 'damaged.iconproj',
+    mimeType: 'application/zip', buffer: sourceBytes.subarray(0, 20) });
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('iconforge:last-project'))).toBe(restored.project.id);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'restored' })).toBeVisible();
+  const freshId = '0198e09b-a810-7000-8000-000000009999';
+  const freshBytes = await encodeProjectArchive({ ...source.project, id: freshId }, source.attachments);
+  await page.getByLabel('Open project file').setInputFiles({ name: 'fresh.iconproj',
+    mimeType: 'application/zip', buffer: Buffer.from(freshBytes) });
+  await expect(page.getByRole('status').filter({ hasText: 'Restored from project file' })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('iconforge:last-project'))).toBe(freshId);
+});
+
 test('S-06 idle compaction keeps undo available after reload', async ({ page }) => {
   await page.clock.install();
   await page.goto(baseUrl);

@@ -51,6 +51,10 @@ export class BrowserWorkspace {
   get writable(): boolean { return this.lock?.mode === 'writer'; }
   get icon(): IconV1 | null { return this.project?.icons.find(icon => icon.id === this.currentIconId) ?? null; }
   get canExportSprite(): boolean { return Boolean(this.project?.exportProfiles.some(profile => profile.name === 'web-sprite' && profile.target === 'sprite')); }
+  get hasUnsavedFileChanges(): boolean {
+    return Boolean(this.project && (this.project.id !== this.fileSavedProjectId
+      || this.project.revision !== this.fileSavedRevision));
+  }
   get preview() { return this.drag?.preview; }
   get needsRecovery(): boolean { return this.recovery !== null; }
   get checkpointRecovery(): boolean { return this.recovery?.kind === 'checkpoint'; }

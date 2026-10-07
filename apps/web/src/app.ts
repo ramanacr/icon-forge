@@ -13,6 +13,7 @@ import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
         <span class="project-name">{{ projectName() }}</span>
         <span class="status" role="status">{{ status() }}</span>
         @if (storageWarning()) { <span class="storage-warning" role="status">Browser storage may be cleared</span> }
+        @if (fileReminder()) { <span class="file-reminder" role="status">Save a project file to back up recent changes</span> }
         @if (readOnly()) {
           <button type="button" (click)="runTakeOver()" [disabled]="busy() || previewOnly()">Take over editing</button>
         }
@@ -200,6 +201,8 @@ export class App implements OnInit, OnDestroy {
   readonly hasProject = signal(false);
   readonly canExportSprite = signal(false);
   readonly storageWarning = signal(false);
+  readonly fileReminder = signal(false);
+  private fileReminderTimer: ReturnType<typeof setTimeout> | null = null;
   readonly canEdit = signal(false);
   readonly canGroup = signal(false);
   readonly canUngroup = signal(false);
@@ -259,6 +262,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.fileReminderTimer) clearTimeout(this.fileReminderTimer);
     window.removeEventListener('focus', this.onFocus);
     window.removeEventListener('keydown', this.onSaveKeydown);
     this.phoneMedia.removeEventListener('change', this.onPhoneMediaChange);
@@ -305,6 +309,7 @@ export class App implements OnInit, OnDestroy {
     this.canExportSprite.set(this.workspace.canExportSprite);
     this.storageWarning.set(Boolean(project && this.workspace.storageDurability
       && this.workspace.storageDurability !== 'persistent'));
+    this.refreshFileReminder();
     this.readOnly.set(Boolean(project) && !this.workspace.writable);
     this.needsRecovery.set(this.workspace.needsRecovery);
     this.checkpointRecovery.set(this.workspace.checkpointRecovery);
@@ -327,6 +332,19 @@ export class App implements OnInit, OnDestroy {
         }
         host.append(svg);
       }
+    }
+  }
+
+  private refreshFileReminder(): void {
+    if (!this.workspace.hasUnsavedFileChanges) {
+      if (this.fileReminderTimer) clearTimeout(this.fileReminderTimer);
+      this.fileReminderTimer = null;
+      this.fileReminder.set(false);
+    } else if (!this.fileReminderTimer && !this.fileReminder()) {
+      this.fileReminderTimer = setTimeout(() => {
+        this.fileReminderTimer = null;
+        if (this.workspace.hasUnsavedFileChanges) this.fileReminder.set(true);
+      }, 30 * 60 * 1000);
     }
   }
 

@@ -43,6 +43,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
 .project-name { font-weight: 600; }
 .status { margin-left: auto; font-size: 13px; color: var(--text-muted); }
 .storage-warning { color: var(--warning); font-size: 13px; }
+.file-reminder { color: var(--warning); font-size: 13px; max-width: 190px; }
 .layout { display: grid; grid-template-columns: 220px minmax(300px, 1fr) 220px; flex: 1; min-height: 0; }
 .sidebar, .inspector { padding: var(--space-5); background: var(--surface); }
 .sidebar { border-right: 1px solid var(--border-subtle); overflow-y: auto; }

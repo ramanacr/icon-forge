@@ -280,6 +280,29 @@ test('M2 cancelling the Save picker leaves the project and status intact', async
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
+test('M2 reminds after 30 minutes of browser-only changes and clears after file save', async ({ page }) => {
+  await page.clock.install();
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
+  });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('button', { name: 'Save project' })).toBeEnabled();
+  await expect(page.locator('.status')).toHaveText('Saved in browser only');
+  const reminder = page.getByText('Save a project file to back up recent changes');
+  await expect(reminder).toHaveCount(0);
+  await page.clock.fastForward(30 * 60 * 1000);
+  await expect(reminder).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save project' }).click();
+  await downloadPromise;
+  await expect(reminder).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await expect(page.locator('.status')).toHaveText('Saved in browser only');
+  await page.clock.fastForward(30 * 60 * 1000);
+  await expect(reminder).toBeVisible();
+});
+
 test('M1 restores a downloaded project with its original SVG and rejects damaged archives', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

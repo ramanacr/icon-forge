@@ -5,10 +5,14 @@
   "type": "module",
   "dependencies": {
     "@iconforge/project-model": "workspace:*",
+    "color-name": "2.1.1",
     "saxes": "6.0.0",
     "svgpath": "2.6.0"
   },
   "exports": {
     ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/color-name": "2.0.0"
   }
 }

@@ -48,6 +48,8 @@ test('S-07 worker parses safe SVG under CSP and rejects malicious inputs', async
       '<!DOCTYPE svg [<!ENTITY x "boom">]><svg/>',
       '<svg><script/></svg>',
       '<svg onload="alert(1)"/>',
+      '<svg><rect style="fill:url(https://example.com/a.svg)"/></svg>',
+      '<svg><rect style="fill:var(--payload)"/></svg>',
       '<svg><use href="https://example.com/a.svg#x"/></svg>',
       '<svg><defs><g id="a"><use href="#a"/></g></defs><use href="#a"/></svg>',
     ];
@@ -62,6 +64,7 @@ test('S-07 worker parses safe SVG under CSP and rejects malicious inputs', async
   });
   expect(result.safe).toMatchObject({ name: 'svg', children: [{ name: 'rect' }] });
   expect(result.errors).toEqual(['import.doctype', 'import.element-unsupported', 'import.attribute-unsupported',
+    'import.style-unsupported', 'import.style-unsupported',
     'import.reference-invalid', 'import.use-cycle', 'import.element-limit']);
 });
 

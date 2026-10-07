@@ -1,5 +1,6 @@
 import { quantize, quantizeMatrix, type IconV1, type MatrixV1, type PaintV1,
   type SceneNodeV1, type StrokeV1, type UUID } from '@iconforge/project-model';
+import colorName from 'color-name';
 import type { SvgElement } from './xml-reader.js';
 import { canonicalizePathData } from './path-data.js';
 
@@ -52,12 +53,26 @@ function rawList(value: string): number[] {
 function paint(value: string): PaintV1 {
   if (value === 'none') return { kind: 'none' };
   if (value === 'currentColor') return { kind: 'token', token: 'currentColor' };
+  if (value.toLowerCase() === 'transparent') return { kind: 'color', value: '#00000000' };
+  const key = value.toLowerCase();
+  const named = Object.hasOwn(colorName, key) ? colorName[key as keyof typeof colorName] : undefined;
+  if (named) return { kind: 'color', value: `#${named.map(channel => channel.toString(16).padStart(2, '0')).join('')}` };
   if (/^#[0-9a-fA-F]{3}$/.test(value)) {
     const digits = value.slice(1).toLowerCase();
     return { kind: 'color', value: `#${[...digits].map(digit => digit + digit).join('')}` };
   }
+  if (/^#[0-9a-fA-F]{4}$/.test(value)) {
+    return { kind: 'color', value: `#${[...value.slice(1).toLowerCase()].map(digit => digit + digit).join('')}` };
+  }
   if (/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(value)) {
     return { kind: 'color', value: value.toLowerCase() };
+  }
+  const rgb = /^rgb\(\s*(\d{1,3})\s*(?:,\s*|\s+)(\d{1,3})\s*(?:,\s*|\s+)(\d{1,3})\s*\)$/i.exec(value);
+  if (rgb) {
+    const channels = rgb.slice(1).map(Number);
+    if (channels.every(channel => channel <= 255)) {
+      return { kind: 'color', value: `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}` };
+    }
   }
   throw new TypeError('import.paint-unsupported');
 }
@@ -128,7 +143,11 @@ function stroke(style: Style): StrokeV1 {
 /** Convert an already validated, expanded SVG AST without importing markup into the DOM. */
 export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions): CanonicalSvgImport {
   if (ast.name !== 'svg') throw new TypeError('import.invalid-root');
-  const viewBox = ast.attributes.viewBox === undefined ? [] : list(ast.attributes.viewBox);
+  const rootWidth = ast.attributes.width === undefined ? undefined : Number(ast.attributes.width.replace(/px$/, ''));
+  const rootHeight = ast.attributes.height === undefined ? undefined : Number(ast.attributes.height.replace(/px$/, ''));
+  const viewBox = ast.attributes.viewBox === undefined
+    ? rootWidth !== undefined && rootHeight !== undefined ? [0, 0, num(String(rootWidth)), num(String(rootHeight))] : []
+    : list(ast.attributes.viewBox);
   if (viewBox.length !== 4 || viewBox[2]! <= 0 || viewBox[3]! <= 0) throw new TypeError('import.viewbox-invalid');
   const initial: Style = { fill: { kind: 'color', value: '#000000' }, stroke: { kind: 'none' },
     fillRule: 'nonzero', strokeWidth: 1, cap: 'butt', join: 'miter', miterLimit: 4 };
@@ -210,12 +229,10 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
   if (ast.attributes.transform !== undefined || ast.attributes.opacity !== undefined) {
     throw new TypeError('import.root-transform-unsupported');
   }
-  const width = ast.attributes.width;
-  const height = ast.attributes.height;
-  if ((width === undefined) !== (height === undefined)
-    || width !== undefined && height !== undefined
-      && (Number(width) <= 0 || Number(height) <= 0
-        || Math.abs(Number(width) * viewBox[3]! - Number(height) * viewBox[2]!) > 1e-6)) {
+  if ((rootWidth === undefined) !== (rootHeight === undefined)
+    || rootWidth !== undefined && rootHeight !== undefined
+      && (rootWidth <= 0 || rootHeight <= 0
+        || Math.abs(rootWidth * viewBox[3]! - rootHeight * viewBox[2]!) > 1e-6)) {
     throw new TypeError('import.viewport-aspect-unsupported');
   }
   const rootStyle = styled(initial, ast.attributes);

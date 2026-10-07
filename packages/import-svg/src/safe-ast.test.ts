@@ -11,6 +11,22 @@ describe('safe SVG import AST', () => {
       }] });
   });
 
+  it('normalizes strictly allowlisted inline styles over presentation attributes', () => {
+    const ast = parseSvgAst('<svg><rect width="4" fill="black" style="fill: red; stroke-width: 2; stroke: currentColor"/></svg>');
+    expect(ast.children[0]?.attributes).toMatchObject({ fill: 'red', stroke: 'currentColor', 'stroke-width': '2' });
+    expect(ast.children[0]?.attributes.style).toBeUndefined();
+  });
+
+  it.each([
+    'fill:url(https://example.com/a.svg)',
+    'fill:var(--paint)',
+    'clip-path: none',
+    'fill: red; fill: blue',
+    'fill: r\\ed',
+  ])('rejects unsafe or ambiguous inline style %s', style => {
+    expect(() => parseSvgAst(`<svg><rect style="${style}"/></svg>`)).toThrow('import.style-unsupported');
+  });
+
   it('expands local use targets as bounded data instances', () => {
     const source = '<svg><defs><symbol id="shape"><rect width="4" height="4"/></symbol></defs><use href="#shape" x="2"/></svg>';
     const result = parseSvgAst(source);
@@ -24,6 +40,7 @@ describe('safe SVG import AST', () => {
   it.each([
     ['script', '<svg><script/></svg>'],
     ['event handler', '<svg onload="alert(1)"/>'],
+    ['prototype-like attribute', '<svg __proto__="ignored"/>'],
     ['foreign object', '<svg><foreignObject/></svg>'],
     ['image', '<svg><image href="x"/></svg>'],
     ['data URL', '<svg><use href="data:text/html,x"/></svg>'],

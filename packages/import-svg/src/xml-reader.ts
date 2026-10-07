@@ -57,6 +57,7 @@ export function readSvgXml(source: string, requestedLimits: Partial<ImportLimits
     const attributes: Record<string, string> = {};
     for (const attribute of Object.values(tag.attributes)) {
       if (attribute.uri === XMLNS_NS) continue;
+      if (attribute.name === '__proto__') throw new TypeError('import.attribute-unsupported');
       if (attribute.uri !== '' && attribute.uri !== XLINK_NS && attribute.uri !== XML_NS) {
         throw new TypeError('import.namespace');
       }

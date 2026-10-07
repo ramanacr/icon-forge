@@ -37,7 +37,8 @@ describe('SVG canonicalization', () => {
 
   it.each([
     ['missing viewBox', '<svg><rect width="2" height="2"/></svg>', 'import.viewbox-invalid'],
-    ['unsupported paint', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="red"/></svg>', 'import.paint-unsupported'],
+    ['unsupported paint', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="hsl(0 100% 50%)"/></svg>', 'import.paint-unsupported'],
+    ['prototype-like paint', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="constructor"/></svg>', 'import.paint-unsupported'],
     ['lossy fill opacity', '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill-opacity="0.5"/></svg>', 'import.opacity-unsupported'],
     ['malformed path', '<svg viewBox="0 0 24 24"><path d="M0 0 L1"/></svg>', 'import.path-invalid'],
     ['unmapped attribute', '<svg viewBox="0 0 24 24"><rect width="2" height="2" cx="3"/></svg>', 'import.attribute-unsupported'],
@@ -81,6 +82,23 @@ describe('SVG canonicalization', () => {
   it('clamps oversized rectangle corners as SVG does', () => {
     const { icon } = canonicalizeSvgAst(parseSvgAst('<svg viewBox="0 0 24 24"><rect width="4" height="2" rx="10"/></svg>'), options());
     expect(icon.nodes[0]).toMatchObject({ type: 'rect', rx: 2, ry: 1 });
+  });
+
+  it('uses explicit root dimensions when viewBox is absent and accepts px viewport sizes', () => {
+    const ast = parseSvgAst('<svg width="24px" height="16px"><rect width="4" height="4"/></svg>');
+    expect(canonicalizeSvgAst(ast, options()).icon.viewBox).toEqual([0, 0, 24, 16]);
+  });
+
+  it('normalizes CSS named, short-alpha and rgb paints to model hex values', () => {
+    const source = '<svg viewBox="0 0 24 24"><rect width="2" height="2" fill="red"/>'
+      + '<rect width="2" height="2" fill="#0f08"/>'
+      + '<rect width="2" height="2" fill="rgb(16, 32, 48)"/></svg>';
+    const { icon } = canonicalizeSvgAst(parseSvgAst(source), options());
+    expect(icon.nodes).toMatchObject([
+      { fill: { kind: 'color', value: '#ff0000' } },
+      { fill: { kind: 'color', value: '#00ff0088' } },
+      { fill: { kind: 'color', value: '#102030' } },
+    ]);
   });
 
   it('inherits evenodd fill rule and preserves it for polygons and paths', () => {

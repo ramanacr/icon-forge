@@ -156,6 +156,22 @@ test('Phase 2 imported primitives and arc paths retain their raster silhouette',
   expect(iou).toBeGreaterThanOrEqual(0.995);
 });
 
+test('Phase 2 browser normalizes safe inline styles, named paint and px viewport', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  const input = page.getByLabel('Import SVG');
+  await expect(input).toBeEnabled();
+  await input.setInputFiles({ name: 'styled.svg', mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg width="24px" height="24px"><rect width="8" height="8" style="fill: red; stroke: blue; stroke-width: 1"/></svg>') });
+  await expect(page.getByRole('button', { name: 'styled' })).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const exported = await readFile((await (await downloadPromise).path())!, 'utf8');
+  expect(exported).toContain('viewBox="0 0 24 24"');
+  expect(exported).toContain('fill="#ff0000"');
+  expect(exported).toContain('stroke="#0000ff"');
+});
+
 test('M1 explains a missing required browser capability before enabling edits', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true });

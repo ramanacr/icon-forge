@@ -8,6 +8,8 @@ const attributes = new Set(['id', 'viewBox', 'width', 'height', 'x', 'y', 'x1', 
   'stroke-opacity', 'stroke-dasharray', 'opacity', 'href', 'xlink:href']);
 const singleNumbers = new Set(['width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy',
   'r', 'rx', 'ry', 'stroke-width', 'stroke-miterlimit', 'fill-opacity', 'stroke-opacity', 'opacity']);
+const percentageLengths = new Set(['width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
+  'cx', 'cy', 'r', 'rx', 'ry', 'stroke-width']);
 const numberPattern = /[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?/g;
 const commandPattern = /^[MLHVCSQTAZmlhvcsqtaz,\s]*$/;
 const styleProperties = new Set(['fill', 'stroke', 'fill-rule', 'fill-opacity', 'stroke-opacity',
@@ -107,7 +109,10 @@ function validate(node: SvgElement, ids: Map<string, SvgElement>, limits: Import
       if (node.name !== 'use' || !/^#[^\s#]+$/.test(value)) throw new TypeError('import.reference-invalid');
     }
     if (singleNumbers.has(name)) {
-      if (node.name === 'svg' && (name === 'width' || name === 'height') && /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?px$/.test(value)) {
+      if (value.endsWith('%') && percentageLengths.has(name)
+        && !(node.name === 'svg' && (name === 'width' || name === 'height'))) {
+        checkNumbers(value.slice(0, -1), 'single', limits.coordinates);
+      } else if (node.name === 'svg' && (name === 'width' || name === 'height') && /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?px$/.test(value)) {
         checkNumbers(value.slice(0, -2), 'single', limits.coordinates);
       } else checkNumbers(value, 'single', limits.coordinates);
     }

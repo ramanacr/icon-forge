@@ -49,6 +49,7 @@ describe('SVG canonicalization', () => {
     ['mismatched viewport', '<svg viewBox="0 0 24 24" width="48" height="24"><rect width="2" height="2"/></svg>', 'import.viewport-aspect-unsupported'],
     ['negative radius', '<svg viewBox="0 0 24 24"><circle r="-1"/></svg>', 'import.geometry-invalid'],
     ['one polyline point', '<svg viewBox="0 0 24 24"><polyline points="1 2"/></svg>', 'import.geometry-invalid'],
+    ['expanded percentage outside coordinate limit', '<svg viewBox="0 0 1000000 1000000"><rect x="200%" width="2" height="2"/></svg>', 'import.coordinate-limit'],
   ])('rejects %s explicitly', (_name, source, error) => {
     expect(() => canonicalizeSvgAst(parseSvgAst(source), options())).toThrow(error);
   });
@@ -131,6 +132,22 @@ describe('SVG canonicalization', () => {
       { type: 'rect', opacity: 0.75, fill: { kind: 'color', value: '#ff000040' },
         stroke: { paint: { kind: 'color', value: '#00ff0040' } } },
       { type: 'line', stroke: { paint: { kind: 'color', value: '#00ff0080' } } },
+    ]);
+  });
+
+  it('resolves geometry percentages against the root viewBox', () => {
+    const source = '<svg viewBox="0 0 40 20" stroke="red" stroke-width="10%">'
+      + '<rect x="25%" y="50%" width="50%" height="25%" rx="10%" ry="20%"/>'
+      + '<circle cx="50%" cy="25%" r="10%"/>'
+      + '<line x1="0%" y1="100%" x2="100%" y2="0%"/>'
+      + '</svg>';
+    const { icon } = canonicalizeSvgAst(parseSvgAst(source), options());
+    const diagonal = Math.hypot(40, 20) / Math.SQRT2;
+    expect(icon.nodes).toMatchObject([
+      { type: 'rect', x: 10, y: 10, width: 20, height: 5, rx: 4, ry: 2.5,
+        stroke: { width: Math.round(diagonal * 100) / 1000 } },
+      { type: 'ellipse', cx: 20, cy: 5, rx: Math.round(diagonal * 100) / 1000 },
+      { type: 'line', x1: 0, y1: 20, x2: 40, y2: 0 },
     ]);
   });
 

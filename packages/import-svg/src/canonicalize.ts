@@ -44,6 +44,14 @@ function num(value: string | undefined, fallback = 0): number {
   return value === undefined ? fallback : quantize(Number(value));
 }
 
+function length(value: string | undefined, scale: number, fallback = 0): number {
+  if (value === undefined) return fallback;
+  if (!value.endsWith('%')) return num(value);
+  const resolved = Number(value.slice(0, -1)) * scale / 100;
+  if (!Number.isFinite(resolved) || Math.abs(resolved) > 1e6) throw new TypeError('import.coordinate-limit');
+  return quantize(resolved);
+}
+
 function list(value: string): number[] {
   return [...value.matchAll(NUMBERS)].map(match => num(match[0]));
 }
@@ -126,7 +134,7 @@ function paint(value: string): PaintV1 {
   throw new TypeError('import.paint-unsupported');
 }
 
-function styled(parent: Style, attributes: Record<string, string>): Style {
+function styled(parent: Style, attributes: Record<string, string>, diagonal: number): Style {
   const fillOpacity = attributes['fill-opacity'] === undefined ? parent.fillOpacity : Number(attributes['fill-opacity']);
   const strokeOpacity = attributes['stroke-opacity'] === undefined ? parent.strokeOpacity : Number(attributes['stroke-opacity']);
   if (fillOpacity < 0 || fillOpacity > 1 || strokeOpacity < 0 || strokeOpacity > 1) {
@@ -138,7 +146,7 @@ function styled(parent: Style, attributes: Record<string, string>): Style {
   if (cap !== 'butt' && cap !== 'round' && cap !== 'square') throw new TypeError('import.stroke-unsupported');
   if (join !== 'miter' && join !== 'round' && join !== 'bevel') throw new TypeError('import.stroke-unsupported');
   if (fillRule !== 'nonzero' && fillRule !== 'evenodd') throw new TypeError('import.fill-rule-unsupported');
-  const strokeWidth = num(attributes['stroke-width'], parent.strokeWidth);
+  const strokeWidth = length(attributes['stroke-width'], diagonal, parent.strokeWidth);
   const miterLimit = num(attributes['stroke-miterlimit'], parent.miterLimit);
   if (strokeWidth < 0 || miterLimit < 1) throw new TypeError('import.stroke-unsupported');
   const dash = attributes['stroke-dasharray'] === undefined ? parent.dash : list(attributes['stroke-dasharray']);
@@ -206,6 +214,9 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
     ? rootWidth !== undefined && rootHeight !== undefined ? [0, 0, num(String(rootWidth)), num(String(rootHeight))] : []
     : list(ast.attributes.viewBox);
   if (viewBox.length !== 4 || viewBox[2]! <= 0 || viewBox[3]! <= 0) throw new TypeError('import.viewbox-invalid');
+  const viewportWidth = viewBox[2]!;
+  const viewportHeight = viewBox[3]!;
+  const viewportDiagonal = Math.hypot(viewportWidth, viewportHeight) / Math.SQRT2;
   const initial: Style = { fill: { kind: 'color', value: '#000000' }, fillOpacity: 1,
     stroke: { kind: 'none' }, strokeOpacity: 1,
     fillRule: 'nonzero', strokeWidth: 1, cap: 'butt', join: 'miter', miterLimit: 4 };
@@ -218,7 +229,7 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
     for (const attribute of Object.keys(element.attributes)) {
       if (!COMMON.includes(attribute) && !allowed.includes(attribute)) throw new TypeError('import.attribute-unsupported');
     }
-    const style = styled(inherited, element.attributes);
+    const style = styled(inherited, element.attributes, viewportDiagonal);
     const matrix = transform(element.attributes.transform);
     const base = { id: options.nextNodeId(), visible: true, locked: false,
       ...(element.attributes.id ? { name: element.attributes.id } : {}),
@@ -229,7 +240,8 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
       if (element.name === 'symbol' && element.attributes.viewBox !== undefined) throw new TypeError('import.symbol-viewbox-unsupported');
       const children = element.children.map(child => convert(child, style)).filter((node): node is SceneNodeV1 => node !== null);
       if (element.name === 'use-instance') {
-        const placement: MatrixV1 = [1, 0, 0, 1, num(element.attributes.x), num(element.attributes.y)];
+        const placement: MatrixV1 = [1, 0, 0, 1,
+          length(element.attributes.x, viewportWidth), length(element.attributes.y, viewportHeight)];
         base.transform = quantizeMatrix(multiply(base.transform ?? IDENTITY, placement));
       }
       return { ...base, type: 'group', children };
@@ -239,29 +251,30 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
       ...(style.stroke.kind === 'none' ? {} : { stroke: stroke(style) }) };
     if (element.name === 'rect') {
       const a = element.attributes;
-      const rx = num(a.rx, num(a.ry));
-      const ry = num(a.ry, rx);
-      const width = num(a.width);
-      const height = num(a.height);
+      const rx = length(a.rx, viewportWidth, length(a.ry, viewportHeight));
+      const ry = length(a.ry, viewportHeight, rx);
+      const width = length(a.width, viewportWidth);
+      const height = length(a.height, viewportHeight);
       if (width < 0 || height < 0 || rx < 0 || ry < 0) {
         throw new TypeError('import.geometry-invalid');
       }
       const clampedRx = rx > width / 2 ? Math.floor(width * 500) / 1000 : rx;
       const clampedRy = ry > height / 2 ? Math.floor(height * 500) / 1000 : ry;
-      return { ...base, type: 'rect', x: num(a.x), y: num(a.y), width, height,
+      return { ...base, type: 'rect', x: length(a.x, viewportWidth), y: length(a.y, viewportHeight), width, height,
         rx: clampedRx, ry: clampedRy, ...fills };
     }
     if (element.name === 'circle' || element.name === 'ellipse') {
       const a = element.attributes;
-      const rx = element.name === 'circle' ? num(a.r) : num(a.rx);
-      const ry = element.name === 'circle' ? rx : num(a.ry);
+      const rx = element.name === 'circle' ? length(a.r, viewportDiagonal) : length(a.rx, viewportWidth);
+      const ry = element.name === 'circle' ? rx : length(a.ry, viewportHeight);
       if (rx < 0 || ry < 0) throw new TypeError('import.geometry-invalid');
-      return { ...base, type: 'ellipse', cx: num(a.cx), cy: num(a.cy),
+      return { ...base, type: 'ellipse', cx: length(a.cx, viewportWidth), cy: length(a.cy, viewportHeight),
         rx, ry, ...fills };
     }
     if (element.name === 'line') {
       const a = element.attributes;
-      return { ...base, type: 'line', x1: num(a.x1), y1: num(a.y1), x2: num(a.x2), y2: num(a.y2), stroke: stroke(style) };
+      return { ...base, type: 'line', x1: length(a.x1, viewportWidth), y1: length(a.y1, viewportHeight),
+        x2: length(a.x2, viewportWidth), y2: length(a.y2, viewportHeight), stroke: stroke(style) };
     }
     if (element.name === 'polyline' || element.name === 'polygon') {
       const points = list(element.attributes.points ?? '');
@@ -294,7 +307,7 @@ export function canonicalizeSvgAst(ast: SvgElement, options: CanonicalizeOptions
         || Math.abs(rootWidth * viewBox[3]! - rootHeight * viewBox[2]!) > 1e-6)) {
     throw new TypeError('import.viewport-aspect-unsupported');
   }
-  const rootStyle = styled(initial, ast.attributes);
+  const rootStyle = styled(initial, ast.attributes, viewportDiagonal);
   const nodes = ast.children.map(child => convert(child, rootStyle)).filter((node): node is SceneNodeV1 => node !== null);
   return { icon: { id: options.iconId, name: options.name, aliases: [], tags: [],
     viewBox: viewBox as IconV1['viewBox'], nodes, variants: [],

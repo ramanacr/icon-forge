@@ -2,7 +2,7 @@ import { ProjectDispatcher } from '@iconforge/application';
 import { defaultDesignSystem, type CommandEnvelopeV1, type IconGridPreset, type ImportDiagnosticV1 } from '@iconforge/commands';
 import { compileSpriteProfile, compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
-import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
+import { gridGuides, nodeGeometryBounds, snapPointToGrid } from '@iconforge/geometry';
 import { prepareSvgImportInWorker } from '@iconforge/import-svg';
 import { DexieProjectRepository, ProjectWriteLock, downloadBuildArchive, downloadProjectFile, openProjectArchive, readStorageDurability,
   requestPersistentStorage, pickProjectFileHandle, saveProjectFile, type StorageDurability, type WritableProjectHandle } from '@iconforge/persistence';
@@ -647,6 +647,40 @@ export class BrowserWorkspace {
       iconId: icon.id, nodeIds: [node.id] });
     gesture.update(matrix);
     await this.commitGesture(gesture, project.id);
+  }
+
+  private async transformSelectedAroundCenter(a: number, b: number, c: number, d: number): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    const node = this.selectedNode;
+    if (!project || !icon || !node || node.locked || !this.writable) throw new TypeError('Select an unlocked layer');
+    const bounds = nodeGeometryBounds(project, node);
+    if (!bounds) throw new TypeError('Selected layer has no visible geometry');
+    const x = (bounds.minX + bounds.maxX) / 2;
+    const y = (bounds.minY + bounds.maxY) / 2;
+    const matrix = quantizeMatrix([a, b, c, d, x - a * x - c * y, y - b * x - d * y]);
+    const gesture = new TransformGesture(this.dispatcher, { ...this.base(project.id),
+      iconId: icon.id, nodeIds: [node.id] });
+    gesture.update(matrix);
+    await this.commitGesture(gesture, project.id);
+  }
+
+  async scaleSelected(percent: number): Promise<void> {
+    if (!Number.isFinite(percent) || percent <= 0 || percent > 1000) {
+      throw new TypeError('Scale percent must be greater than 0 and at most 1000');
+    }
+    const factor = percent / 100;
+    await this.transformSelectedAroundCenter(factor, 0, 0, factor);
+  }
+
+  async rotateSelected(degrees: number): Promise<void> {
+    if (!Number.isFinite(degrees) || Math.abs(degrees) > 360) {
+      throw new TypeError('Rotation must be between -360 and 360 degrees');
+    }
+    const radians = degrees * Math.PI / 180;
+    const cosine = Math.cos(radians);
+    const sine = Math.sin(radians);
+    await this.transformSelectedAroundCenter(cosine, sine, -sine, cosine);
   }
 
   async moveRight(): Promise<void> { await this.translateSelected(1, 0); }

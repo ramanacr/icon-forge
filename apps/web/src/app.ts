@@ -167,6 +167,14 @@ import type { IconGridPreset } from '@iconforge/commands';
             <label>Y position <input #positionY type="number" step="0.001" [value]="yPosition()" [disabled]="!canEdit() || !canPosition()"></label>
             <button type="button" (click)="runPosition(positionX.value, positionY.value)"
               [disabled]="!canEdit() || !canPosition()">Apply position</button>
+            <label>Scale percent <input #scalePercent type="number" min="0.001" max="1000" step="0.1" value="100"
+              [disabled]="!canEdit() || !canPosition()"></label>
+            <button type="button" (click)="runScale(scalePercent.value)"
+              [disabled]="!canEdit() || !canPosition()">Apply scale</button>
+            <label>Rotate degrees <input #rotateDegrees type="number" min="-360" max="360" step="1" value="0"
+              [disabled]="!canEdit() || !canPosition()"></label>
+            <button type="button" (click)="runRotation(rotateDegrees.value)"
+              [disabled]="!canEdit() || !canPosition()">Apply rotation</button>
           </div>
           <button type="button" (click)="runAppearance('filled')" [disabled]="!canEdit() || !canStyle()">Fill shape</button>
           <button type="button" (click)="runAppearance('outline')" [disabled]="!canEdit() || !canStyle()">Outline shape</button>
@@ -551,6 +559,14 @@ export class App implements OnInit, OnDestroy {
   runPosition(x: string, y: string): void {
     if (!x.trim() || !y.trim()) { this.error.set('Enter both position values'); return; }
     void this.run(() => this.workspace.setPosition(Number(x), Number(y)));
+  }
+  runScale(percent: string): void {
+    if (!percent.trim()) { this.error.set('Enter a scale percent'); return; }
+    void this.run(() => this.workspace.scaleSelected(Number(percent)));
+  }
+  runRotation(degrees: string): void {
+    if (!degrees.trim()) { this.error.set('Enter rotation degrees'); return; }
+    void this.run(() => this.workspace.rotateSelected(Number(degrees)));
   }
   runFillColor(color: string): void { void this.run(() => this.workspace.setFillColor(color)); }
   runStrokeWidth(width: string): void {

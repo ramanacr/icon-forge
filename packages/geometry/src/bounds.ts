@@ -116,6 +116,11 @@ function nodeBounds(project: ProjectV1, node: SceneNodeV1, parent: MatrixV1): Bo
   return bounds;
 }
 
+/** Bounds of one node in its parent's coordinate system, including its own transform. */
+export function nodeGeometryBounds(project: ProjectV1, node: SceneNodeV1): Bounds | null {
+  return nodeBounds(project, node, IDENTITY);
+}
+
 /** Bounds of visible scene geometry in icon coordinates. Stroke expansion is excluded;
  * rotated rounded rectangles may have conservative corner bounds. */
 export function iconGeometryBounds(input: ProjectV1, iconInput: IconV1, variantId?: string): Bounds | null {

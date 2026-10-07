@@ -1034,6 +1034,32 @@ test('M1 numeric inspector applies a precise reversible position', async ({ page
   await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 3.5 -2.25)');
 });
 
+test('M1 selection scales and rotates around its center with undo and export', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  const rect = page.locator('svg rect[data-node-id]');
+  await page.getByRole('spinbutton', { name: 'Scale percent' }).fill('200');
+  await page.getByRole('button', { name: 'Apply scale' }).click();
+  await expect(rect).toHaveAttribute('transform', /^matrix\(2 0 0 2 /);
+  const scaled = await rect.getAttribute('transform');
+  expect(scaled).toMatch(/^matrix\(2 0 0 2 /);
+  await page.getByRole('spinbutton', { name: 'Rotate degrees' }).fill('90');
+  await page.getByRole('button', { name: 'Apply rotation' }).click();
+  await expect(rect).toHaveAttribute('transform', /^matrix\(0 2 -2 0 /);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  expect((await readFile(await (await downloadPromise).path()!)).toString('utf8')).toContain('matrix(0 2 -2 0');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rect).toHaveAttribute('transform', scaled!);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rect).not.toHaveAttribute('transform');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(rect).toHaveAttribute('transform', scaled!);
+});
+
 test('M1 inspector color and stroke width changes survive export and reload', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

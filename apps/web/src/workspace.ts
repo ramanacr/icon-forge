@@ -5,7 +5,7 @@ import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, snapPointToGrid } from '@iconforge/geometry';
 import { prepareSvgImportInWorker } from '@iconforge/import-svg';
 import { DexieProjectRepository, ProjectWriteLock, downloadBuildArchive, downloadProjectFile, openProjectArchive, readStorageDurability,
-  requestPersistentStorage, type StorageDurability } from '@iconforge/persistence';
+  requestPersistentStorage, pickProjectFileHandle, saveProjectFile, type StorageDurability, type WritableProjectHandle } from '@iconforge/persistence';
 import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type ProvenanceRecordV1, type SceneNodeV1 } from '@iconforge/project-model';
 import { STARTER_ICONS, starterSvg, type StarterIconName } from './starter-library.js';
 
@@ -28,6 +28,9 @@ export class BrowserWorkspace {
   private lock: ProjectWriteLock | null = null;
   private unsubscribeMode: (() => void) | null = null;
   private pendingSave: Promise<void> | null = null;
+  private fileHandle: WritableProjectHandle | null = null;
+  private fileSavedProjectId: string | null = null;
+  private fileSavedRevision: number | null = null;
   private compaction: Promise<void> | null = null;
   private idleCompaction: ReturnType<typeof setTimeout> | null = null;
   private drag: TransformGesture | null = null;
@@ -38,6 +41,11 @@ export class BrowserWorkspace {
   error = '';
   storageDurability: StorageDurability | null = null;
   onChanged: (() => void) | null = null;
+
+  private savedStatus(): string {
+    return this.project?.id === this.fileSavedProjectId && this.project.revision === this.fileSavedRevision
+      ? 'Saved to file' : 'Saved in browser only';
+  }
 
   get project(): ProjectV1 | null { return this.dispatcher.project; }
   get writable(): boolean { return this.lock?.mode === 'writer'; }
@@ -100,7 +108,7 @@ export class BrowserWorkspace {
       await this.compaction;
     });
     this.unsubscribeMode = this.lock.onModeChange(mode => {
-      if (!this.recovery) this.saveStatus = mode === 'writer' ? 'Saved in browser only' : 'Read only in this tab';
+      if (!this.recovery) this.saveStatus = mode === 'writer' ? this.savedStatus() : 'Read only in this tab';
       this.onChanged?.();
     });
   }
@@ -153,7 +161,7 @@ export class BrowserWorkspace {
     }
     this.recovery = null;
     this.error = '';
-    this.saveStatus = this.writable ? 'Saved in browser only' : 'Read only in this tab';
+    this.saveStatus = this.writable ? this.savedStatus() : 'Read only in this tab';
     if (this.writable && this.dispatcher.journalLength) void this.scheduleCompaction(row.id);
   }
 
@@ -212,6 +220,9 @@ export class BrowserWorkspace {
       if (!latest || latest.revision !== damaged.storedRevision) throw new TypeError('revision.conflict');
       const copy = { ...source, id: uuidV7() };
       await this.repository.insertSnapshot(copy);
+      this.fileHandle = null;
+      this.fileSavedProjectId = null;
+      this.fileSavedRevision = null;
       await this.openLock(copy.id);
       localStorage.setItem(POINTER, copy.id);
       this.loadRow((await this.repository.load(copy.id))!);
@@ -260,7 +271,7 @@ export class BrowserWorkspace {
     try {
       await write;
       if (this.lock?.mode === 'writer') this.lock.publishRevision(this.dispatcher.revision);
-      this.saveStatus = 'Saved in browser only';
+      this.saveStatus = this.savedStatus();
       this.error = '';
       if (this.project) this.selection.reconcile(this.project);
     } catch (error) {
@@ -278,6 +289,9 @@ export class BrowserWorkspace {
 
   async create(): Promise<void> {
     const id = uuidV7();
+    this.fileHandle = null;
+    this.fileSavedProjectId = null;
+    this.fileSavedRevision = null;
     await this.openLock(id);
     this.dispatcher = new ProjectDispatcher();
     this.recovery = null;
@@ -523,7 +537,7 @@ export class BrowserWorkspace {
     try {
       await write;
       if (this.lock?.mode === 'writer') this.lock.publishRevision(this.dispatcher.revision);
-      this.saveStatus = 'Saved in browser only';
+      this.saveStatus = this.savedStatus();
       this.error = '';
     } catch (error) {
       const row = await this.repository.load(projectId);
@@ -599,6 +613,25 @@ export class BrowserWorkspace {
     await downloadProjectFile(project, await this.repository.loadOriginals(project.id));
   }
 
+  async saveProject(): Promise<void> {
+    const project = this.project;
+    if (!project) throw new TypeError('No project to save');
+    if (!this.writable || this.recovery) throw new TypeError('Project is read only until recovery is complete');
+    const handle = (this.fileSavedProjectId === project.id ? this.fileHandle : null)
+      ?? await pickProjectFileHandle(project.name);
+    const attachments = await this.repository.loadOriginals(project.id);
+    const saved = await saveProjectFile(project, handle
+      ? { handle, attachments }
+      : { picker: async () => undefined, attachments });
+    if (this.project?.id === project.id) {
+      this.fileHandle = saved.method === 'file' ? saved.handle : null;
+      this.fileSavedProjectId = project.id;
+      this.fileSavedRevision = saved.revision;
+      this.saveStatus = this.savedStatus();
+      this.onChanged?.();
+    }
+  }
+
   async downloadSprite(): Promise<void> {
     const project = this.project;
     if (!project) throw new TypeError('No project to export');
@@ -613,6 +646,9 @@ export class BrowserWorkspace {
     await this.pendingSave;
     const collision = await this.repository.load(opened.project.id);
     const project = collision ? { ...opened.project, id: uuidV7() } : opened.project;
+    this.fileHandle = null;
+    this.fileSavedProjectId = null;
+    this.fileSavedRevision = null;
     await this.repository.insertArchive(project, opened.attachments);
     await this.openLock(project.id);
     localStorage.setItem(POINTER, project.id);

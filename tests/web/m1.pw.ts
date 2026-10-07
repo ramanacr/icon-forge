@@ -216,6 +216,70 @@ test('M1 warns on best-effort storage and downloads a project backup', async ({ 
   await expect(page.getByText('Browser storage may be cleared')).toBeVisible();
 });
 
+test('M2 Save falls back to a project download and Ctrl+S saves the latest revision', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
+  });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  let downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save project' }).click();
+  let archive = await decodeProjectArchive(await readFile((await (await downloadPromise).path())!));
+  expect(archive.project.icons).toHaveLength(1);
+  await expect(page.locator('.status')).toHaveText('Saved to file');
+
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await expect(page.locator('.status')).toHaveText('Saved in browser only');
+  downloadPromise = page.waitForEvent('download');
+  await page.keyboard.press('Control+s');
+  archive = await decodeProjectArchive(await readFile((await (await downloadPromise).path())!));
+  expect(archive.project.icons).toHaveLength(2);
+  await expect(page.locator('.status')).toHaveText('Saved to file');
+});
+
+test('M2 native Save reuses its handle after the first picker choice', async ({ page }) => {
+  await page.addInitScript(() => {
+    const state = { pickerCalls: 0, saves: [] as number[][] };
+    (window as typeof window & { __saveTest?: typeof state }).__saveTest = state;
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: async () => {
+      state.pickerCalls++;
+      return { createWritable: async () => ({
+        write: async (bytes: Uint8Array) => { state.saves.push(Array.from(bytes)); },
+        close: async () => {},
+      }) };
+    } });
+  });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Save project' }).click();
+  await expect(page.locator('.status')).toHaveText('Saved to file');
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await expect(page.locator('.status')).toHaveText('Saved in browser only');
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('.status')).toHaveText('Saved to file');
+  const state = await page.evaluate(() => (window as typeof window & {
+    __saveTest: { pickerCalls: number; saves: number[][] } }).__saveTest);
+  expect(state.pickerCalls).toBe(1);
+  expect(state.saves).toHaveLength(2);
+  expect((await decodeProjectArchive(Uint8Array.from(state.saves[1]!))).project.icons).toHaveLength(2);
+});
+
+test('M2 cancelling the Save picker leaves the project and status intact', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true,
+      value: async () => { throw new DOMException('Cancelled', 'AbortError'); } });
+  });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.locator('.status')).toHaveText('Saved in browser only');
+  await page.getByRole('button', { name: 'Save project' }).click();
+  await expect(page.getByRole('button', { name: 'Save project' })).toBeEnabled();
+  await expect(page.locator('.status')).toHaveText('Saved in browser only');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
 test('M1 restores a downloaded project with its original SVG and rejects damaged archives', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

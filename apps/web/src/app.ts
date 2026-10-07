@@ -26,6 +26,7 @@ import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
         </label>
         <button type="button" (click)="runExport()" [disabled]="!hasIcon() || previewOnly()">Export SVG</button>
         <button type="button" (click)="runDownloadSprite()" [disabled]="!canExportSprite() || busy() || previewOnly()">Download sprite</button>
+        <button type="button" (click)="runSaveProject()" [disabled]="!canEdit()">Save project</button>
         <button type="button" (click)="runDownloadProject()" [disabled]="!hasProject() || busy() || previewOnly()">Download project</button>
       </header>
       @if (previewOnly()) { <p class="mobile-preview" role="status">Mobile preview only</p> }
@@ -232,6 +233,11 @@ export class App implements OnInit, OnDestroy {
     if (!this.workspace) return;
     void this.workspace.refreshReadonly().then(() => this.refresh()).catch(error => this.error.set(this.message(error)));
   };
+  private readonly onSaveKeydown = (event: KeyboardEvent): void => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's' || !this.hasProject()) return;
+    event.preventDefault();
+    if (this.canEdit()) this.runSaveProject();
+  };
 
   async ngOnInit(): Promise<void> {
     try {
@@ -244,6 +250,7 @@ export class App implements OnInit, OnDestroy {
       this.renderIconSvg = renderIconSvg;
       await this.workspace.openLast();
       window.addEventListener('focus', this.onFocus);
+      window.addEventListener('keydown', this.onSaveKeydown);
       this.phoneMedia.addEventListener('change', this.onPhoneMediaChange);
       this.busy.set(false);
       this.refresh();
@@ -253,6 +260,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener('focus', this.onFocus);
+    window.removeEventListener('keydown', this.onSaveKeydown);
     this.phoneMedia.removeEventListener('change', this.onPhoneMediaChange);
     if (this.workspace) void this.workspace.close();
   }
@@ -470,6 +478,15 @@ export class App implements OnInit, OnDestroy {
   runExport(): void { try { this.workspace.exportSvg(); } catch (error) { this.error.set(this.message(error)); } }
   runDownloadProject(): void {
     void this.workspace.downloadProject().catch(error => this.error.set(this.message(error)));
+  }
+  runSaveProject(): void {
+    void this.run(async () => {
+      try { await this.workspace.saveProject(); }
+      catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        throw error;
+      }
+    }, 'File save failed');
   }
   runDownloadSprite(): void {
     void this.workspace.downloadSprite().catch(error => this.error.set(this.message(error)));

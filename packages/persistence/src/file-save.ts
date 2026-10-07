@@ -8,7 +8,7 @@ export interface WritableProjectHandle {
 
 export interface FileSaveOptions {
   handle?: WritableProjectHandle;
-  picker?: (suggestedName: string) => Promise<WritableProjectHandle>;
+  picker?: (suggestedName: string) => Promise<WritableProjectHandle | undefined>;
   download?: (filename: string, bytes: Uint8Array) => Promise<void>;
   attachments?: Record<string, Uint8Array>;
 }
@@ -25,6 +25,16 @@ function nativePicker(): FileSaveOptions['picker'] {
   return name => browser.showSaveFilePicker!({ suggestedName: name,
     types: [{ description: 'IconForge project', accept: { 'application/zip': ['.iconproj'] } }],
   });
+}
+
+function projectFilename(projectName: string): string {
+  return `${projectName.replace(/[^A-Za-z0-9 _.-]/g, '_').slice(0, 120) || 'project'}.iconproj`;
+}
+
+/** Start the native picker during the user's activation, before archive I/O. */
+export function pickProjectFileHandle(projectName: string): Promise<WritableProjectHandle | undefined> {
+  const picker = nativePicker();
+  return picker ? picker(projectFilename(projectName)) : Promise.resolve(undefined);
 }
 
 async function browserDownload(filename: string, bytes: Uint8Array): Promise<void> {
@@ -44,10 +54,10 @@ async function browserDownload(filename: string, bytes: Uint8Array): Promise<voi
 
 /** Save a validated archive. A native handle remains bound for subsequent Ctrl/Cmd+S saves. */
 export async function saveProjectFile(project: ProjectV1, options: FileSaveOptions = {}): Promise<FileSaveResult> {
-  const bytes = await encodeProjectArchive(project, options.attachments);
-  const filename = `${project.name.replace(/[^A-Za-z0-9 _.-]/g, '_').slice(0, 120) || 'project'}.iconproj`;
+  const filename = projectFilename(project.name);
   const picker = options.picker ?? (options.download ? undefined : nativePicker());
   const handle = options.handle ?? (picker ? await picker(filename) : undefined);
+  const bytes = await encodeProjectArchive(project, options.attachments);
   if (handle) {
     const writable = await handle.createWritable();
     await writable.write(bytes);

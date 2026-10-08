@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectV1, SceneNodeV1 } from '@iconforge/project-model';
-import { STROKE_WIDTH_RULE, validateIconRules } from './index.js';
+import { SAFE_AREA_RULE, STROKE_WIDTH_RULE, validateIconRules } from './index.js';
 
 const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
 const stroke = { paint: { kind: 'color' as const, value: '#123456' }, width: 2.5,
@@ -35,5 +35,19 @@ describe('rule registry', () => {
     expect(validateIconRules(project, { ...icon, nodes: [{ ...line, visible: false }] })).toEqual([]);
     expect(validateIconRules(project, { ...icon, nodes: [{ ...line,
       stroke: { ...stroke, paint: { kind: 'none' } } }] })).toEqual([]);
+  });
+
+  it('locates safe area violations, respects overrides, and ignores hidden geometry', () => {
+    const outside = { ...line, x1: 1, stroke: { ...stroke,
+      width: 1.75 } };
+    const icon = { ...project.icons[0]!, nodes: [outside] };
+    expect(validateIconRules(project, icon)).toEqual([{
+      code: SAFE_AREA_RULE, severity: 'warning', iconId: id(2), nodeId: id(3),
+      message: 'Visible geometry crosses the set safe area',
+    }]);
+    expect(validateIconRules(project, { ...icon,
+      ruleOverrides: { [SAFE_AREA_RULE]: 'off' } })).toEqual([]);
+    expect(validateIconRules(project, { ...icon, nodes: [{ ...outside, visible: false }] })).toEqual([]);
+    expect(validateIconRules(project, { ...icon, nodes: [{ ...outside, x1: 2 }] })).toEqual([]);
   });
 });

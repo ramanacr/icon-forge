@@ -274,6 +274,9 @@ importers:
 
   packages/rules:
     dependencies:
+      '@iconforge/geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@iconforge/project-model':
         specifier: workspace:*
         version: link:../project-model

@@ -1,7 +1,7 @@
 {
   "name": "rules",
   "tags": ["scope:core", "type:lib", "layer:rules"],
-  "implicitDependencies": ["project-model"],
+  "implicitDependencies": ["project-model", "geometry"],
   "targets": {
     "test": { "command": "vitest run packages/rules" },
     "typecheck": { "command": "tsc --noEmit" }

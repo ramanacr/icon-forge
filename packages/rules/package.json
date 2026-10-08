@@ -3,6 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "dependencies": { "@iconforge/project-model": "workspace:*" },
+  "dependencies": { "@iconforge/project-model": "workspace:*", "@iconforge/geometry": "workspace:*" },
   "exports": { ".": "./src/index.ts" }
 }

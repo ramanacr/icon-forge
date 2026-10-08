@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectV1, SceneNodeV1 } from '@iconforge/project-model';
 import { iconConsistencyWarnings, STROKE_WIDTH_RULE } from './consistency.js';
+import { SAFE_AREA_RULE } from '@iconforge/rules';
 
 const stroke = { paint: { kind: 'color' as const, value: '#123456' }, width: 2.5,
   cap: 'round' as const, join: 'round' as const, miterLimit: 4 };
@@ -34,5 +35,12 @@ describe('overview consistency warnings', () => {
     expect(iconConsistencyWarnings(configured, configured.icons[0]!)[0]?.severity).toBe('error');
     expect(iconConsistencyWarnings(configured, { ...configured.icons[0]!,
       ruleOverrides: { [STROKE_WIDTH_RULE]: 'off' } })).toEqual([]);
+  });
+
+  it('summarizes located safe area warnings', () => {
+    const icon = { ...project.icons[0]!, nodes: [{ ...rectangle, x: 1 }] };
+    expect(iconConsistencyWarnings(project, icon).find(warning => warning.code === SAFE_AREA_RULE)).toEqual({
+      code: SAFE_AREA_RULE, severity: 'warning', count: 1, message: '1 shape crosses the set safe area',
+    });
   });
 });

@@ -428,6 +428,24 @@ test('M2 set overview warns about stroke widths that differ from the set policy'
   await expect(overview.getByRole('button', { name: /Open icon-1/ })).not.toContainText('differs');
 });
 
+test('M2 set overview locates geometry outside the safe area and clears after undo', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('spinbutton', { name: 'X position' }).fill('-3');
+  await page.getByRole('button', { name: 'Apply position' }).click();
+  await expect(page.locator('svg rect[data-node-id]')).toHaveAttribute('transform', 'matrix(1 0 0 1 -3 0)');
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  const card = page.getByRole('button', { name: 'Open icon-1' });
+  await expect(card).toContainText('1 shape crosses the set safe area');
+  await page.getByRole('button', { name: 'Return to editor' }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('button', { name: 'Set overview' }).click();
+  await expect(card).not.toContainText('safe area');
+});
+
 test('M2 starter library creates five editable icons with licensed source in backups', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

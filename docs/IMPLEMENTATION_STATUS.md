@@ -17,6 +17,7 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 ## Phase 4 rules kickoff
 
 - A framework-independent rules package now registers the stroke-width consistency rule and returns deterministic diagnostics with icon and scene-node locations. It honors project severity and per-icon overrides, skips hidden and unpainted strokes, and leaves the project unchanged. The set overview aggregates these diagnostics without changing its existing warning behavior. The broader rule registry, fix commands, batch dry-run diff and atomic apply remain open.
+- The registry also checks visible top-level scene bounds against the configured safe area, reports the affected node, and honors severity overrides. The overview summarizes those violations and Chromium checks that undo clears the warning. Bounds currently exclude stroke expansion, as documented by the geometry query.
 
 ## Phase 2 import spike
 

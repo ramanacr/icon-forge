@@ -386,8 +386,7 @@ export class App implements OnInit, OnDestroy {
     const project = this.workspace.project;
     if (this.batchPreview() && this.batchPreview()!.revision !== project?.revision) this.batchPreview.set(null);
     const icon = this.workspace.icon;
-    this.ruleDiagnostics.set(this.workspace.ruleDiagnostics.map(item => ({ ...item,
-      fixable: this.workspace.canApplyRuleFix(item) })));
+    this.ruleDiagnostics.set(this.workspace.ruleFindings);
     this.projectName.set(project?.name ?? 'No project');
     this.icons.set(project?.icons.map(item => ({ id: item.id, name: item.name })) ?? []);
     this.activeIconId.set(icon?.id ?? null);

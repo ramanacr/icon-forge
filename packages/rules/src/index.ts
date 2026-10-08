@@ -110,6 +110,15 @@ export function proposeRuleFix(project: ProjectV1, diagnostic: RuleDiagnostic): 
   if (!icon || !validateIconRules(project, icon).some(current => current.code === diagnostic.code
     && current.nodeId === diagnostic.nodeId && current.message === diagnostic.message
     && current.severity === diagnostic.severity)) return null;
+  return proposeFixForValidatedDiagnostic(project, diagnostic);
+}
+
+/** Use only with a diagnostic returned by validateIconRules for this same project snapshot. */
+export function proposeFixForValidatedDiagnostic(project: ProjectV1,
+  diagnostic: RuleDiagnostic): RuleFixProposal | null {
+  if (![STROKE_WIDTH_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE].includes(diagnostic.code)) return null;
+  const icon = project.icons.find(candidate => candidate.id === diagnostic.iconId);
+  if (!icon) return null;
   const find = (nodes: SceneNodeV1[], lockedParent = false): SceneNodeV1 | null => {
     for (const node of nodes) {
       if (node.id === diagnostic.nodeId) return lockedParent || node.locked ? null : node;

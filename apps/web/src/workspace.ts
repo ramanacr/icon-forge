@@ -7,7 +7,7 @@ import { prepareSvgImportInWorker } from '@iconforge/import-svg';
 import { DexieProjectRepository, ProjectWriteLock, downloadBuildArchive, downloadProjectFile, openProjectArchive, readStorageDurability,
   requestPersistentStorage, pickProjectFileHandle, saveProjectFile, type StorageDurability, type WritableProjectHandle } from '@iconforge/persistence';
 import { quantize, quantizeMatrix, type IconV1, type MatrixV1, type ProjectV1, type ProvenanceRecordV1, type SceneNodeV1 } from '@iconforge/project-model';
-import { proposeRuleFix, validateIconRules, type RuleDiagnostic } from '@iconforge/rules';
+import { proposeFixForValidatedDiagnostic, proposeRuleFix, validateIconRules, type RuleDiagnostic } from '@iconforge/rules';
 import { STARTER_ICONS, starterSvg, type StarterIconName } from './starter-library.js';
 
 const POINTER = 'iconforge:last-project';
@@ -67,14 +67,11 @@ export class BrowserWorkspace {
   get needsRecovery(): boolean { return this.recovery !== null; }
   get checkpointRecovery(): boolean { return this.recovery?.kind === 'checkpoint'; }
   get guides() { return this.icon ? gridGuides(this.icon.viewBox, [1, 1]) : null; }
-  get ruleDiagnostics(): RuleDiagnostic[] {
+  get ruleFindings(): (RuleDiagnostic & { fixable: boolean })[] {
     const project = this.project;
     const icon = this.icon;
-    return project && icon ? validateIconRules(project, icon) : [];
-  }
-  canApplyRuleFix(diagnostic: RuleDiagnostic): boolean {
-    const project = this.project;
-    return Boolean(project && this.writable && proposeRuleFix(project, diagnostic));
+    return project && icon ? validateIconRules(project, icon).map(item => ({ ...item,
+      fixable: this.writable && proposeFixForValidatedDiagnostic(project, item) !== null })) : [];
   }
   get selectedNode(): SceneNodeV1 | null {
     const selectedIds = this.selection.snapshot.nodeIds;

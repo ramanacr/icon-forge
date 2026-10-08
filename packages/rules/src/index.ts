@@ -15,6 +15,11 @@ export interface RuleDiagnostic {
   message: string;
 }
 
+export interface RuleFixProposal {
+  type: 'node.update';
+  payload: { iconId: string; nodeId: string; ops: [{ op: 'setStroke'; stroke: StrokeV1 }] };
+}
+
 export interface RuleDefinition {
   code: string;
   defaultSeverity: Exclude<Severity, 'off'>;
@@ -96,4 +101,31 @@ export function validateIconRules(project: ProjectV1, icon: IconV1): RuleDiagnos
       ?? project.designSystem.severities[rule.code] ?? rule.defaultSeverity;
     return severity === 'off' ? [] : rule.check(project, icon, severity);
   });
+}
+
+/** A typed command proposal for a current, directly editable stroke violation. */
+export function proposeRuleFix(project: ProjectV1, diagnostic: RuleDiagnostic): RuleFixProposal | null {
+  if (![STROKE_WIDTH_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE].includes(diagnostic.code)) return null;
+  const icon = project.icons.find(candidate => candidate.id === diagnostic.iconId);
+  if (!icon || !validateIconRules(project, icon).some(current => current.code === diagnostic.code
+    && current.nodeId === diagnostic.nodeId && current.message === diagnostic.message
+    && current.severity === diagnostic.severity)) return null;
+  const find = (nodes: SceneNodeV1[], lockedParent = false): SceneNodeV1 | null => {
+    for (const node of nodes) {
+      if (node.id === diagnostic.nodeId) return lockedParent || node.locked ? null : node;
+      if (node.type === 'group') {
+        const found = find(node.children, lockedParent || node.locked);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  const node = find(icon.nodes);
+  if (!node || node.type === 'group' || node.type === 'instance' || !node.stroke) return null;
+  const stroke = structuredClone(node.stroke);
+  if (diagnostic.code === STROKE_WIDTH_RULE) stroke.width = project.designSystem.stroke.width;
+  else if (diagnostic.code === STROKE_CAP_RULE) stroke.cap = project.designSystem.stroke.cap;
+  else stroke.join = project.designSystem.stroke.join;
+  return { type: 'node.update', payload: { iconId: icon.id, nodeId: node.id,
+    ops: [{ op: 'setStroke', stroke }] } };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectV1, SceneNodeV1 } from '@iconforge/project-model';
-import { SAFE_AREA_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE, STROKE_WIDTH_RULE, validateIconRules } from './index.js';
+import { SAFE_AREA_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE, STROKE_WIDTH_RULE, proposeRuleFix,
+  validateIconRules } from './index.js';
 
 const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
 const stroke = { paint: { kind: 'color' as const, value: '#123456' }, width: 2.5,
@@ -65,5 +66,25 @@ describe('rule registry', () => {
       { code: STROKE_JOIN_RULE, severity: 'error', iconId: id(2), nodeId: id(3),
         message: 'Stroke join bevel differs from set join round' },
     ]);
+  });
+
+  it('proposes a current stroke update without changing the source and rejects stale or unsafe targets', () => {
+    const before = structuredClone(project);
+    const diagnostic = validateIconRules(project, project.icons[0]!)[0]!;
+    expect(proposeRuleFix(project, diagnostic)).toEqual({ type: 'node.update', payload: {
+      iconId: id(2), nodeId: id(3), ops: [{ op: 'setStroke', stroke: { ...stroke, width: 1.75 } }],
+    } });
+    expect(project).toEqual(before);
+    const changed = structuredClone(project);
+    (changed.icons[0]!.nodes[0] as typeof line).stroke = { ...stroke, width: 1.75 };
+    expect(proposeRuleFix(changed, diagnostic)).toBeNull();
+    const locked = structuredClone(project);
+    locked.icons[0]!.nodes[0]!.locked = true;
+    expect(proposeRuleFix(locked, diagnostic)).toBeNull();
+    const grouped = structuredClone(project);
+    grouped.icons[0]!.nodes = [{ id: id(4), type: 'group', visible: true, locked: true,
+      children: [line] }];
+    expect(proposeRuleFix(grouped, diagnostic)).toBeNull();
+    expect(proposeRuleFix(project, { ...diagnostic, code: SAFE_AREA_RULE })).toBeNull();
   });
 });

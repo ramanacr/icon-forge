@@ -446,6 +446,25 @@ test('M2 set overview locates geometry outside the safe area and clears after un
   await expect(card).not.toContainText('safe area');
 });
 
+test('Phase 4 applies a current stroke rule fix and undoes it', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Line layer' }).click();
+  await page.getByRole('spinbutton', { name: 'Stroke width', exact: true }).fill('2.5');
+  await page.getByRole('button', { name: 'Apply stroke width' }).click();
+  const line = page.locator('svg line[data-node-id]');
+  await expect(line).toHaveAttribute('stroke-width', '2.5');
+  await expect(page.getByText('Stroke width 2.5 differs from set width 1.75')).toBeVisible();
+  await page.getByRole('button', { name: 'Fix rule.stroke-width-mismatch' }).click();
+  await expect(line).toHaveAttribute('stroke-width', '1.75');
+  await page.reload();
+  await expect(line).toHaveAttribute('stroke-width', '1.75');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(line).toHaveAttribute('stroke-width', '2.5');
+});
+
 test('M2 starter library creates five editable icons with licensed source in backups', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

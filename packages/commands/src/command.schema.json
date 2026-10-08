@@ -2230,6 +2230,115 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "rule.applyFix"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "diagnostic": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "fix": {
+                      "$ref": "#/$defs/RuleFixCommand"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "info",
+                        "warning",
+                        "error"
+                      ]
+                    },
+                    "iconId": {
+                      "type": "string"
+                    },
+                    "nodeId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "fix",
+                    "iconId",
+                    "message",
+                    "nodeId",
+                    "severity"
+                  ]
+                }
+              },
+              "required": [
+                "diagnostic"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "exportProfile.upsert"
             },
             "payload": {
@@ -3831,6 +3940,108 @@
       ],
       "additionalProperties": false,
       "description": "Initial batch normalization capability: copy the set stroke policy to painted scene strokes."
+    },
+    "RuleFixCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "node.update"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "iconId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "nodeId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "ops": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "setStroke"
+                  },
+                  "stroke": {
+                    "$ref": "#/$defs/StrokeV1"
+                  }
+                },
+                "required": [
+                  "op",
+                  "stroke"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 1
+            }
+          },
+          "required": [
+            "iconId",
+            "nodeId",
+            "ops"
+          ],
+          "additionalProperties": false
+        },
+        "commandVersion": {
+          "type": "string",
+          "const": "1.0"
+        },
+        "commandId": {
+          "$ref": "#/$defs/UUID"
+        },
+        "projectId": {
+          "$ref": "#/$defs/UUID"
+        },
+        "expectedRevision": {
+          "type": "number"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "confirmsDryRun": {
+          "$ref": "#/$defs/UUID"
+        },
+        "issuedAt": {
+          "type": "string"
+        },
+        "actor": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "user",
+                "cli",
+                "mcp",
+                "webmcp",
+                "ai-proposal"
+              ]
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "actor",
+        "commandId",
+        "commandVersion",
+        "issuedAt",
+        "payload",
+        "projectId",
+        "type"
+      ]
     },
     "ExportProfileV1": {
       "anyOf": [

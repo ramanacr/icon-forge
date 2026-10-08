@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@iconforge/project-model": "workspace:*",
+    "@iconforge/rules": "workspace:*",
     "ajv": "8.17.1"
   },
   "exports": {

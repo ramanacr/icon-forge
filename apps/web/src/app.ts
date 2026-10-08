@@ -4,6 +4,7 @@ import { assertBrowserCapabilities } from './browser-capabilities.js';
 import { iconConsistencyWarnings, type IconConsistencyWarning } from './consistency.js';
 import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
 import type { IconGridPreset } from '@iconforge/commands';
+import type { RuleDiagnostic } from '@iconforge/rules';
 
 @Component({
   selector: 'iconforge-root',
@@ -182,6 +183,17 @@ import type { IconGridPreset } from '@iconforge/commands';
             <button type="button" (click)="runIconAccessibility(iconUse.value, accessibleName.value)"
               [disabled]="!canEdit() || !hasIcon()">Apply icon use</button>
           </div>
+          <h2>Validation</h2>
+          @if (ruleDiagnostics().length) {
+            <ul class="rule-diagnostics">
+              @for (item of ruleDiagnostics(); track item.code + item.nodeId) {
+                <li>{{ item.message }}
+                  <button type="button" [attr.aria-label]="'Fix ' + item.code"
+                    [disabled]="!canEdit() || !item.fixable" (click)="runApplyRuleFix(item)">Fix</button>
+                </li>
+              }
+            </ul>
+          } @else { <p class="hint">No current rule warnings.</p> }
           <h2>Selection</h2>
           <p>{{ selected() ? 'Shape selected' : 'Select a shape on the canvas' }}</p>
           <div class="layout-fields">
@@ -311,6 +323,7 @@ export class App implements OnInit, OnDestroy {
   readonly setStrokeWidth = signal(1.75);
   readonly setCornerRadius = signal(2);
   readonly batchPreview = signal<BatchStylePreview | null>(null);
+  readonly ruleDiagnostics = signal<(RuleDiagnostic & { fixable: boolean })[]>([]);
   readonly gridHint = signal('24 × 24');
   readonly canEditStroke = signal(false);
   readonly previewOnly = signal(this.phoneMedia.matches);
@@ -373,6 +386,8 @@ export class App implements OnInit, OnDestroy {
     const project = this.workspace.project;
     if (this.batchPreview() && this.batchPreview()!.revision !== project?.revision) this.batchPreview.set(null);
     const icon = this.workspace.icon;
+    this.ruleDiagnostics.set(this.workspace.ruleDiagnostics.map(item => ({ ...item,
+      fixable: this.workspace.canApplyRuleFix(item) })));
     this.projectName.set(project?.name ?? 'No project');
     this.icons.set(project?.icons.map(item => ({ id: item.id, name: item.name })) ?? []);
     this.activeIconId.set(icon?.id ?? null);
@@ -588,6 +603,9 @@ export class App implements OnInit, OnDestroy {
       await this.workspace.applyBatchStrokePolicy(preview);
       this.batchPreview.set(null);
     });
+  }
+  runApplyRuleFix(diagnostic: RuleDiagnostic): void {
+    void this.run(() => this.workspace.applyRuleFix(diagnostic));
   }
   runImportSvg(event: Event): void {
     const input = event.target;

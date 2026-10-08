@@ -1,7 +1,7 @@
 {
   "name": "commands",
   "tags": ["scope:core", "type:lib", "layer:commands"],
-  "implicitDependencies": ["project-model"],
+  "implicitDependencies": ["project-model", "rules"],
   "targets": {
     "test": { "command": "vitest run packages/commands" },
     "typecheck": { "command": "tsc --noEmit" }

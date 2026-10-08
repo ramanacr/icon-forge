@@ -7,6 +7,7 @@ import { prepareSvgImportInWorker } from '@iconforge/import-svg';
 import { DexieProjectRepository, ProjectWriteLock, downloadBuildArchive, downloadProjectFile, openProjectArchive, readStorageDurability,
   requestPersistentStorage, pickProjectFileHandle, saveProjectFile, type StorageDurability, type WritableProjectHandle } from '@iconforge/persistence';
 import { quantize, quantizeMatrix, type IconV1, type MatrixV1, type ProjectV1, type ProvenanceRecordV1, type SceneNodeV1 } from '@iconforge/project-model';
+import { proposeRuleFix, validateIconRules, type RuleDiagnostic } from '@iconforge/rules';
 import { STARTER_ICONS, starterSvg, type StarterIconName } from './starter-library.js';
 
 const POINTER = 'iconforge:last-project';
@@ -66,6 +67,15 @@ export class BrowserWorkspace {
   get needsRecovery(): boolean { return this.recovery !== null; }
   get checkpointRecovery(): boolean { return this.recovery?.kind === 'checkpoint'; }
   get guides() { return this.icon ? gridGuides(this.icon.viewBox, [1, 1]) : null; }
+  get ruleDiagnostics(): RuleDiagnostic[] {
+    const project = this.project;
+    const icon = this.icon;
+    return project && icon ? validateIconRules(project, icon) : [];
+  }
+  canApplyRuleFix(diagnostic: RuleDiagnostic): boolean {
+    const project = this.project;
+    return Boolean(project && this.writable && proposeRuleFix(project, diagnostic));
+  }
   get selectedNode(): SceneNodeV1 | null {
     const selectedIds = this.selection.snapshot.nodeIds;
     if (selectedIds.length !== 1) return null;
@@ -430,6 +440,17 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(project.id), confirmsDryRun: preview.commandId,
       type: 'set.applyStyle', payload: { iconIds: preview.iconIds,
         changes: [{ op: 'setStrokePolicy' }] } });
+  }
+
+  async applyRuleFix(diagnostic: RuleDiagnostic): Promise<void> {
+    const project = this.project;
+    if (!project || !this.writable) throw new TypeError('Project is read only');
+    const proposal = proposeRuleFix(project, diagnostic);
+    if (!proposal) throw new TypeError('Rule fix is stale or unsupported');
+    const fix = { ...this.base(project.id), ...proposal };
+    await this.persist({ ...this.base(project.id), type: 'rule.applyFix',
+      payload: { diagnostic: { code: diagnostic.code, severity: diagnostic.severity,
+        iconId: diagnostic.iconId, nodeId: diagnostic.nodeId, message: diagnostic.message, fix } } });
   }
 
   async importSvg(originalSvg: Uint8Array, requestedName: string,

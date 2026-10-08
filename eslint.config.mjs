@@ -13,7 +13,7 @@ export default [
         allow: [],
         depConstraints: [
           { sourceTag: 'layer:model', onlyDependOnLibsWithTags: ['layer:model'] },
-          { sourceTag: 'layer:commands', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry', 'layer:commands'] },
+          { sourceTag: 'layer:commands', onlyDependOnLibsWithTags: ['layer:model', 'layer:geometry', 'layer:rules', 'layer:commands'] },
           { sourceTag: 'layer:application', onlyDependOnLibsWithTags: ['layer:model', 'layer:commands', 'layer:application'] },
           { sourceTag: 'layer:export-svg', onlyDependOnLibsWithTags: ['layer:model', 'layer:export-svg'] },
           { sourceTag: 'layer:compiler-core', onlyDependOnLibsWithTags: ['layer:model', 'layer:export-svg', 'layer:compiler-core'] },

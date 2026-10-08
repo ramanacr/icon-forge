@@ -228,7 +228,7 @@ Handler contract: `(project: ProjectV1, cmd: CommandEnvelope) → { project, pat
 | `variant.add` / `variant.update` / `variant.remove` | | |
 | `component.add` / `component.update` / `component.remove` / `component.instantiate` | | |
 | `set.applyStyle` | `{ iconIds, changes: StyleChange[] }` | The batch command. Expected to be run with `dryRun: true` first by every UI. |
-| `rule.applyFix` | `{ diagnostic }` | Executes `diagnostic.fix`. |
+| `rule.applyFix` | `{ diagnostic }` | Executes a current stroke diagnostic's `node.update` fix after revalidating its proposed payload and revision; stale or altered fixes are rejected. |
 | `exportProfile.upsert` / `exportProfile.remove` | | |
 | `history.undo` / `history.redo` | `{}` | Operate on transactions, not individual patches. |
 

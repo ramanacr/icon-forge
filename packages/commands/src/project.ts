@@ -2,6 +2,7 @@ import { assertProject, canonicalJson, quantize, quantizeMatrix, type ColorToken
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 import { findNodePath, hasLockedAncestor, nodeArrayAt, removalOrder } from './scene-path.js';
+import { proposeRuleFix, type RuleDiagnostic } from '@iconforge/rules';
 
 interface EnvelopeBase {
   commandVersion: '1.0';
@@ -13,6 +14,11 @@ interface EnvelopeBase {
   issuedAt: string;
   actor: { kind: 'user' | 'cli' | 'mcp' | 'webmcp' | 'ai-proposal'; id?: string };
 }
+
+export type RuleFixCommand = EnvelopeBase & {
+  type: 'node.update';
+  payload: { iconId: UUID; nodeId: UUID; ops: [{ op: 'setStroke'; stroke: StrokeV1 }] };
+};
 
 export type ProjectCommand = EnvelopeBase & (
   | { type: 'project.create'; payload: { id: UUID; name: string; designSystem?: DesignSystemV1 } }
@@ -41,6 +47,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'selection.transform'; payload: { iconId: UUID; nodeIds: UUID[]; matrix: MatrixV1 } }
   | { type: 'selection.transformMany'; payload: { iconId: UUID; transforms: { nodeId: UUID; matrix: MatrixV1 }[] } }
   | { type: 'set.applyStyle'; payload: { iconIds: UUID[]; changes: StyleChange[] } }
+  | { type: 'rule.applyFix'; payload: { diagnostic: RuleDiagnostic & { fix: RuleFixCommand } } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -157,6 +164,20 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
   if (project === null || command.projectId !== project.id) throw new TypeError('project.not-found');
   if (command.expectedRevision !== undefined && command.expectedRevision !== project.revision) {
     throw new TypeError('revision.conflict');
+  }
+  if (command.type === 'rule.applyFix') {
+    const { diagnostic } = command.payload;
+    const proposed = proposeRuleFix(project, diagnostic);
+    const fix = diagnostic.fix;
+    if (!proposed || fix.projectId !== project.id || fix.expectedRevision !== project.revision
+      || canonicalJson({ type: fix.type, payload: fix.payload }) !== canonicalJson(proposed)) {
+      throw new TypeError('rule.fix.stale-or-unsupported');
+    }
+    return applyProjectCommand(project, { commandVersion: '1.0', commandId: command.commandId,
+      projectId: project.id, issuedAt: command.issuedAt, actor: command.actor,
+      expectedRevision: project.revision, dryRun: command.dryRun ?? false,
+      ...(command.confirmsDryRun === undefined ? {} : { confirmsDryRun: command.confirmsDryRun }),
+      type: 'node.update', payload: fix.payload });
   }
   if (command.type === 'icon.importSvg') {
     const { icon, provenance, diagnostics } = command.payload;

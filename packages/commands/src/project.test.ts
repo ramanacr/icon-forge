@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyProjectCommand } from './project.js';
 import { assertCommandEnvelope } from './validation.js';
 import type { IconV1 } from '@iconforge/project-model';
+import { proposeRuleFix, validateIconRules } from '@iconforge/rules';
 
 const id = '0198e09b-a810-7000-8000-000000000001';
 const commandId = '0198e09b-a810-7000-8000-000000000002';
@@ -15,6 +16,29 @@ const icon: IconV1 = {
 };
 
 describe('project command handlers', () => {
+  it('applies a current rule fix and rejects a stale or altered proposal', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const nodeId = '0198e09b-a810-7000-8000-0000000000e9';
+    const line = { id: nodeId, type: 'line' as const, visible: true, locked: false,
+      x1: 2, y1: 2, x2: 18, y2: 2,
+      stroke: { paint: { kind: 'color' as const, value: '#123456' }, width: 2.5,
+        cap: 'round' as const, join: 'round' as const, miterLimit: 4 } };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add',
+      payload: { icon: { ...icon, nodes: [line] } } });
+    const diagnostic = validateIconRules(added.project, added.project.icons[0]!)[0]!;
+    const proposed = proposeRuleFix(added.project, diagnostic)!;
+    const fix = { ...envelope, expectedRevision: added.project.revision, ...proposed };
+    const command = { ...envelope, type: 'rule.applyFix' as const,
+      payload: { diagnostic: { ...diagnostic, fix } } };
+    expect(assertCommandEnvelope(command)).toBe(command);
+    const changed = applyProjectCommand(added.project, command);
+    expect(changed.project.icons[0]!.nodes[0]).toMatchObject({ stroke: { width: 1.75 } });
+    expect(changed.patches).toHaveLength(1);
+    expect(() => applyProjectCommand(changed.project, command)).toThrow('rule.fix.stale-or-unsupported');
+    const altered = structuredClone(command);
+    altered.payload.diagnostic.fix.payload.ops[0]!.stroke.width = 4;
+    expect(() => applyProjectCommand(added.project, altered)).toThrow('rule.fix.stale-or-unsupported');
+  });
   it('applies distinct selection matrices as one reversible command', () => {
     const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     const ids = ['0198e09b-a810-7000-8000-0000000000e9', '0198e09b-a810-7000-8000-0000000000ea'];

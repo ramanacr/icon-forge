@@ -141,6 +141,9 @@ importers:
       '@iconforge/project-model':
         specifier: workspace:*
         version: link:../project-model
+      '@iconforge/rules':
+        specifier: workspace:*
+        version: link:../rules
       ajv:
         specifier: 8.17.1
         version: 8.17.1

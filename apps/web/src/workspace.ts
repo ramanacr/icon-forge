@@ -18,6 +18,7 @@ export interface BatchStylePreview {
   commandId: string;
   iconIds: string[];
   changes: { iconName: string; nodeName: string; before: string; after: string }[];
+  icons: { iconName: string; before: string; after: string }[];
 }
 
 function uuidV7(): string {
@@ -425,7 +426,10 @@ export class BrowserWorkspace {
       return { iconName: icon.name, nodeName: before.name ?? before.type,
         before: format(before), after: format(after) };
     });
-    return { revision: project.revision, commandId: base.commandId, iconIds, changes };
+    const icons = preview.icons.map(item => ({ iconName: project.icons.find(icon => icon.id === item.iconId)!.name,
+      before: `data:image/svg+xml,${encodeURIComponent(item.beforeSvg)}`,
+      after: `data:image/svg+xml,${encodeURIComponent(item.afterSvg)}` }));
+    return { revision: project.revision, commandId: base.commandId, iconIds, changes, icons };
   }
 
   async applyBatchStrokePolicy(preview: BatchStylePreview): Promise<void> {

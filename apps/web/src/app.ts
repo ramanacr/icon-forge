@@ -161,6 +161,17 @@ import type { RuleDiagnostic } from '@iconforge/rules';
                   <li>{{ change.iconName }} / {{ change.nodeName }}: {{ change.before }} → {{ change.after }}</li>
                 }
               </ul>
+              <div class="batch-icon-previews">
+                @for (icon of preview.icons; track icon.iconName) {
+                  <div class="batch-icon-preview">
+                    <strong>{{ icon.iconName }}</strong>
+                    <figure><img [src]="icon.before" [alt]="icon.iconName + ' before style preview'">
+                      <figcaption>Before</figcaption></figure>
+                    <figure><img [src]="icon.after" [alt]="icon.iconName + ' after style preview'">
+                      <figcaption>After</figcaption></figure>
+                  </div>
+                }
+              </div>
               <button type="button" (click)="runApplyBatchStrokePolicy()"
                 [disabled]="!canEdit() || !preview.changes.length">Apply stroke policy to set</button>
             </section>

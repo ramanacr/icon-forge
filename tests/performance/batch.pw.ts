@@ -55,7 +55,8 @@ test('Phase 4 100-icon batch dry-run stays within the worker compute budget', as
   const samples: number[] = [];
   for (let index = 0; index < 3; index++) {
     const reply = await page.evaluate(({ project, command, workerFile }) => new Promise<{
-      ok: boolean; patches?: unknown[]; computeMs?: number; error?: string;
+      ok: boolean; patches?: unknown[]; icons?: { beforeSvg: string; afterSvg: string }[];
+      computeMs?: number; error?: string;
     }>((resolve, reject) => {
       const worker = new Worker(`/${workerFile}`, { type: 'module' });
       worker.onmessage = event => { worker.terminate(); resolve(event.data); };
@@ -64,6 +65,9 @@ test('Phase 4 100-icon batch dry-run stays within the worker compute budget', as
     }), { project, command, workerFile });
     expect(reply.error).toBeUndefined();
     expect(reply.patches).toHaveLength(100);
+    expect(reply.icons).toHaveLength(100);
+    expect(reply.icons![0]!.beforeSvg).toContain('stroke-width="2.5"');
+    expect(reply.icons![0]!.afterSvg).toContain('stroke-width="1.75"');
     samples.push(reply.computeMs!);
   }
   expect(samples.sort((a, b) => a - b)[2]).toBeLessThanOrEqual(500);

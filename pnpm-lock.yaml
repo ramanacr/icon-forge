@@ -102,6 +102,9 @@ importers:
       '@iconforge/editor-core':
         specifier: workspace:*
         version: link:../../packages/editor-core
+      '@iconforge/export-svg':
+        specifier: workspace:*
+        version: link:../../packages/export-svg
       '@iconforge/geometry':
         specifier: workspace:*
         version: link:../../packages/geometry

@@ -605,6 +605,14 @@ test('Phase 4 batch stroke preview applies across icons and undoes atomically', 
   await expect(preview).toContainText('2 shape changes across the set');
   await expect(preview).toContainText('icon-1 / line: 2.5 units');
   await expect(preview).toContainText('icon-2 / line: 3 units');
+  const before = preview.getByRole('img', { name: 'icon-1 before style preview' });
+  const after = preview.getByRole('img', { name: 'icon-1 after style preview' });
+  await expect(before).toBeVisible();
+  await expect(after).toBeVisible();
+  await expect.poll(() => before.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect.poll(() => after.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  expect(await before.getAttribute('src')).toContain('stroke-width%3D%222.5%22');
+  expect(await after.getAttribute('src')).toContain('stroke-width%3D%221.75%22');
   await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '3');
   await preview.getByRole('button', { name: 'Apply stroke policy to set' }).click();
   await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '1.75');

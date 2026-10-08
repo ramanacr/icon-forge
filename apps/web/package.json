@@ -16,6 +16,7 @@
     "@iconforge/commands": "workspace:*",
     "@iconforge/compiler-core": "workspace:*",
     "@iconforge/editor-core": "workspace:*",
+    "@iconforge/export-svg": "workspace:*",
     "@iconforge/geometry": "workspace:*",
     "@iconforge/import-svg": "workspace:*",
     "@iconforge/persistence": "workspace:*",

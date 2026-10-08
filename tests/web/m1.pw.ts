@@ -1100,6 +1100,37 @@ test('M1 layer visibility and lock survive reload and undo', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'Unlock Rectangle' })).toBeVisible();
 });
 
+test('M1 layout distributes and aligns selected shapes as reversible commands', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  for (let index = 0; index < 3; index++) await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const rects = page.locator('svg rect[data-node-id]');
+  await page.getByRole('button', { name: 'Rectangle 2 layer' }).click();
+  await page.getByRole('spinbutton', { name: 'X position' }).fill('5');
+  await page.getByRole('button', { name: 'Apply position' }).click();
+  await expect(rects.nth(1)).toHaveAttribute('transform', 'matrix(1 0 0 1 5 0)');
+  await page.getByRole('button', { name: 'Rectangle 3 layer' }).click();
+  await expect(page.getByRole('spinbutton', { name: 'X position' })).toHaveValue('0');
+  await page.getByRole('spinbutton', { name: 'X position' }).fill('15');
+  await page.getByRole('button', { name: 'Apply position' }).click();
+  await expect(rects.nth(2)).toHaveAttribute('transform', 'matrix(1 0 0 1 15 0)');
+  await page.getByRole('button', { name: 'Rectangle 1 layer' }).click();
+  await page.getByRole('button', { name: 'Rectangle 2 layer' }).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Rectangle 3 layer' }).click({ modifiers: ['Shift'] });
+  await page.getByRole('combobox', { name: 'Align or distribute' }).selectOption('distribute-x');
+  await page.getByRole('button', { name: 'Apply layout' }).click();
+  await expect(rects.nth(1)).toHaveAttribute('transform', 'matrix(1 0 0 1 7.5 0)');
+  await page.getByRole('combobox', { name: 'Align or distribute' }).selectOption('left');
+  await page.getByRole('button', { name: 'Apply layout' }).click();
+  await expect(rects.nth(1)).toHaveAttribute('transform', 'matrix(1 0 0 1 0 0)');
+  await expect(rects.nth(2)).toHaveAttribute('transform', 'matrix(1 0 0 1 0 0)');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rects.nth(1)).toHaveAttribute('transform', 'matrix(1 0 0 1 7.5 0)');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(rects.nth(1)).toHaveAttribute('transform', 'matrix(1 0 0 1 5 0)');
+});
+
 test('M1 inspector color and stroke width changes survive export and reload', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();
@@ -1205,6 +1236,7 @@ test('M1 open polyline uses the set stroke and exports without a fill', async ({
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();
   await page.getByRole('button', { name: 'Add icon' }).click();
+  await expect(page.getByRole('button', { name: 'icon-1' })).toBeVisible();
   await page.getByRole('spinbutton', { name: 'Set stroke width' }).fill('2.25');
   await page.getByRole('button', { name: 'Apply set style' }).click();
   await expect(page.getByRole('spinbutton', { name: 'Set stroke width' })).toHaveValue('2.25');

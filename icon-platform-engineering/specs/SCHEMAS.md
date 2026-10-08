@@ -220,6 +220,7 @@ Handler contract: `(project: ProjectV1, cmd: CommandEnvelope) → { project, pat
 | `node.group` | `{ iconId, nodeIds, groupId, index }` | Selected nodes must be siblings. Creates a neutral group (visible, unlocked, no transform/opacity/role) at `index` in that sibling array after selected nodes are removed. Child order follows scene order. |
 | `node.ungroup` | `{ iconId, groupId }` | Expands a neutral group at its current position. Rejects groups with visual properties or variant references to the group ID. |
 | `selection.transform` | `{ iconId, nodeIds, matrix }` | Matrix is pre-computed and quantized by the adapter. |
+| `selection.transformMany` | `{ iconId, transforms: { nodeId, matrix }[] }` | Distinct pre-computed, quantized matrices for non-overlapping nodes; one reversible layout edit. |
 | `path.editSegments` | `{ iconId, nodeId, edits }` | Node editing in Expert Mode. |
 | `node.boolean` | `{ iconId, nodeIds, op: "union"\|"subtract"\|"intersect"\|"exclude", resultId }` | Inputs must be closed and stroke-free; else `boolean.invalid-input`. |
 | `node.outlineStroke` | `{ iconId, nodeIds, resultIds }` | Uses `IOutlineEngine` (ADR-022). |

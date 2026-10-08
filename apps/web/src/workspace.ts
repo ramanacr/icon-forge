@@ -6,7 +6,7 @@ import { gridGuides, nodeGeometryBounds, snapPointToGrid } from '@iconforge/geom
 import { prepareSvgImportInWorker } from '@iconforge/import-svg';
 import { DexieProjectRepository, ProjectWriteLock, downloadBuildArchive, downloadProjectFile, openProjectArchive, readStorageDurability,
   requestPersistentStorage, pickProjectFileHandle, saveProjectFile, type StorageDurability, type WritableProjectHandle } from '@iconforge/persistence';
-import { quantize, quantizeMatrix, type IconV1, type ProjectV1, type ProvenanceRecordV1, type SceneNodeV1 } from '@iconforge/project-model';
+import { quantize, quantizeMatrix, type IconV1, type MatrixV1, type ProjectV1, type ProvenanceRecordV1, type SceneNodeV1 } from '@iconforge/project-model';
 import { STARTER_ICONS, starterSvg, type StarterIconName } from './starter-library.js';
 
 const POINTER = 'iconforge:last-project';
@@ -84,6 +84,11 @@ export class BrowserWorkspace {
       || node.transform !== undefined || node.opacity !== undefined
       || node.role !== undefined || node.name !== undefined) return false;
     return !this.icon?.variants.some(variant => variant.overrides.some(override => override.nodeId === node.id));
+  }
+  get canLayoutSelection(): boolean {
+    const ids = this.selection.snapshot.nodeIds;
+    const nodes = this.icon?.nodes ?? [];
+    return ids.length >= 2 && ids.every(id => nodes.some(node => node.id === id && node.visible && !node.locked));
   }
   get styleableSelection(): boolean {
     const node = this.selectedNode;
@@ -702,6 +707,59 @@ export class BrowserWorkspace {
   async flipSelected(axis: 'horizontal' | 'vertical'): Promise<void> {
     await this.transformSelectedAroundCenter(axis === 'horizontal' ? -1 : 1, 0,
       0, axis === 'vertical' ? -1 : 1);
+  }
+
+  async layoutSelected(kind: 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom'
+    | 'distribute-x' | 'distribute-y'): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    const ids = this.selection.snapshot.nodeIds;
+    if (!project || !icon || !this.writable || !this.canLayoutSelection) {
+      throw new TypeError('Select at least two unlocked visible layers');
+    }
+    if (kind.startsWith('distribute') && ids.length < 3) throw new TypeError('Select at least three layers to distribute');
+    const entries = ids.map(nodeId => {
+      const node = icon.nodes.find(node => node.id === nodeId)!;
+      const bounds = nodeGeometryBounds(project, node);
+      if (!bounds) throw new TypeError('Selected layer has no visible geometry');
+      return { nodeId, bounds, centerX: (bounds.minX + bounds.maxX) / 2,
+        centerY: (bounds.minY + bounds.maxY) / 2 };
+    });
+    const left = Math.min(...entries.map(entry => entry.bounds.minX));
+    const right = Math.max(...entries.map(entry => entry.bounds.maxX));
+    const top = Math.min(...entries.map(entry => entry.bounds.minY));
+    const bottom = Math.max(...entries.map(entry => entry.bounds.maxY));
+    const moves = new Map<string, [number, number]>();
+    if (kind === 'distribute-x' || kind === 'distribute-y') {
+      const horizontal = kind === 'distribute-x';
+      const ordered = [...entries].sort((a, b) => horizontal
+        ? a.centerX - b.centerX : a.centerY - b.centerY);
+      const start = horizontal ? ordered[0]!.centerX : ordered[0]!.centerY;
+      const end = horizontal ? ordered.at(-1)!.centerX : ordered.at(-1)!.centerY;
+      ordered.forEach((entry, index) => {
+        const current = horizontal ? entry.centerX : entry.centerY;
+        const delta = start + (end - start) * index / (ordered.length - 1) - current;
+        moves.set(entry.nodeId, horizontal ? [delta, 0] : [0, delta]);
+      });
+    } else {
+      for (const entry of entries) {
+        const dx = kind === 'left' ? left - entry.bounds.minX
+          : kind === 'right' ? right - entry.bounds.maxX
+            : kind === 'center-x' ? (left + right) / 2 - entry.centerX : 0;
+        const dy = kind === 'top' ? top - entry.bounds.minY
+          : kind === 'bottom' ? bottom - entry.bounds.maxY
+            : kind === 'center-y' ? (top + bottom) / 2 - entry.centerY : 0;
+        moves.set(entry.nodeId, [dx, dy]);
+      }
+    }
+    const transforms = entries.map(entry => {
+      const [dx, dy] = moves.get(entry.nodeId)!;
+      return { nodeId: entry.nodeId,
+        matrix: quantizeMatrix([1, 0, 0, 1, dx, dy]) as MatrixV1 };
+    }).filter(entry => entry.matrix[4] !== 0 || entry.matrix[5] !== 0);
+    if (!transforms.length) return;
+    await this.persist({ ...this.base(project.id), type: 'selection.transformMany',
+      payload: { iconId: icon.id, transforms } });
   }
 
   async moveRight(): Promise<void> { await this.translateSelected(1, 0); }

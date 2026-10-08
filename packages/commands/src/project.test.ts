@@ -15,6 +15,29 @@ const icon: IconV1 = {
 };
 
 describe('project command handlers', () => {
+  it('applies distinct selection matrices as one reversible command', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const ids = ['0198e09b-a810-7000-8000-0000000000e9', '0198e09b-a810-7000-8000-0000000000ea'];
+    const nodes = ids.map((nodeId, index) => ({ id: nodeId!, type: 'rect' as const,
+      visible: true, locked: false, x: index * 8, y: 0, width: 4, height: 4, rx: 0, ry: 0 }));
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add',
+      payload: { icon: { ...icon, nodes } } });
+    const command = { ...envelope, type: 'selection.transformMany' as const,
+      payload: { iconId: icon.id, transforms: [
+        { nodeId: ids[0]!, matrix: [1, 0, 0, 1, 3, 0] as [number, number, number, number, number, number] },
+        { nodeId: ids[1]!, matrix: [1, 0, 0, 1, -5, 0] as [number, number, number, number, number, number] },
+      ] } };
+    expect(assertCommandEnvelope(command)).toBe(command);
+    const changed = applyProjectCommand(added.project, command);
+    expect(changed.project.icons[0]!.nodes.map(node => node.transform)).toEqual([
+      [1, 0, 0, 1, 3, 0], [1, 0, 0, 1, -5, 0],
+    ]);
+    expect(changed.patches).toHaveLength(2);
+    expect(changed.inversePatches).toHaveLength(2);
+    expect(() => applyProjectCommand(added.project, { ...command,
+      payload: { ...command.payload, transforms: [...command.payload.transforms, command.payload.transforms[0]!] } }))
+      .toThrow('selection.invalid-targets');
+  });
   it('hides and locks a layer with reversible typed operations, while allowing unlock', () => {
     const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     const rect = { id: '0198e09b-a810-7000-8000-0000000000e9', type: 'rect' as const,

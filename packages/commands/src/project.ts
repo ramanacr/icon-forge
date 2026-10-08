@@ -39,6 +39,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'node.group'; payload: { iconId: UUID; nodeIds: UUID[]; groupId: UUID; index: number } }
   | { type: 'node.ungroup'; payload: { iconId: UUID; groupId: UUID } }
   | { type: 'selection.transform'; payload: { iconId: UUID; nodeIds: UUID[]; matrix: MatrixV1 } }
+  | { type: 'selection.transformMany'; payload: { iconId: UUID; transforms: { nodeId: UUID; matrix: MatrixV1 }[] } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -295,7 +296,8 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
   }
   if (command.type === 'node.add' || command.type === 'node.update' || command.type === 'node.remove'
     || command.type === 'node.reorder' || command.type === 'node.group'
-    || command.type === 'node.ungroup' || command.type === 'selection.transform') {
+    || command.type === 'node.ungroup' || command.type === 'selection.transform'
+    || command.type === 'selection.transformMany') {
     const iconIndex = project.icons.findIndex(icon => icon.id === command.payload.iconId);
     if (iconIndex < 0) throw new TypeError('icon.not-found');
     const icon = project.icons[iconIndex]!;
@@ -466,13 +468,17 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         { op: 'insert', path: removePath, value: removed }];
       count = { added: 0, updated: 1, removed: 0 };
       changedIds = [icon.id, removed.id];
-    } else if (command.type === 'selection.transform') {
-      const ids = command.payload.nodeIds;
+    } else if (command.type === 'selection.transform' || command.type === 'selection.transformMany') {
+      const transforms = command.type === 'selection.transform'
+        ? command.payload.nodeIds.map(nodeId => ({ nodeId, matrix: command.payload.matrix }))
+        : command.payload.transforms;
+      const ids = transforms.map(entry => entry.nodeId);
       if (ids.length === 0 || new Set(ids).size !== ids.length) throw new TypeError('selection.invalid-targets');
-      const matrix = command.payload.matrix;
-      if (matrix.length !== 6 || matrix.some(value => !Number.isFinite(value))) throw new TypeError('selection.matrix.invalid');
-      const normalized = quantizeMatrix(matrix);
-      if (matrix.some((value, offset) => value !== normalized[offset])) throw new TypeError('selection.matrix.invalid');
+      for (const { matrix } of transforms) {
+        if (matrix.length !== 6 || matrix.some(value => !Number.isFinite(value))) throw new TypeError('selection.matrix.invalid');
+        const normalized = quantizeMatrix(matrix);
+        if (matrix.some((value, offset) => value !== normalized[offset])) throw new TypeError('selection.matrix.invalid');
+      }
       const paths = ids.map(id => {
         const path = findNodePath(icon, id);
         if (!path) throw new TypeError('node.not-found');
@@ -486,11 +492,11 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         && path.length < other.length && path.every((part, offset) => part === other[offset])))) {
         throw new TypeError('selection.overlap');
       }
-      const transformPatches = paths.map(path => {
+      const transformPatches = paths.map((path, offset) => {
         const container = nodeArrayAt(copy, path.slice(0, -1));
         const index = Number(path.at(-1));
         const before = container[index]!;
-        const [a, b, c, d, e, f] = matrix;
+        const [a, b, c, d, e, f] = transforms[offset]!.matrix;
         const [g, h, i, j, k, l] = before.transform ?? [1, 0, 0, 1, 0, 0];
         const transform = quantizeMatrix([a * g + c * h, b * g + d * h, a * i + c * j, b * i + d * j,
           a * k + c * l + e, b * k + d * l + f]);

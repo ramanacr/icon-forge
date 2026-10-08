@@ -170,6 +170,22 @@ import type { IconGridPreset } from '@iconforge/commands';
           </div>
           <h2>Selection</h2>
           <p>{{ selected() ? 'Shape selected' : 'Select a shape on the canvas' }}</p>
+          <div class="layout-fields">
+            <label>Align or distribute
+              <select #layoutKind [disabled]="!canEdit() || !canLayout()">
+                <option value="left">Align left</option>
+                <option value="center-x">Align horizontal centers</option>
+                <option value="right">Align right</option>
+                <option value="top">Align top</option>
+                <option value="center-y">Align vertical centers</option>
+                <option value="bottom">Align bottom</option>
+                <option value="distribute-x">Distribute horizontally</option>
+                <option value="distribute-y">Distribute vertically</option>
+              </select>
+            </label>
+            <button type="button" (click)="runLayout(layoutKind.value)"
+              [disabled]="!canEdit() || !canLayout()">Apply layout</button>
+          </div>
           <div class="position-fields">
             <label>X position <input #positionX type="number" step="0.001" [value]="xPosition()" [disabled]="!canEdit() || !canPosition()"></label>
             <label>Y position <input #positionY type="number" step="0.001" [value]="yPosition()" [disabled]="!canEdit() || !canPosition()"></label>
@@ -270,6 +286,7 @@ export class App implements OnInit, OnDestroy {
   readonly canUngroup = signal(false);
   readonly canStyle = signal(false);
   readonly canPosition = signal(false);
+  readonly canLayout = signal(false);
   readonly xPosition = signal(0);
   readonly yPosition = signal(0);
   readonly currentFillColor = signal('#000000');
@@ -364,6 +381,7 @@ export class App implements OnInit, OnDestroy {
     this.canStyle.set(this.workspace.styleableSelection);
     const position = this.workspace.position;
     this.canPosition.set(Boolean(position && !this.workspace.selectedNode?.locked));
+    this.canLayout.set(this.workspace.canLayoutSelection);
     this.xPosition.set(position?.[0] ?? 0);
     this.yPosition.set(position?.[1] ?? 0);
     this.currentFillColor.set(this.workspace.fillColor);
@@ -582,6 +600,12 @@ export class App implements OnInit, OnDestroy {
   }
   runFlip(axis: 'horizontal' | 'vertical'): void {
     void this.run(() => this.workspace.flipSelected(axis));
+  }
+  runLayout(kind: string): void {
+    if (!['left', 'center-x', 'right', 'top', 'center-y', 'bottom', 'distribute-x', 'distribute-y'].includes(kind)) {
+      this.error.set('Invalid layout action'); return;
+    }
+    void this.run(() => this.workspace.layoutSelected(kind as Parameters<BrowserWorkspace['layoutSelected']>[0]));
   }
   runLayerVisible(id: string, visible: boolean): void {
     void this.run(() => this.workspace.setLayerVisible(id, visible));

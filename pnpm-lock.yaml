@@ -114,6 +114,9 @@ importers:
       '@iconforge/project-model':
         specifier: workspace:*
         version: link:../../packages/project-model
+      '@iconforge/rules':
+        specifier: workspace:*
+        version: link:../../packages/rules
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
@@ -268,6 +271,12 @@ importers:
       ajv:
         specifier: 8.17.1
         version: 8.17.1
+
+  packages/rules:
+    dependencies:
+      '@iconforge/project-model':
+        specifier: workspace:*
+        version: link:../project-model
 
 packages:
 

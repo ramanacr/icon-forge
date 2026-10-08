@@ -1,7 +1,7 @@
 {
   "name": "web",
   "tags": ["scope:editor", "type:app", "layer:web"],
-  "implicitDependencies": ["application", "editor-core", "geometry", "persistence", "compiler-core"],
+  "implicitDependencies": ["application", "editor-core", "geometry", "rules", "persistence", "compiler-core"],
   "targets": {
     "build": { "command": "pnpm --filter @iconforge/web build" },
     "typecheck": { "command": "tsc --noEmit" }

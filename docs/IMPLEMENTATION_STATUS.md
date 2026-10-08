@@ -14,6 +14,10 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 - A single Chromium scenario now exercises project creation and naming, adding five starter icons, exporting one SVG and a five-symbol sprite, and saving a five-icon `.iconproj` with provenance. This verifies the automated functional route to M2; the release exit still requires the documented 5-of-6 participant usability study, real Windows picker verification and the open Phase 0/2 gates.
 - The browser inspector now edits the schema-supported decorative/informative icon semantics through one undoable metadata command. Informative labels appear in SVG `<title>` output; decorative exports remain `aria-hidden`. Chromium verifies export, undo/redo and reload. The UX document also mentions an "interactive asset" kind, while the normative v1 schema defines only decorative and informative; this mismatch is recorded as [B-11](BLOCKERS.md).
 
+## Phase 4 rules kickoff
+
+- A framework-independent rules package now registers the stroke-width consistency rule and returns deterministic diagnostics with icon and scene-node locations. It honors project severity and per-icon overrides, skips hidden and unpainted strokes, and leaves the project unchanged. The set overview aggregates these diagnostics without changing its existing warning behavior. The broader rule registry, fix commands, batch dry-run diff and atomic apply remain open.
+
 ## Phase 2 import spike
 
 - S-07 has a data-only `saxes` XML reader and an allowlisted AST adapter behind a one-shot module worker. It rejects DOCTYPE/entity declarations, unsupported processing instructions, dangerous elements/attributes/URLs, malformed or extreme numbers, and local `use` cycles, missing targets, excessive depth and fan-out. Source, element, path-data, coordinate and nesting limits can be tightened but not raised. Unsupported clip paths are rejected until explicit Boolean conversion exists. No imported markup is inserted into the DOM.

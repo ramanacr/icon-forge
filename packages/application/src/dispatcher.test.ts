@@ -10,6 +10,9 @@ const secondId = '0198e09b-a810-7000-8000-000000000003';
 const base = { commandVersion: '1.0' as const, projectId: id, issuedAt: '2026-10-02T00:00:00Z', actor: { kind: 'user' as const } };
 const create = { ...base, commandId: firstId, type: 'project.create' as const, payload: { id, name: 'Medical' } };
 const rename = { ...base, commandId: secondId, type: 'project.rename' as const, payload: { name: 'Clinical' }, expectedRevision: 1 };
+const iconFixture = (iconId: string, name: string): IconV1 => ({ id: iconId, name,
+  aliases: [], tags: [], viewBox: [0, 0, 24, 24], nodes: [], variants: [],
+  accessibility: { kind: 'decorative' }, provenanceIds: [] });
 
 describe('project dispatcher', () => {
   it('previews and atomically undoes a batch stroke policy change', () => {
@@ -45,6 +48,43 @@ describe('project dispatcher', () => {
     expect(() => lockedDispatcher.dispatch({ ...command,
       commandId: '0198e09b-a810-7000-8000-000000000096' })).toThrow('set.applyStyle.locked');
     expect(lockedDispatcher.project).toEqual(locked);
+  });
+  it('normalizes a mixed set in one transaction and restores its content on undo', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const makeLine = (index: number, width: number, join: 'round' | 'miter', miterLimit: number) => ({
+      id: `0198e09b-a810-7000-8000-${(300 + index).toString(16).padStart(12, '0')}`,
+      type: 'line' as const, visible: true, locked: false, x1: 2, y1: 2, x2: 18, y2: 2,
+      stroke: { paint: { kind: 'color' as const, value: '#123456' }, width,
+        cap: 'round' as const, join, miterLimit },
+    });
+    const icons: IconV1[] = [
+      { ...iconFixture('0198e09b-a810-7000-8000-000000000131', 'mixed-a'),
+        nodes: [{ id: '0198e09b-a810-7000-8000-000000000135', type: 'group',
+          visible: true, locked: false, children: [makeLine(1, 2.5, 'miter', 8)] }] },
+      { ...iconFixture('0198e09b-a810-7000-8000-000000000132', 'mixed-b'),
+        nodes: [makeLine(2, 1.75, 'round', 4)] },
+      { ...iconFixture('0198e09b-a810-7000-8000-000000000133', 'mixed-c'),
+        nodes: [makeLine(3, 1.75, 'miter', 8)] },
+    ];
+    for (const [index, icon] of icons.entries()) {
+      dispatcher.dispatch({ ...base,
+        commandId: `0198e09b-a810-7000-8000-${(320 + index).toString(16).padStart(12, '0')}`,
+        type: 'icon.add', payload: { icon } });
+    }
+    const before = dispatcher.project!;
+    const command = { ...base, commandId: '0198e09b-a810-7000-8000-000000000150',
+      expectedRevision: dispatcher.revision, type: 'set.applyStyle' as const,
+      payload: { iconIds: icons.map(icon => icon.id), changes: [{ op: 'setStrokePolicy' as const }] } };
+    expect(dispatcher.dispatch({ ...command, dryRun: true }).patchSummary.updated).toBe(2);
+    expect(dispatcher.project).toEqual(before);
+    expect(dispatcher.dispatch(command).patchSummary.updated).toBe(2);
+    expect(dispatcher.journal.at(-1)?.patches).toHaveLength(2);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000151',
+      type: 'history.undo', payload: {} });
+    const restored = dispatcher.project!;
+    expect(canonicalJson({ ...restored, revision: before.revision })).toBe(canonicalJson(before));
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(restored);
   });
   it('imports a canonical icon and provenance as one reversible replayable command', () => {
     const dispatcher = new ProjectDispatcher();

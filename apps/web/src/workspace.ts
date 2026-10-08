@@ -415,7 +415,7 @@ export class BrowserWorkspace {
       type: 'set.applyStyle', payload: { iconIds, changes: [{ op: 'setStrokePolicy' }] } });
     const format = (node: SceneNodeV1): string => {
       if (!('stroke' in node) || !node.stroke) throw new TypeError('Batch diff is not a stroke');
-      return `${node.stroke.width} units · ${node.stroke.cap} cap · ${node.stroke.join} join`;
+      return `${node.stroke.width} units · ${node.stroke.cap} cap · ${node.stroke.join} join · ${node.stroke.miterLimit} miter limit`;
     };
     const changes = preview.patches.map(patch => {
       if (patch.op !== 'replace') throw new TypeError('Batch diff is not a replacement');

@@ -231,7 +231,7 @@ Handler contract: `(project: ProjectV1, cmd: CommandEnvelope) → { project, pat
 | `exportProfile.upsert` / `exportProfile.remove` | | |
 | `history.undo` / `history.redo` | `{}` | Operate on transactions, not individual patches. |
 
-`NodeUpdateOp` includes `setFill`, `setStroke`, and `setCornerRadius`. The latter is `{ op: "setCornerRadius", radius: number }`; it applies only to an unlocked rectangle, sets both `rx` and `ry`, and rejects values outside `0 ≤ radius ≤ min(width, height)/2`. Operations remain one reversible node patch.
+`NodeUpdateOp` includes `setFill`, `setStroke`, `setCornerRadius`, `setVisible`, and `setLocked`. The corner-radius operation is `{ op: "setCornerRadius", radius: number }`; it applies only to an unlocked rectangle, sets both `rx` and `ry`, and rejects values outside `0 ≤ radius ≤ min(width, height)/2`. Visibility and lock operations use `{ op, value: boolean }`. A locked node accepts only `setLocked` with `value: false`; other edits remain blocked. Operations remain one reversible node patch.
 
 **Queries** (no revision change, not journaled): `project.summary`, `icon.list`, `icon.get`, `rule.validate`, `compile.run`, `compile.capabilities`, `exportProfile.list`, `command.schemas`. `compile.run` is a query: it never mutates the project (ADR-008).
 

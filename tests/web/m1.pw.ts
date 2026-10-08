@@ -1078,6 +1078,28 @@ test('M1 selection flips around its center and each flip can be undone', async (
   await expect(rect).not.toHaveAttribute('transform');
 });
 
+test('M1 layer visibility and lock survive reload and undo', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const rect = page.locator('svg rect[data-node-id]');
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('button', { name: 'Hide Rectangle' }).click();
+  await expect(rect).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show Rectangle' }).click();
+  await expect(rect).toHaveCount(1);
+  await page.getByRole('button', { name: 'Lock Rectangle' }).click();
+  await expect(page.getByRole('button', { name: 'Apply position' })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Unlock Rectangle' })).toBeVisible();
+  await page.getByRole('button', { name: 'Rectangle layer' }).click();
+  await page.getByRole('button', { name: 'Unlock Rectangle' }).click();
+  await expect(page.getByRole('button', { name: 'Apply position' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('button', { name: 'Unlock Rectangle' })).toBeVisible();
+});
+
 test('M1 inspector color and stroke width changes survive export and reload', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

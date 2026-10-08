@@ -649,6 +649,22 @@ export class BrowserWorkspace {
     await this.commitGesture(gesture, project.id);
   }
 
+  async setLayerVisible(nodeId: string, visible: boolean): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    if (!project || !icon || !this.writable) throw new TypeError('Project is read only');
+    await this.persist({ ...this.base(project.id), type: 'node.update',
+      payload: { iconId: icon.id, nodeId, ops: [{ op: 'setVisible', value: visible }] } });
+  }
+
+  async setLayerLocked(nodeId: string, locked: boolean): Promise<void> {
+    const project = this.project;
+    const icon = this.icon;
+    if (!project || !icon || !this.writable) throw new TypeError('Project is read only');
+    await this.persist({ ...this.base(project.id), type: 'node.update',
+      payload: { iconId: icon.id, nodeId, ops: [{ op: 'setLocked', value: locked }] } });
+  }
+
   private async transformSelectedAroundCenter(a: number, b: number, c: number, d: number): Promise<void> {
     const project = this.project;
     const icon = this.icon;

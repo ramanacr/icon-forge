@@ -64,9 +64,17 @@ import type { IconGridPreset } from '@iconforge/commands';
           @if (hasIcon()) {
             <h2 class="layers-heading">Layers</h2>
             @for (layer of layers(); track layer.id) {
-              <button type="button" class="layer" [class.active]="layer.selected"
-                [attr.aria-label]="layer.label + ' layer'" [attr.aria-pressed]="layer.selected"
-                (click)="chooseLayer(layer.id, $event)" (keydown)="onLayerKeydown(layer.id, $event)">{{ layer.label }}</button>
+              <div class="layer-row">
+                <button type="button" class="layer" [class.active]="layer.selected"
+                  [attr.aria-label]="layer.label + ' layer'" [attr.aria-pressed]="layer.selected"
+                  (click)="chooseLayer(layer.id, $event)" (keydown)="onLayerKeydown(layer.id, $event)">{{ layer.label }}</button>
+                <button type="button" [attr.aria-label]="(layer.visible ? 'Hide ' : 'Show ') + layer.label"
+                  [disabled]="!canEdit() || layer.locked"
+                  (click)="runLayerVisible(layer.id, !layer.visible)">{{ layer.visible ? 'Hide' : 'Show' }}</button>
+                <button type="button" [attr.aria-label]="(layer.locked ? 'Unlock ' : 'Lock ') + layer.label"
+                  [disabled]="!canEdit()"
+                  (click)="runLayerLocked(layer.id, !layer.locked)">{{ layer.locked ? 'Unlock' : 'Lock' }}</button>
+              </div>
             }
           }
         </aside>
@@ -245,7 +253,7 @@ export class App implements OnInit, OnDestroy {
   readonly projectName = signal('No project');
   readonly icons = signal<{ id: string; name: string }[]>([]);
   readonly importMessages = signal<string[]>([]);
-  readonly layers = signal<{ id: string; label: string; selected: boolean }[]>([]);
+  readonly layers = signal<{ id: string; label: string; selected: boolean; visible: boolean; locked: boolean }[]>([]);
   readonly activeIconId = signal<string | null>(null);
   readonly activeIconName = signal('');
   readonly accessibilityKind = signal<'decorative' | 'informative'>('decorative');
@@ -340,7 +348,7 @@ export class App implements OnInit, OnDestroy {
     this.accessibilityLabel.set(icon?.accessibility.label ?? icon?.name ?? '');
     const selectedIds = this.workspace.selection.snapshot.nodeIds;
     this.selected.set(selectedIds.length > 0);
-    const layerBases = icon?.nodes.map(node => ({ id: node.id,
+    const layerBases = icon?.nodes.map(node => ({ id: node.id, visible: node.visible, locked: node.locked,
       label: node.name ?? (node.type === 'rect' ? 'Rectangle' : node.type[0]!.toUpperCase() + node.type.slice(1)) })) ?? [];
     const totals = new Map<string, number>();
     for (const layer of layerBases) totals.set(layer.label, (totals.get(layer.label) ?? 0) + 1);
@@ -349,7 +357,7 @@ export class App implements OnInit, OnDestroy {
       const number = (sequence.get(layer.label) ?? 0) + 1;
       sequence.set(layer.label, number);
       return { id: layer.id, label: totals.get(layer.label)! > 1 ? `${layer.label} ${number}` : layer.label,
-        selected: selectedIds.includes(layer.id) };
+        selected: selectedIds.includes(layer.id), visible: layer.visible, locked: layer.locked };
     }));
     this.canGroup.set(selectedIds.length > 1 && selectedIds.every(id => icon?.nodes.some(node => node.id === id)));
     this.canUngroup.set(this.workspace.canUngroupSelection);
@@ -574,6 +582,12 @@ export class App implements OnInit, OnDestroy {
   }
   runFlip(axis: 'horizontal' | 'vertical'): void {
     void this.run(() => this.workspace.flipSelected(axis));
+  }
+  runLayerVisible(id: string, visible: boolean): void {
+    void this.run(() => this.workspace.setLayerVisible(id, visible));
+  }
+  runLayerLocked(id: string, locked: boolean): void {
+    void this.run(() => this.workspace.setLayerLocked(id, locked));
   }
   runFillColor(color: string): void { void this.run(() => this.workspace.setFillColor(color)); }
   runStrokeWidth(width: string): void {

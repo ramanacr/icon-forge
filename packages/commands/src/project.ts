@@ -53,7 +53,9 @@ export interface ImportDiagnosticV1 {
 export type NodeUpdateOp =
   | { op: 'setFill'; fill: PaintV1 | null }
   | { op: 'setStroke'; stroke: StrokeV1 | null }
-  | { op: 'setCornerRadius'; radius: number };
+  | { op: 'setCornerRadius'; radius: number }
+  | { op: 'setVisible'; value: boolean }
+  | { op: 'setLocked'; value: boolean };
 
 export type IconMetadataPatch = Partial<Pick<IconV1, 'aliases' | 'tags' | 'accessibility'>> & {
   /** Explicit null removes the optional font mapping. */
@@ -323,10 +325,12 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       const container = nodeArrayAt(copy, path.slice(0, -1));
       const index = Number(path.at(-1));
       const before = container[index]!;
-      if (before.locked) throw new TypeError('node.update.locked');
       const ops = command.payload.ops;
       if (!ops.length) throw new TypeError('node.update.empty');
       if (new Set(ops.map(op => op.op)).size !== ops.length) throw new TypeError('node.update.duplicate-op');
+      if (before.locked && (ops.length !== 1 || ops[0]?.op !== 'setLocked' || ops[0]?.value !== false)) {
+        throw new TypeError('node.update.locked');
+      }
       const after = structuredClone(before) as unknown as Record<string, unknown>;
       for (const op of ops) {
         if (op.op === 'setFill') {
@@ -345,6 +349,10 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
             if (before.type === 'line') throw new TypeError('node.update.stroke.required');
             delete after.stroke;
           } else after.stroke = structuredClone(op.stroke);
+        } else if (op.op === 'setVisible') {
+          after.visible = op.value;
+        } else if (op.op === 'setLocked') {
+          after.locked = op.value;
         } else {
           if (before.type !== 'rect') throw new TypeError('node.update.corner-radius.unsupported');
           if (!Number.isFinite(op.radius) || op.radius < 0
@@ -377,6 +385,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       const container = nodeArrayAt(copy, parentPath);
       const sorted = paths.map(path => Number(path.at(-1))).sort((left, right) => left - right);
       const children = sorted.map(index => container[index]!);
+      if (children.some(node => node.locked)) throw new TypeError('node.group.locked');
       const removalPatches = [...sorted].reverse().map(index => {
         const node = container.splice(index, 1)[0]!;
         return { op: 'remove' as const, path: ['icons', String(iconIndex), ...parentPath, String(index)], value: node };
@@ -427,6 +436,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         throw new TypeError('node.reorder.invalid-parent');
       }
       const source = nodeArrayAt(copy, sourcePath.slice(0, -1));
+      if (source[Number(sourcePath.at(-1))]!.locked) throw new TypeError('node.reorder.locked');
       const removed = source.splice(Number(sourcePath.at(-1)), 1)[0]!;
       const destinationParentPath = command.payload.parentId === undefined ? null
         : findNodePath(copy, command.payload.parentId);
@@ -456,6 +466,9 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         if (!path) throw new TypeError('node.not-found');
         return path;
       });
+      if (paths.some(path => nodeArrayAt(copy, path.slice(0, -1))[Number(path.at(-1))]!.locked)) {
+        throw new TypeError('selection.transform.locked');
+      }
       if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex
         && path.length < other.length && path.every((part, offset) => part === other[offset])))) {
         throw new TypeError('selection.overlap');
@@ -485,6 +498,9 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         if (!path) throw new TypeError('node.not-found');
         return path;
       });
+      if (paths.some(path => nodeArrayAt(copy, path.slice(0, -1))[Number(path.at(-1))]!.locked)) {
+        throw new TypeError('node.remove.locked');
+      }
       if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex
         && path.length < other.length && path.every((part, offset) => part === other[offset])))) {
         throw new TypeError('node.remove.overlap');

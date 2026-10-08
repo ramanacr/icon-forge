@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectV1, SceneNodeV1 } from '@iconforge/project-model';
-import { SAFE_AREA_RULE, STROKE_WIDTH_RULE, validateIconRules } from './index.js';
+import { SAFE_AREA_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE, STROKE_WIDTH_RULE, validateIconRules } from './index.js';
 
 const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
 const stroke = { paint: { kind: 'color' as const, value: '#123456' }, width: 2.5,
@@ -49,5 +49,21 @@ describe('rule registry', () => {
       ruleOverrides: { [SAFE_AREA_RULE]: 'off' } })).toEqual([]);
     expect(validateIconRules(project, { ...icon, nodes: [{ ...outside, visible: false }] })).toEqual([]);
     expect(validateIconRules(project, { ...icon, nodes: [{ ...outside, x1: 2 }] })).toEqual([]);
+  });
+
+  it('finds mismatched stroke caps and joins at the offending scene node', () => {
+    const icon = { ...project.icons[0]!, nodes: [{ ...line,
+      stroke: { ...stroke, width: 1.75, cap: 'square' as const, join: 'bevel' as const } }] };
+    expect(validateIconRules(project, icon)).toEqual([
+      { code: STROKE_CAP_RULE, severity: 'warning', iconId: id(2), nodeId: id(3),
+        message: 'Stroke cap square differs from set cap round' },
+      { code: STROKE_JOIN_RULE, severity: 'warning', iconId: id(2), nodeId: id(3),
+        message: 'Stroke join bevel differs from set join round' },
+    ]);
+    expect(validateIconRules(project, { ...icon,
+      ruleOverrides: { [STROKE_CAP_RULE]: 'off', [STROKE_JOIN_RULE]: 'error' } })).toEqual([
+      { code: STROKE_JOIN_RULE, severity: 'error', iconId: id(2), nodeId: id(3),
+        message: 'Stroke join bevel differs from set join round' },
+    ]);
   });
 });

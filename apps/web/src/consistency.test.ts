@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectV1, SceneNodeV1 } from '@iconforge/project-model';
 import { iconConsistencyWarnings, STROKE_WIDTH_RULE } from './consistency.js';
-import { SAFE_AREA_RULE } from '@iconforge/rules';
+import { SAFE_AREA_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE } from '@iconforge/rules';
 
 const stroke = { paint: { kind: 'color' as const, value: '#123456' }, width: 2.5,
   cap: 'round' as const, join: 'round' as const, miterLimit: 4 };
@@ -42,5 +42,16 @@ describe('overview consistency warnings', () => {
     expect(iconConsistencyWarnings(project, icon).find(warning => warning.code === SAFE_AREA_RULE)).toEqual({
       code: SAFE_AREA_RULE, severity: 'warning', count: 1, message: '1 shape crosses the set safe area',
     });
+  });
+
+  it('summarizes stroke cap and join warnings independently', () => {
+    const icon = { ...project.icons[0]!, nodes: [{ ...rectangle,
+      stroke: { ...stroke, width: 1.75, cap: 'square' as const, join: 'bevel' as const } }] };
+    expect(iconConsistencyWarnings(project, icon)).toEqual([
+      { code: STROKE_CAP_RULE, severity: 'warning', count: 1,
+        message: '1 stroke cap differs from set policy' },
+      { code: STROKE_JOIN_RULE, severity: 'warning', count: 1,
+        message: '1 stroke join differs from set policy' },
+    ]);
   });
 });

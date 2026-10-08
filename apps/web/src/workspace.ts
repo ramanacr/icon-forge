@@ -1,5 +1,5 @@
 import { ProjectDispatcher } from '@iconforge/application';
-import { defaultDesignSystem, type CommandEnvelopeV1, type IconGridPreset, type ImportDiagnosticV1 } from '@iconforge/commands';
+import { applyProjectCommand, defaultDesignSystem, type CommandEnvelopeV1, type IconGridPreset, type ImportDiagnosticV1 } from '@iconforge/commands';
 import { compileSpriteProfile, compileSvgProfile } from '@iconforge/compiler-core';
 import { SelectionModel, TransformGesture } from '@iconforge/editor-core';
 import { gridGuides, nodeGeometryBounds, snapPointToGrid } from '@iconforge/geometry';
@@ -10,6 +10,13 @@ import { quantize, quantizeMatrix, type IconV1, type MatrixV1, type ProjectV1, t
 import { STARTER_ICONS, starterSvg, type StarterIconName } from './starter-library.js';
 
 const POINTER = 'iconforge:last-project';
+
+export interface BatchStylePreview {
+  revision: number;
+  commandId: string;
+  iconIds: string[];
+  changes: { iconName: string; nodeName: string; before: string; after: string }[];
+}
 
 function uuidV7(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -389,6 +396,40 @@ export class BrowserWorkspace {
     await this.persist({ ...this.base(project.id), type: 'project.updateDesignSystem', payload: { patch: {
       style, stroke: { ...project.designSystem.stroke, width: strokeWidth }, cornerRadius: roundness,
     } } });
+  }
+
+  previewBatchStrokePolicy(): BatchStylePreview {
+    const project = this.project;
+    if (!project || !this.writable || !project.icons.length) throw new TypeError('Add icons before applying a set style');
+    const iconIds = project.icons.map(icon => icon.id);
+    const base = this.base(project.id);
+    const preview = applyProjectCommand(project, { ...base, dryRun: true,
+      type: 'set.applyStyle', payload: { iconIds, changes: [{ op: 'setStrokePolicy' }] } });
+    const format = (node: SceneNodeV1): string => {
+      if (!('stroke' in node) || !node.stroke) throw new TypeError('Batch diff is not a stroke');
+      return `${node.stroke.width} units · ${node.stroke.cap} cap · ${node.stroke.join} join`;
+    };
+    const changes = preview.patches.map(patch => {
+      if (patch.op !== 'replace') throw new TypeError('Batch diff is not a replacement');
+      const icon = project.icons[Number(patch.path[1])]!;
+      const before = patch.before as SceneNodeV1;
+      const after = patch.after as SceneNodeV1;
+      return { iconName: icon.name, nodeName: before.name ?? before.type,
+        before: format(before), after: format(after) };
+    });
+    return { revision: project.revision, commandId: base.commandId, iconIds, changes };
+  }
+
+  async applyBatchStrokePolicy(preview: BatchStylePreview): Promise<void> {
+    const project = this.project;
+    if (!project || !this.writable || project.revision !== preview.revision
+      || !preview.changes.length || project.icons.length !== preview.iconIds.length
+      || project.icons.some((icon, index) => icon.id !== preview.iconIds[index])) {
+      throw new TypeError('Batch preview is stale; preview again');
+    }
+    await this.persist({ ...this.base(project.id), confirmsDryRun: preview.commandId,
+      type: 'set.applyStyle', payload: { iconIds: preview.iconIds,
+        changes: [{ op: 'setStrokePolicy' }] } });
   }
 
   async importSvg(originalSvg: Uint8Array, requestedName: string,

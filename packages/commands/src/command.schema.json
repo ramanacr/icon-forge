@@ -2145,6 +2145,91 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "set.applyStyle"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "iconIds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/UUID"
+                  }
+                },
+                "changes": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/StyleChange"
+                  }
+                }
+              },
+              "required": [
+                "iconIds",
+                "changes"
+              ],
+              "additionalProperties": false
+            },
+            "commandVersion": {
+              "type": "string",
+              "const": "1.0"
+            },
+            "commandId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "projectId": {
+              "$ref": "#/$defs/UUID"
+            },
+            "expectedRevision": {
+              "type": "number"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "confirmsDryRun": {
+              "$ref": "#/$defs/UUID"
+            },
+            "issuedAt": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "cli",
+                    "mcp",
+                    "webmcp",
+                    "ai-proposal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "actor",
+            "commandId",
+            "commandVersion",
+            "issuedAt",
+            "payload",
+            "projectId",
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "exportProfile.upsert"
             },
             "payload": {
@@ -3732,6 +3817,20 @@
         }
       ],
       "description": "Explicit node field operations; callers cannot merge arbitrary scene data."
+    },
+    "StyleChange": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "setStrokePolicy"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "additionalProperties": false,
+      "description": "Initial batch normalization capability: copy the set stroke policy to painted scene strokes."
     },
     "ExportProfileV1": {
       "anyOf": [

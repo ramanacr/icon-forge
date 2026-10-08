@@ -20,6 +20,7 @@ Phase 0 is in progress. At the user's direction, Phase 1 independent work has st
 - The registry also checks visible top-level scene bounds against the configured safe area, reports the affected node, and honors severity overrides. The overview summarizes those violations and Chromium checks that undo clears the warning. Bounds currently exclude stroke expansion, as documented by the geometry query.
 - Stroke cap and join rules now report mismatches at the painted scene node and honor project/icon severity settings. The overview groups each rule's count without changing the project document.
 - Current stroke-width, cap and join diagnostics can produce a typed `node.update` fix proposal for an unlocked scene node. Proposals preserve the other stroke fields and never mutate the project; stale diagnostics, locked nodes and component instances return no proposal. Wiring the proposal into `rule.applyFix` and the batch preview UI remains open.
+- `set.applyStyle` now has an initial `setStrokePolicy` change for painted scene strokes. A pure dry-run produces per-node patches; the browser shows the exact before/after stroke style for every affected icon and applies the batch as one journalled, undoable command only from a current preview. Component instances, variants and locked mismatches reject atomically. Chromium checks the two-icon preview and undo; broader style changes, 100-icon worker timing, and non-UI confirmation policy are still open.
 
 ## Phase 2 import spike
 

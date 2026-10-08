@@ -12,6 +12,40 @@ const create = { ...base, commandId: firstId, type: 'project.create' as const, p
 const rename = { ...base, commandId: secondId, type: 'project.rename' as const, payload: { name: 'Clinical' }, expectedRevision: 1 };
 
 describe('project dispatcher', () => {
+  it('previews and atomically undoes a batch stroke policy change', () => {
+    const dispatcher = new ProjectDispatcher();
+    dispatcher.dispatch(create);
+    const nodes = [0, 1].map(index => ({ id: `0198e09b-a810-7000-8000-0000000000${90 + index}`,
+      type: 'line' as const, visible: true, locked: false, x1: 0, y1: index, x2: 12, y2: index,
+      stroke: { paint: { kind: 'color' as const, value: '#123456' }, width: 2.5,
+        cap: 'square' as const, join: 'bevel' as const, miterLimit: 4 } }));
+    const icon: IconV1 = { id: '0198e09b-a810-7000-8000-000000000092', name: 'batch',
+      aliases: [], tags: [], viewBox: [0, 0, 24, 24], nodes, variants: [],
+      accessibility: { kind: 'decorative' }, provenanceIds: [] };
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000093',
+      type: 'icon.add', payload: { icon } });
+    const before = dispatcher.project;
+    const command = { ...base, commandId: '0198e09b-a810-7000-8000-000000000094',
+      type: 'set.applyStyle' as const, expectedRevision: dispatcher.revision,
+      payload: { iconIds: [icon.id], changes: [{ op: 'setStrokePolicy' as const }] } };
+    expect(dispatcher.dispatch({ ...command, dryRun: true }).patchSummary.updated).toBe(2);
+    expect(dispatcher.project).toEqual(before);
+    expect(dispatcher.dispatch(command).patchSummary.updated).toBe(2);
+    expect(dispatcher.project?.icons[0]?.nodes).toMatchObject([
+      { stroke: { width: 1.75, cap: 'round', join: 'round' } },
+      { stroke: { width: 1.75, cap: 'round', join: 'round' } },
+    ]);
+    dispatcher.dispatch({ ...base, commandId: '0198e09b-a810-7000-8000-000000000095',
+      type: 'history.undo', payload: {} });
+    expect(dispatcher.project?.icons[0]?.nodes).toEqual(nodes);
+    expect(ProjectDispatcher.replay(null, dispatcher.journal).project).toEqual(dispatcher.project);
+    const locked = structuredClone(before)!;
+    locked.icons[0]!.nodes[1]!.locked = true;
+    const lockedDispatcher = new ProjectDispatcher(locked);
+    expect(() => lockedDispatcher.dispatch({ ...command,
+      commandId: '0198e09b-a810-7000-8000-000000000096' })).toThrow('set.applyStyle.locked');
+    expect(lockedDispatcher.project).toEqual(locked);
+  });
   it('imports a canonical icon and provenance as one reversible replayable command', () => {
     const dispatcher = new ProjectDispatcher();
     dispatcher.dispatch(create);

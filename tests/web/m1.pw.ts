@@ -566,6 +566,37 @@ test('M2 set style changes are undoable without rewriting icon geometry', async 
   await expect(page.getByRole('spinbutton', { name: 'Set stroke width' })).toHaveValue('1.75');
 });
 
+test('Phase 4 batch stroke preview applies across icons and undoes atomically', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Line layer' }).click();
+  await page.getByRole('spinbutton', { name: 'Stroke width', exact: true }).fill('2.5');
+  await page.getByRole('button', { name: 'Apply stroke width' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '2.5');
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Line layer' }).click();
+  await page.getByRole('spinbutton', { name: 'Stroke width', exact: true }).fill('3');
+  await page.getByRole('button', { name: 'Apply stroke width' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '3');
+  await page.getByRole('button', { name: 'Preview matching stroke policy' }).click();
+  const preview = page.getByRole('region', { name: 'Batch style preview' });
+  await expect(preview).toContainText('2 shape changes across the set');
+  await expect(preview).toContainText('icon-1 / line: 2.5 units');
+  await expect(preview).toContainText('icon-2 / line: 3 units');
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '3');
+  await preview.getByRole('button', { name: 'Apply stroke policy to set' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '1.75');
+  await page.getByRole('button', { name: 'icon-1' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '1.75');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '2.5');
+  await page.getByRole('button', { name: 'icon-2' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '3');
+});
+
 test('M2 project name survives reload and can be undone', async ({ page }) => {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Create project' }).click();

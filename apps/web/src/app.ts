@@ -1,5 +1,5 @@
 import { Component, ElementRef, ViewChild, signal, type OnInit, type OnDestroy } from '@angular/core';
-import type { BrowserWorkspace } from './workspace.js';
+import type { BatchStylePreview, BrowserWorkspace } from './workspace.js';
 import { assertBrowserCapabilities } from './browser-capabilities.js';
 import { iconConsistencyWarnings, type IconConsistencyWarning } from './consistency.js';
 import { STARTER_ICONS, type StarterIconName } from './starter-library.js';
@@ -150,6 +150,20 @@ import type { IconGridPreset } from '@iconforge/commands';
               [disabled]="!canEdit()">Apply set style</button>
           </div>
           <p class="hint">Sets the design policy. Existing icons are not changed.</p>
+          <button type="button" (click)="runPreviewBatchStrokePolicy()"
+            [disabled]="!canEdit() || !hasIcon()">Preview matching stroke policy</button>
+          @if (batchPreview(); as preview) {
+            <section class="batch-preview" aria-label="Batch style preview">
+              <p>{{ preview.changes.length }} shape changes across the set</p>
+              <ul>
+                @for (change of preview.changes; track $index) {
+                  <li>{{ change.iconName }} / {{ change.nodeName }}: {{ change.before }} → {{ change.after }}</li>
+                }
+              </ul>
+              <button type="button" (click)="runApplyBatchStrokePolicy()"
+                [disabled]="!canEdit() || !preview.changes.length">Apply stroke policy to set</button>
+            </section>
+          }
           <h2>Icon</h2>
           <label class="icon-name-field">Icon name
             <input #iconName type="text" [value]="activeIconName()" [disabled]="!canEdit() || !hasIcon()">
@@ -296,6 +310,7 @@ export class App implements OnInit, OnDestroy {
   readonly setStyleValue = signal('outline');
   readonly setStrokeWidth = signal(1.75);
   readonly setCornerRadius = signal(2);
+  readonly batchPreview = signal<BatchStylePreview | null>(null);
   readonly gridHint = signal('24 × 24');
   readonly canEditStroke = signal(false);
   readonly previewOnly = signal(this.phoneMedia.matches);
@@ -356,6 +371,7 @@ export class App implements OnInit, OnDestroy {
 
   private refresh(): void {
     const project = this.workspace.project;
+    if (this.batchPreview() && this.batchPreview()!.revision !== project?.revision) this.batchPreview.set(null);
     const icon = this.workspace.icon;
     this.projectName.set(project?.name ?? 'No project');
     this.icons.set(project?.icons.map(item => ({ id: item.id, name: item.name })) ?? []);
@@ -561,6 +577,17 @@ export class App implements OnInit, OnDestroy {
     if (!width.trim() || !roundness.trim()) { this.error.set('Enter stroke width and roundness'); return; }
     void this.run(() => this.workspace.updateSetStyle(
       style as 'outline' | 'filled' | 'duotone' | 'custom', Number(width), Number(roundness)));
+  }
+  runPreviewBatchStrokePolicy(): void {
+    try { this.batchPreview.set(this.workspace.previewBatchStrokePolicy()); this.error.set(''); }
+    catch (error) { this.batchPreview.set(null); this.error.set(this.message(error)); }
+  }
+  runApplyBatchStrokePolicy(): void {
+    const preview = this.batchPreview();
+    if (preview) void this.run(async () => {
+      await this.workspace.applyBatchStrokePolicy(preview);
+      this.batchPreview.set(null);
+    });
   }
   runImportSvg(event: Event): void {
     const input = event.target;

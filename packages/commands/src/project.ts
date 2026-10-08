@@ -1,4 +1,4 @@
-import { assertProject, quantize, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type ProvenanceRecordV1, type StrokeV1,
+import { assertProject, canonicalJson, quantize, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type ProvenanceRecordV1, type StrokeV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
 import { findNodePath, hasLockedAncestor, nodeArrayAt, removalOrder } from './scene-path.js';
@@ -40,6 +40,7 @@ export type ProjectCommand = EnvelopeBase & (
   | { type: 'node.ungroup'; payload: { iconId: UUID; groupId: UUID } }
   | { type: 'selection.transform'; payload: { iconId: UUID; nodeIds: UUID[]; matrix: MatrixV1 } }
   | { type: 'selection.transformMany'; payload: { iconId: UUID; transforms: { nodeId: UUID; matrix: MatrixV1 }[] } }
+  | { type: 'set.applyStyle'; payload: { iconIds: UUID[]; changes: StyleChange[] } }
   | { type: 'exportProfile.upsert'; payload: { profile: ExportProfileV1 } }
   | { type: 'exportProfile.remove'; payload: { profileId: UUID } }
 );
@@ -57,6 +58,9 @@ export type NodeUpdateOp =
   | { op: 'setCornerRadius'; radius: number }
   | { op: 'setVisible'; value: boolean }
   | { op: 'setLocked'; value: boolean };
+
+/** Initial batch normalization capability: copy the set stroke policy to painted scene strokes. */
+export type StyleChange = { op: 'setStrokePolicy' };
 
 export type IconMetadataPatch = Partial<Pick<IconV1, 'aliases' | 'tags' | 'accessibility'>> & {
   /** Explicit null removes the optional font mapping. */
@@ -193,6 +197,51 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
       inversePatches: [{ op: 'replace', path: ['designSystem'], before: next.designSystem, after: project.designSystem }],
       result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
         changedIds: [project.id], patchSummary: { added: 0, updated: 1, removed: 0, iconsAffected: [] }, diagnostics: [] } };
+  }
+  if (command.type === 'set.applyStyle') {
+    const { iconIds, changes } = command.payload;
+    if (!iconIds.length || new Set(iconIds).size !== iconIds.length
+      || changes.length !== 1 || changes[0]?.op !== 'setStrokePolicy') {
+      throw new TypeError('set.applyStyle.invalid-targets');
+    }
+    const icons = structuredClone(project.icons);
+    const patches: StructuralPatch[] = [];
+    const changedIds: UUID[] = [];
+    const policy = project.designSystem.stroke;
+    for (const iconId of iconIds) {
+      const iconIndex = icons.findIndex(icon => icon.id === iconId);
+      if (iconIndex < 0) throw new TypeError('icon.not-found');
+      const icon = icons[iconIndex]!;
+      if (icon.variants.length) throw new TypeError('set.applyStyle.variants-unsupported');
+      const visit = (nodes: SceneNodeV1[], path: string[], lockedParent = false): void => {
+        for (const [index, node] of nodes.entries()) {
+          const nodePath = [...path, String(index)];
+          if (node.type === 'instance') throw new TypeError('set.applyStyle.instance-unsupported');
+          if (node.type === 'group') {
+            visit(node.children, [...nodePath, 'children'], lockedParent || node.locked);
+          } else if (node.stroke && node.stroke.paint.kind !== 'none') {
+            const before = node;
+            const stroke = { ...node.stroke, ...policy };
+            if (canonicalJson(stroke) === canonicalJson(node.stroke)) continue;
+            if (lockedParent || node.locked) throw new TypeError('set.applyStyle.locked');
+            const after = { ...node, stroke };
+            nodes[index] = after;
+            patches.push({ op: 'replace', path: ['icons', String(iconIndex), ...nodePath], before, after });
+            changedIds.push(node.id);
+          }
+        }
+      };
+      visit(icon.nodes, ['nodes']);
+    }
+    const next = assertProject({ ...project, icons, revision: project.revision + 1 });
+    const inversePatches = patches.map(patch => {
+      if (patch.op !== 'replace') throw new TypeError('set.applyStyle.patch.invalid');
+      return { op: 'replace' as const, path: patch.path, before: patch.after, after: patch.before };
+    }).reverse();
+    return { project: next, patches, inversePatches,
+      result: { commandId: command.commandId, status: command.dryRun ? 'dry-run' : 'applied', revision: next.revision,
+        changedIds: [...iconIds, ...changedIds],
+        patchSummary: { added: 0, updated: patches.length, removed: 0, iconsAffected: iconIds }, diagnostics: [] } };
   }
   if (command.type === 'token.upsert' || command.type === 'token.remove') {
     const name = command.type === 'token.upsert' ? command.payload.token.name : command.payload.name;

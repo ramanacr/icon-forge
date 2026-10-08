@@ -234,6 +234,8 @@ Handler contract: `(project: ProjectV1, cmd: CommandEnvelope) → { project, pat
 
 `NodeUpdateOp` includes `setFill`, `setStroke`, `setCornerRadius`, `setVisible`, and `setLocked`. The corner-radius operation is `{ op: "setCornerRadius", radius: number }`; it applies only to an unlocked rectangle, sets both `rx` and `ry`, and rejects values outside `0 ≤ radius ≤ min(width, height)/2`. Visibility and lock operations use `{ op, value: boolean }`. A locked node accepts only `setLocked` with `value: false`; other edits remain blocked. Operations remain one reversible node patch.
 
+The first supported `StyleChange` is `{ op: "setStrokePolicy" }`. It copies the set stroke width, cap, join and miter limit to painted scene strokes in the selected icons while preserving paint and other stroke fields. A target with a component instance or variant is rejected until those batch behaviors are defined; locked mismatches reject the whole batch. The UI previews a per-node before/after diff in viewBox units and applies the result as one undoable transaction.
+
 **Queries** (no revision change, not journaled): `project.summary`, `icon.list`, `icon.get`, `rule.validate`, `compile.run`, `compile.capabilities`, `exportProfile.list`, `command.schemas`. `compile.run` is a query: it never mutates the project (ADR-008).
 
 Persistence (`open`, `save`, `saveAs`, `export package`) is a repository concern exposed by adapters, not a command.

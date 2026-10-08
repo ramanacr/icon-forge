@@ -6,6 +6,7 @@ export const STROKE_WIDTH_RULE = 'rule.stroke-width-mismatch';
 export const SAFE_AREA_RULE = 'rule.safe-area';
 export const STROKE_CAP_RULE = 'rule.stroke-cap-mismatch';
 export const STROKE_JOIN_RULE = 'rule.stroke-join-mismatch';
+export const STROKE_MITER_LIMIT_RULE = 'rule.stroke-miter-limit-mismatch';
 
 export interface RuleDiagnostic {
   code: string;
@@ -91,8 +92,25 @@ const safeAreaRule: RuleDefinition = {
   },
 };
 
+const strokeMiterLimitRule: RuleDefinition = {
+  code: STROKE_MITER_LIMIT_RULE,
+  defaultSeverity: 'warning',
+  check(project, icon, severity) {
+    const expected = project.designSystem.stroke.miterLimit;
+    const diagnostics: RuleDiagnostic[] = [];
+    visitPaintedStrokes(project, icon, (stroke, nodeId) => {
+      if (stroke.join === 'miter' && Math.abs(stroke.miterLimit - expected) > 0.001) {
+        diagnostics.push({ code: STROKE_MITER_LIMIT_RULE, severity, iconId: icon.id, nodeId,
+          message: `Stroke miter limit ${stroke.miterLimit} differs from set miter limit ${expected}` });
+      }
+    });
+    return diagnostics;
+  },
+};
+
 export const RULES: readonly RuleDefinition[] = [strokeWidthRule,
-  strokePropertyRule(STROKE_CAP_RULE, 'cap'), strokePropertyRule(STROKE_JOIN_RULE, 'join'), safeAreaRule];
+  strokePropertyRule(STROKE_CAP_RULE, 'cap'), strokePropertyRule(STROKE_JOIN_RULE, 'join'),
+  strokeMiterLimitRule, safeAreaRule];
 
 /** Deterministic, read-only diagnostics with a scene location for each violation. */
 export function validateIconRules(project: ProjectV1, icon: IconV1): RuleDiagnostic[] {
@@ -105,7 +123,8 @@ export function validateIconRules(project: ProjectV1, icon: IconV1): RuleDiagnos
 
 /** A typed command proposal for a current, directly editable stroke violation. */
 export function proposeRuleFix(project: ProjectV1, diagnostic: RuleDiagnostic): RuleFixProposal | null {
-  if (![STROKE_WIDTH_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE].includes(diagnostic.code)) return null;
+  if (![STROKE_WIDTH_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE,
+    STROKE_MITER_LIMIT_RULE].includes(diagnostic.code)) return null;
   const icon = project.icons.find(candidate => candidate.id === diagnostic.iconId);
   if (!icon || !validateIconRules(project, icon).some(current => current.code === diagnostic.code
     && current.nodeId === diagnostic.nodeId && current.message === diagnostic.message
@@ -116,7 +135,8 @@ export function proposeRuleFix(project: ProjectV1, diagnostic: RuleDiagnostic): 
 /** Use only with a diagnostic returned by validateIconRules for this same project snapshot. */
 export function proposeFixForValidatedDiagnostic(project: ProjectV1,
   diagnostic: RuleDiagnostic): RuleFixProposal | null {
-  if (![STROKE_WIDTH_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE].includes(diagnostic.code)) return null;
+  if (![STROKE_WIDTH_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE,
+    STROKE_MITER_LIMIT_RULE].includes(diagnostic.code)) return null;
   const icon = project.icons.find(candidate => candidate.id === diagnostic.iconId);
   if (!icon) return null;
   const find = (nodes: SceneNodeV1[], lockedParent = false): SceneNodeV1 | null => {
@@ -134,7 +154,8 @@ export function proposeFixForValidatedDiagnostic(project: ProjectV1,
   const stroke = structuredClone(node.stroke);
   if (diagnostic.code === STROKE_WIDTH_RULE) stroke.width = project.designSystem.stroke.width;
   else if (diagnostic.code === STROKE_CAP_RULE) stroke.cap = project.designSystem.stroke.cap;
-  else stroke.join = project.designSystem.stroke.join;
+  else if (diagnostic.code === STROKE_JOIN_RULE) stroke.join = project.designSystem.stroke.join;
+  else stroke.miterLimit = project.designSystem.stroke.miterLimit;
   return { type: 'node.update', payload: { iconId: icon.id, nodeId: node.id,
     ops: [{ op: 'setStroke', stroke }] } };
 }

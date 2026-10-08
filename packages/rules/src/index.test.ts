@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectV1, SceneNodeV1 } from '@iconforge/project-model';
-import { SAFE_AREA_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE, STROKE_WIDTH_RULE, proposeRuleFix,
+import { SAFE_AREA_RULE, STROKE_CAP_RULE, STROKE_JOIN_RULE, STROKE_MITER_LIMIT_RULE,
+  STROKE_WIDTH_RULE, proposeRuleFix,
   validateIconRules } from './index.js';
 
 const id = (part: number): string => `0198e09b-a810-7000-8000-${part.toString(16).padStart(12, '0')}`;
@@ -66,6 +67,24 @@ describe('rule registry', () => {
       { code: STROKE_JOIN_RULE, severity: 'error', iconId: id(2), nodeId: id(3),
         message: 'Stroke join bevel differs from set join round' },
     ]);
+  });
+
+  it('reports and fixes a miter limit only where the stroke uses a miter join', () => {
+    const miter = { ...line, stroke: { ...stroke, width: 1.75, join: 'miter' as const, miterLimit: 8 } };
+    const icon = { ...project.icons[0]!, nodes: [miter],
+      ruleOverrides: { [STROKE_JOIN_RULE]: 'off' as const } };
+    const diagnostic = validateIconRules(project, icon);
+    expect(diagnostic).toEqual([{ code: STROKE_MITER_LIMIT_RULE, severity: 'warning',
+      iconId: id(2), nodeId: id(3), message: 'Stroke miter limit 8 differs from set miter limit 4' }]);
+    const current = { ...project, icons: [icon] };
+    expect(proposeRuleFix(current, diagnostic[0]!)).toEqual({ type: 'node.update', payload: {
+      iconId: id(2), nodeId: id(3), ops: [{ op: 'setStroke', stroke: { ...miter.stroke, miterLimit: 4 } }],
+    } });
+    expect(validateIconRules(project, { ...icon, nodes: [{ ...miter,
+      stroke: { ...miter.stroke, join: 'round' } }] })).toEqual([]);
+    expect(validateIconRules(project, { ...icon,
+      ruleOverrides: { ...icon.ruleOverrides, [STROKE_MITER_LIMIT_RULE]: 'off' },
+    })).toEqual([]);
   });
 
   it('proposes a current stroke update without changing the source and rejects stale or unsafe targets', () => {

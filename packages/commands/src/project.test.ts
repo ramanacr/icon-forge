@@ -46,6 +46,34 @@ describe('project command handlers', () => {
       before: { ...rect, visible: false, locked: false }, after: { ...rect, visible: false, locked: true } }]);
     expect(update(unlocked.project, [{ op: 'setVisible', value: true }]).project.icons[0]!.nodes[0]!.visible).toBe(true);
   });
+  it('prevents edits beneath a locked group', () => {
+    const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
+    const childId = '0198e09b-a810-7000-8000-0000000000e9';
+    const groupId = '0198e09b-a810-7000-8000-0000000000ea';
+    const child = { id: childId, type: 'rect' as const, visible: true, locked: false,
+      x: 4, y: 4, width: 16, height: 16, rx: 0, ry: 0 };
+    const group = { id: groupId, type: 'group' as const, visible: true, locked: true, children: [child] };
+    const added = applyProjectCommand(created.project, { ...envelope, type: 'icon.add',
+      payload: { icon: { ...icon, nodes: [group] } } });
+    const command = (type: 'node.update' | 'selection.transform' | 'node.remove', payload: object) =>
+      applyProjectCommand(added.project, { ...envelope, type, payload } as Parameters<typeof applyProjectCommand>[1]);
+    expect(() => command('node.update', { iconId: icon.id, nodeId: childId,
+      ops: [{ op: 'setVisible', value: false }] })).toThrow('node.update.locked-parent');
+    expect(() => command('selection.transform', { iconId: icon.id, nodeIds: [childId],
+      matrix: [1, 0, 0, 1, 1, 0] })).toThrow('selection.transform.locked-parent');
+    expect(() => command('node.remove', { iconId: icon.id, nodeIds: [childId] }))
+      .toThrow('node.remove.locked-parent');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.add', payload: {
+      iconId: icon.id, parentId: groupId, index: 1, node: { ...child,
+        id: '0198e09b-a810-7000-8000-0000000000eb' } } })).toThrow('node.add.locked-parent');
+    expect(() => applyProjectCommand(added.project, { ...envelope, type: 'node.reorder',
+      payload: { iconId: icon.id, nodeId: childId, index: 1 } })).toThrow('node.reorder.locked-parent');
+    const unlocked = applyProjectCommand(added.project, { ...envelope, type: 'node.update',
+      payload: { iconId: icon.id, nodeId: groupId, ops: [{ op: 'setLocked', value: false }] } });
+    expect(applyProjectCommand(unlocked.project, { ...envelope, type: 'node.update',
+      payload: { iconId: icon.id, nodeId: childId, ops: [{ op: 'setVisible', value: false }] } })
+      .project.icons[0]!.nodes[0]).toMatchObject({ children: [{ visible: false }] });
+  });
   it('updates only rectangle corners with a typed reversible operation', () => {
     const created = applyProjectCommand(null, { ...envelope, type: 'project.create', payload: { id, name: 'Medical' } });
     const rect = { id: '0198e09b-a810-7000-8000-0000000000e9', type: 'rect' as const,

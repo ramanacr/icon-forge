@@ -1,7 +1,7 @@
 import { assertProject, quantize, quantizeMatrix, type ColorTokenV1, type ComponentV1, type DesignSystemV1, type ExportProfileV1, type IconV1, type MatrixV1, type PaintV1, type ProjectV1, type ProvenanceRecordV1, type StrokeV1,
   type SceneNodeV1, type UUID, type VariantV1 } from '@iconforge/project-model';
 import { duplicateIcon } from './duplicate.js';
-import { findNodePath, nodeArrayAt, removalOrder } from './scene-path.js';
+import { findNodePath, hasLockedAncestor, nodeArrayAt, removalOrder } from './scene-path.js';
 
 interface EnvelopeBase {
   commandVersion: '1.0';
@@ -308,6 +308,10 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     if (command.type === 'node.add') {
       const parentPath = command.payload.parentId === undefined ? null : findNodePath(icon, command.payload.parentId);
       if (command.payload.parentId !== undefined && parentPath === null) throw new TypeError('node.parent.not-found');
+      if (parentPath && (hasLockedAncestor(icon, parentPath)
+        || nodeArrayAt(icon, parentPath.slice(0, -1))[Number(parentPath.at(-1))]!.locked)) {
+        throw new TypeError('node.add.locked-parent');
+      }
       const containerPath = parentPath === null ? ['nodes'] : [...parentPath, 'children'];
       const container = nodeArrayAt(copy, containerPath);
       const index = command.payload.index;
@@ -322,6 +326,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     } else if (command.type === 'node.update') {
       const path = findNodePath(icon, command.payload.nodeId);
       if (!path) throw new TypeError('node.not-found');
+      if (hasLockedAncestor(icon, path)) throw new TypeError('node.update.locked-parent');
       const container = nodeArrayAt(copy, path.slice(0, -1));
       const index = Number(path.at(-1));
       const before = container[index]!;
@@ -377,6 +382,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         if (!path) throw new TypeError('node.not-found');
         return path;
       });
+      if (paths.some(path => hasLockedAncestor(icon, path))) throw new TypeError('node.group.locked-parent');
       const parentPath = paths[0]!.slice(0, -1);
       if (paths.some(path => path.length !== parentPath.length + 1
         || parentPath.some((part, offset) => path[offset] !== part))) {
@@ -404,6 +410,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     } else if (command.type === 'node.ungroup') {
       const path = findNodePath(icon, command.payload.groupId);
       if (!path) throw new TypeError('node.not-found');
+      if (hasLockedAncestor(icon, path)) throw new TypeError('node.ungroup.locked-parent');
       const container = nodeArrayAt(copy, path.slice(0, -1));
       const index = Number(path.at(-1));
       const group = container[index]!;
@@ -429,8 +436,13 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
     } else if (command.type === 'node.reorder') {
       const sourcePath = findNodePath(icon, command.payload.nodeId);
       if (!sourcePath) throw new TypeError('node.not-found');
+      if (hasLockedAncestor(icon, sourcePath)) throw new TypeError('node.reorder.locked-parent');
       const parentPath = command.payload.parentId === undefined ? null : findNodePath(icon, command.payload.parentId);
       if (command.payload.parentId !== undefined && !parentPath) throw new TypeError('node.parent.not-found');
+      if (parentPath && (hasLockedAncestor(icon, parentPath)
+        || nodeArrayAt(icon, parentPath.slice(0, -1))[Number(parentPath.at(-1))]!.locked)) {
+        throw new TypeError('node.reorder.locked-parent');
+      }
       if (parentPath && sourcePath.length <= parentPath.length
         && sourcePath.every((part, offset) => part === parentPath[offset])) {
         throw new TypeError('node.reorder.invalid-parent');
@@ -466,6 +478,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         if (!path) throw new TypeError('node.not-found');
         return path;
       });
+      if (paths.some(path => hasLockedAncestor(icon, path))) throw new TypeError('selection.transform.locked-parent');
       if (paths.some(path => nodeArrayAt(copy, path.slice(0, -1))[Number(path.at(-1))]!.locked)) {
         throw new TypeError('selection.transform.locked');
       }
@@ -498,6 +511,7 @@ export function applyProjectCommand(project: ProjectV1 | null, command: ProjectC
         if (!path) throw new TypeError('node.not-found');
         return path;
       });
+      if (paths.some(path => hasLockedAncestor(icon, path))) throw new TypeError('node.remove.locked-parent');
       if (paths.some(path => nodeArrayAt(copy, path.slice(0, -1))[Number(path.at(-1))]!.locked)) {
         throw new TypeError('node.remove.locked');
       }

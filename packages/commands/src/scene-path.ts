@@ -31,6 +31,18 @@ export function nodeArrayAt(icon: IconV1, path: readonly string[]): SceneNodeV1[
   return nodes;
 }
 
+/** True when a node path descends through a locked group. */
+export function hasLockedAncestor(icon: IconV1, path: readonly string[]): boolean {
+  let nodes = icon.nodes;
+  for (let offset = 1; offset < path.length - 1; offset += 2) {
+    const node = nodes[Number(path[offset])];
+    if (!node || node.type !== 'group') throw new TypeError('node.path.invalid');
+    if (node.locked) return true;
+    nodes = node.children;
+  }
+  return false;
+}
+
 export function removalOrder(left: readonly string[], right: readonly string[]): number {
   const length = Math.min(left.length, right.length);
   for (let offset = 1; offset < length; offset += 2) {

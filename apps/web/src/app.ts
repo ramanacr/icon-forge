@@ -172,6 +172,14 @@ import type { RuleDiagnostic } from '@iconforge/rules';
                   </div>
                 }
               </div>
+              @if (preview.notApplicable.length) {
+                <h3>Not applicable</h3>
+                <ul>
+                  @for (item of preview.notApplicable; track item.iconName) {
+                    <li>{{ item.iconName }}: {{ item.reason }}</li>
+                  }
+                </ul>
+              }
               <button type="button" (click)="runApplyBatchStrokePolicy()"
                 [disabled]="!canEdit() || !preview.changes.length">Apply stroke policy to set</button>
             </section>

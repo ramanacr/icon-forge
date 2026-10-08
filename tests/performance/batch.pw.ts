@@ -71,4 +71,22 @@ test('Phase 4 100-icon batch dry-run stays within the worker compute budget', as
     samples.push(reply.computeMs!);
   }
   expect(samples.sort((a, b) => a - b)[2]).toBeLessThanOrEqual(500);
+  const mixed = structuredClone(project);
+  for (const [index, icon] of mixed.icons.entries()) {
+    if (index % 2 === 0) icon.nodes[0]!.locked = true;
+  }
+  const mixedReply = await page.evaluate(({ project, command, workerFile }) => new Promise<{
+    ok: boolean; patches?: unknown[]; iconIds?: string[]; notApplicable?: unknown[];
+    computeMs?: number; error?: string;
+  }>((resolve, reject) => {
+    const worker = new Worker(`/${workerFile}`, { type: 'module' });
+    worker.onmessage = event => { worker.terminate(); resolve(event.data); };
+    worker.onerror = event => { worker.terminate(); reject(new Error(event.message)); };
+    worker.postMessage({ project, command });
+  }), { project: mixed, command, workerFile });
+  expect(mixedReply.error).toBeUndefined();
+  expect(mixedReply.patches).toHaveLength(50);
+  expect(mixedReply.iconIds).toHaveLength(50);
+  expect(mixedReply.notApplicable).toHaveLength(50);
+  expect(mixedReply.computeMs).toBeLessThanOrEqual(500);
 });

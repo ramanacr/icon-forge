@@ -622,6 +622,39 @@ test('Phase 4 batch stroke preview applies across icons and undoes atomically', 
   await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '2.5');
   await page.getByRole('button', { name: 'icon-2' }).click();
   await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '3');
+  await page.getByRole('button', { name: 'Lock Line' }).click();
+  await page.getByRole('button', { name: 'Preview matching stroke policy' }).click();
+  await expect(preview).toContainText('0 shape changes across the set');
+  await expect(preview).toContainText('icon-2: A locked shape needs a different stroke policy');
+  await expect(preview.getByRole('button', { name: 'Apply stroke policy to set' })).toBeDisabled();
+});
+
+test('Phase 4 batch preview explains an inapplicable icon and applies eligible icons', async ({ page }) => {
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Line layer' }).click();
+  await page.getByRole('spinbutton', { name: 'Stroke width', exact: true }).fill('2.5');
+  await page.getByRole('button', { name: 'Apply stroke width' }).click();
+  await page.getByRole('button', { name: 'Lock Line' }).click();
+  await page.getByRole('button', { name: 'Add icon' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Line layer' }).click();
+  await page.getByRole('spinbutton', { name: 'Stroke width', exact: true }).fill('3');
+  await page.getByRole('button', { name: 'Apply stroke width' }).click();
+  await page.getByRole('button', { name: 'Preview matching stroke policy' }).click();
+  const preview = page.getByRole('region', { name: 'Batch style preview' });
+  await expect(preview).toContainText('1 shape changes across the set');
+  await expect(preview).toContainText('icon-1: A locked shape needs a different stroke policy');
+  await expect(preview.getByRole('img', { name: 'icon-2 after style preview' })).toBeVisible();
+  await preview.getByRole('button', { name: 'Apply stroke policy to set' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '1.75');
+  await page.getByRole('button', { name: 'icon-1' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '2.5');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('button', { name: 'icon-2' }).click();
+  await expect(page.locator('svg line[data-node-id]')).toHaveAttribute('stroke-width', '3');
 });
 
 test('M2 project name survives reload and can be undone', async ({ page }) => {

@@ -19,6 +19,7 @@ export interface BatchStylePreview {
   iconIds: string[];
   changes: { iconName: string; nodeName: string; before: string; after: string }[];
   icons: { iconName: string; before: string; after: string }[];
+  notApplicable: { iconName: string; reason: string }[];
 }
 
 function uuidV7(): string {
@@ -429,14 +430,18 @@ export class BrowserWorkspace {
     const icons = preview.icons.map(item => ({ iconName: project.icons.find(icon => icon.id === item.iconId)!.name,
       before: `data:image/svg+xml,${encodeURIComponent(item.beforeSvg)}`,
       after: `data:image/svg+xml,${encodeURIComponent(item.afterSvg)}` }));
-    return { revision: project.revision, commandId: base.commandId, iconIds, changes, icons };
+    const notApplicable = preview.notApplicable.map(item => ({
+      iconName: project.icons.find(icon => icon.id === item.iconId)!.name, reason: item.reason }));
+    return { revision: project.revision, commandId: base.commandId,
+      iconIds: preview.iconIds, changes, icons, notApplicable };
   }
 
   async applyBatchStrokePolicy(preview: BatchStylePreview): Promise<void> {
     const project = this.project;
     if (!project || !this.writable || project.revision !== preview.revision
-      || !preview.changes.length || project.icons.length !== preview.iconIds.length
-      || project.icons.some((icon, index) => icon.id !== preview.iconIds[index])) {
+      || !preview.changes.length || !preview.iconIds.length
+      || new Set(preview.iconIds).size !== preview.iconIds.length
+      || preview.iconIds.some(iconId => !project.icons.some(icon => icon.id === iconId))) {
       throw new TypeError('Batch preview is stale; preview again');
     }
     await this.persist({ ...this.base(project.id), confirmsDryRun: preview.commandId,

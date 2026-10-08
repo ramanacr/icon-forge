@@ -46,8 +46,9 @@ jobs:
       - run: pnpm --filter @iconforge/cli build
       - run: pnpm --filter @iconforge/web build
       - run: pnpm budget:web
-      - run: pnpm exec playwright test --grep-invert 'Phase 0 validation, command history and SVG throughput budgets|225-shape scene stable|S-07 parses near-limit'
+      - run: pnpm exec playwright test --grep-invert 'Phase 0 validation, command history and SVG throughput budgets|225-shape scene stable|S-07 parses near-limit|Phase 4 100-icon batch dry-run'
       - run: pnpm exec playwright test tests/performance/phase0.pw.ts --workers=1
+      - run: pnpm exec playwright test tests/performance/batch.pw.ts --workers=1
       - run: pnpm exec playwright test tests/web/m1.pw.ts --grep '225-shape scene stable' --workers=1
       - run: pnpm exec playwright test tests/import/s07.pw.ts --grep 'S-07 parses near-limit' --workers=1
 

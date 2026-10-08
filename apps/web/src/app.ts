@@ -593,8 +593,17 @@ export class App implements OnInit, OnDestroy {
       style as 'outline' | 'filled' | 'duotone' | 'custom', Number(width), Number(roundness)));
   }
   runPreviewBatchStrokePolicy(): void {
-    try { this.batchPreview.set(this.workspace.previewBatchStrokePolicy()); this.error.set(''); }
-    catch (error) { this.batchPreview.set(null); this.error.set(this.message(error)); }
+    if (this.busy() || this.previewOnly()) return;
+    this.busy.set(true);
+    this.canEdit.set(false);
+    this.status.set('Preparing preview…');
+    void this.workspace.previewBatchStrokePolicy().then(preview => {
+      this.batchPreview.set(preview);
+      this.workspace.error = '';
+    }).catch(error => {
+      this.batchPreview.set(null);
+      this.workspace.error = this.message(error);
+    }).finally(() => { this.busy.set(false); this.refresh(); });
   }
   runApplyBatchStrokePolicy(): void {
     const preview = this.batchPreview();
